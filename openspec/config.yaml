@@ -1,0 +1,60 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Stack: Django 6.0.7 + Django REST Framework 3.17.1 (managed with uv), Prisma Client Python 0.15 + PostgreSQL 16, import-linter 2.13
+  Architecture: Hexagonal (Ports & Adapters), feature-first, 5 apps — apps/client, apps/conversation, apps/order, apps/catalog, apps/config_coupon
+  Testing: pytest 9.1.1 + pytest-django 4.12.0 installed (scaffold-inicial). Conftest session fixture creates test_<db> and runs prisma migrate deploy against it.
+  Style: Python 3.13, conventional commits, no AI attribution in commits
+  Domain: pedidos (BORRADOR..ENTREGADO/RETIRADO/CANCELADO), conversaciones/agente, cupones, pagos — docs/modelo-dominio.md, docs/order-state-machine.md, docs/reglas-negocio.md (RN-001..041), docs/req-funcionales.md (REQ-001..053)
+
+strict_tdd: true
+
+testing:
+  strict_tdd: true
+  note: >
+    pytest + pytest-django installed by scaffold-inicial; test DB fixture lives in
+    tests/conftest.py (creates test_<db>, runs prisma migrate deploy, session Prisma client).
+    Strict TDD Mode is active: write the failing test first, then implement.
+  test_runner:
+    framework: pytest + pytest-django
+    command: "uv run pytest"
+  layers:
+    unit: { available: true, tool: "pytest" }
+    integration: { available: true, tool: "pytest + pytest-django (Prisma test DB fixture)" }
+    e2e: { available: false, tool: "" }
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter: { available: true, command: "uv run lint-imports" }
+    type_checker: { available: false, command: "" }
+    formatter: { available: false, command: "" }
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Identify affected modules/apps
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Follow skills/hexagonal-architecture/SKILL.md (ports & adapters)
+  tasks:
+    - Group tasks by phase (infrastructure, implementation, testing)
+    - Use hierarchical numbering (1.1, 1.2, etc.)
+    - Keep tasks small enough to complete in one session
+  apply:
+    - Follow existing code patterns and conventions
+    - Load relevant coding skills for the project stack (hexagonal-architecture)
+    - Run import-linter to verify architecture contracts
+    tdd: true
+    test_command: "uv run pytest"
+  verify:
+    test_command: "uv run pytest"
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas (large removals)

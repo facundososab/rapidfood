@@ -1,0 +1,13 @@
+change: scaffold-inicial
+status: in_progress
+created: 2026-08-03
+artifact_store: openspec
+phases:
+  explore: done
+  propose: done
+  spec: done
+  design: done
+  tasks: done
+  apply: done
+  verify: done
+  archive: done
