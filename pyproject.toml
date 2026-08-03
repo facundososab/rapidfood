@@ -1,0 +1,139 @@
+[project]
+name = "rapidfood"
+version = "0.1.0"
+description = "Rapidfood — Django 5/DRF HTTP shell + Prisma Client Python data layer (hexagonal, 5 apps)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.0",
+    "djangorestframework>=3.15",
+    "prisma>=0.15",
+    "psycopg[binary]>=3.2",
+]
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.0",
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+]
+
+# ---------------------------------------------------------------------------
+# import-linter (v2.x) — architecture gates.
+# Notes on v2 semantics (verified against installed import-linter 2.13/grimp):
+# - `as_packages = true` treats modules as packages: descendant modules are
+#   covered by the check. `as_packages = false` would only check the package
+#   __init__ module and silently miss every real violation.
+# - `unmatched_ignore_imports_alerting = "warn"`: the scaffold has no cross-app
+#   imports yet, so every whitelist entry is unmatched; v2 default is ERROR
+#   (MissingImport). Warn keeps the gate green until real port edges appear.
+# - `include_external_packages` is a session option (graph level), NOT a
+#   contract option.
+# - There is no `acyclic` contract type in v2; `acyclic_siblings` checks that
+#   the children of each ancestor (the 5 apps under `apps`) have no import
+#   cycles. That is the exact intent of the design's "No circular imports
+#   between apps".
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "apps"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Hexagonal layers inside each app"
+type = "layers"
+containers = [
+  "apps.client", "apps.conversation", "apps.order", "apps.catalog", "apps.config_coupon",
+]
+layers = [
+  "adapters.inbound.http",       # DRF views/serializers (highest)
+  "adapters.outbound",           # Prisma repositories/gateways
+  "application.ports.inbound",   # inbound port interfaces
+  "application.use_cases",       # orchestration
+  "application.ports.outbound",  # outbound port interfaces
+  "domain",                      # pure domain (lowest)
+]
+# NOTE: composition/ is intentionally outside this contract — it is the wiring root.
+# If lint-imports flags composition imports, add "composition" as the top layer.
+
+[[tool.importlinter.contracts]]
+name = "No inbound HTTP adapter to outbound adapter (views never touch the DB)"
+type = "forbidden"
+source_modules = ["apps.*.adapters.inbound.http"]
+forbidden_modules = ["apps.*.adapters.outbound"]
+as_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain, ports and use cases must not import frameworks"
+type = "forbidden"
+source_modules = [
+  "apps.*.domain",
+  "apps.*.application.ports",
+  "apps.*.application.use_cases",
+]
+forbidden_modules = ["django", "rest_framework", "prisma"]
+as_packages = true
+
+# --- One per app; forbids ONLY the 4 sibling apps (no self-import false positives) ---
+# Whitelisted edges use `**` so they match imports from ANY module of the app
+# to ANY module under the sibling's application.ports subtree.
+[[tool.importlinter.contracts]]
+name = "conversation consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["apps.conversation"]
+forbidden_modules = ["apps.order", "apps.client", "apps.catalog", "apps.config_coupon"]
+as_packages = true
+unmatched_ignore_imports_alerting = "warn"
+ignore_imports = [
+  "apps.conversation.** -> apps.order.application.ports.**",
+  "apps.conversation.** -> apps.client.application.ports.**",
+  "apps.conversation.** -> apps.catalog.application.ports.**",
+  "apps.conversation.** -> apps.config_coupon.application.ports.**",
+]
+
+[[tool.importlinter.contracts]]
+name = "order consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["apps.order"]
+forbidden_modules = ["apps.client", "apps.catalog", "apps.config_coupon"]
+as_packages = true
+unmatched_ignore_imports_alerting = "warn"
+ignore_imports = [
+  "apps.order.** -> apps.client.application.ports.**",
+  "apps.order.** -> apps.catalog.application.ports.**",
+  "apps.order.** -> apps.config_coupon.application.ports.**",
+]
+
+[[tool.importlinter.contracts]]
+name = "client consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["apps.client"]
+forbidden_modules = ["apps.conversation", "apps.order", "apps.catalog", "apps.config_coupon"]
+as_packages = true
+
+[[tool.importlinter.contracts]]
+name = "catalog consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["apps.catalog"]
+forbidden_modules = ["apps.client", "apps.conversation", "apps.order", "apps.config_coupon"]
+as_packages = true
+
+[[tool.importlinter.contracts]]
+name = "config_coupon consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["apps.config_coupon"]
+forbidden_modules = ["apps.client", "apps.conversation", "apps.order", "apps.catalog"]
+as_packages = true
+
+[[tool.importlinter.contracts]]
+name = "No circular imports between apps"
+type = "acyclic_siblings"
+ancestors = ["apps"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["."]              # makes `apps.*` and `config.*` importable
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "db: test that requires the Prisma-managed test database",
+]
