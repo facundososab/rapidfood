@@ -13,7 +13,7 @@ venv/
 .env
 
 # Prisma generated artifacts (regenerated via `uv run prisma generate`)
-.prisma/
+**/prisma/generated/**
 *.prisma-client-*
 node_modules/
 

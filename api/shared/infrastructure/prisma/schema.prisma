@@ -1,0 +1,260 @@
+// Rapidfood - single source of truth for the data layer (ADR-7/ADR-8).
+// Django owns NO tables; `prisma migrate dev` owns all migrations.
+// NOTE: comments are ASCII-only (Windows cp1252 limitation of the generator).
+
+generator client {
+  provider = "prisma-client-py"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Enums: ONLY doc-fixed vocabularies (native PG enums are costly to alter) ---
+
+enum OrderStatus {
+  BORRADOR
+  PENDIENTE
+  PAGADO
+  CONFIRMADO
+  EN_PREPARACION
+  LISTO
+  ENTREGADO
+  RETIRADO
+  CANCELADO
+}
+
+enum DeliveryType {
+  ENVIO
+  RETIRO
+}
+
+enum PaymentType {
+  EFECTIVO
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  FALLIDO
+  VENCIDO
+}
+
+enum WeekDay {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+// --- Models: snake_case via @map / @@map ---
+
+model BusinessConfiguration {
+  id            String  @id @default(uuid()) @map("business_id") @db.Uuid
+  businessName  String  @map("business_name")
+  minOrder      Decimal @map("min_order") @db.Decimal(10, 2)
+  shippingCost  Decimal @map("shipping_cost") @db.Decimal(10, 2)
+  availableZone String  @map("available_zone")
+  businessHours BusinessHours[]
+  addresses     Address[]
+
+  @@map("business_configuration")
+}
+
+model BusinessHours {
+  id               String   @id @default(uuid()) @map("business_hours_id") @db.Uuid
+  openWeekDay      WeekDay  @map("open_week_day")
+  openFromHour     String   @map("open_from_hour") // "HH:MM" (Prisma lacks TIME type)
+  openToHour       String   @map("open_to_hour")
+  businessConfigId String   @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+
+  @@map("business_hours")
+}
+
+model Address {
+  id               String  @id @default(uuid()) @map("address_id") @db.Uuid
+  street           String
+  streetNumber     String  @map("street_number")
+  floor            String?
+  apartment        String?
+  city             String
+  province         String
+  postalCode       String? @map("postal_code")
+  businessConfigId String  @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+  orders           Order[]
+
+  @@map("address")
+}
+
+model Client {
+  id            String  @id @default(uuid()) @map("client_id") @db.Uuid
+  name          String
+  lastName      String  @map("last_name")
+  phoneNumber   String  @unique @map("phone_number")
+  conversations Conversation[]
+  orders        Order[]
+
+  @@map("client")
+}
+
+model Conversation {
+  id               String   @id @default(uuid()) @map("conversation_id") @db.Uuid
+  overallSentiment String?  @map("overall_sentiment")
+  lastIntent       String?  @map("last_intent")
+  channel          String   @default("WHATSAPP")
+  clientId         String?  @map("client_id") @db.Uuid
+  client           Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  messages         Message[]
+  orders           Order[]
+
+  @@map("conversation")
+}
+
+model Message {
+  id             String       @id @default(uuid()) @map("message_id") @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // USER | AGENT | SYSTEM - open vocab -> String
+  content        String
+  detectedIntent String?      @map("detected_intent")
+  sentiment      String?
+  status         String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("message")
+  @@index([conversationId])
+}
+
+model Order {
+  id             String        @id @default(uuid()) @map("order_id") @db.Uuid
+  estimatedTime  Int?          @map("estimated_time") // minutes (RN-025/037)
+  deliveryType   DeliveryType? @map("delivery_type") // null until REQ-033
+  paymentType    PaymentType?  @map("payment_type") // null until REQ-033
+  status         OrderStatus   @default(BORRADOR)
+  shippingCost   Decimal?      @map("shipping_cost") @db.Decimal(10, 2)
+  totalAmount    Decimal?      @map("total_amount") @db.Decimal(10, 2)
+  clientId       String?       @map("client_id") @db.Uuid
+  client         Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  addressId      String?       @map("address_id") @db.Uuid // nullable: BORRADOR needs no address (RN-020)
+  address        Address?      @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  conversationId String?       @map("conversation_id") @db.Uuid // RN-030: order references its conversation; RN-031: 1 conv -> many orders
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  lines          OrderLine[]
+  appliedCoupons AppliedCoupon[]
+  payments       Payment[]
+
+  @@map("order")
+  @@index([clientId])
+  @@index([status])
+  @@index([conversationId])
+}
+
+model OrderLine {
+  id         String    @id @default(uuid()) @map("order_line_id") @db.Uuid
+  orderId    String    @map("order_id") @db.Uuid
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String    @map("product_id") @db.Uuid
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  amount     Int // quantity (docs "amount"; Q9 -> quantity)
+  unitPrice  Decimal?  @map("unit_price") @db.Decimal(10, 2) // RN-024/035 snapshot - NULL in BORRADOR, frozen at confirm
+  subtotal   Decimal   @db.Decimal(10, 2) // recomputed on draft edits (RN-032)
+  discountId String?   @map("discount_id") @db.Uuid
+  discount   Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
+
+  @@map("order_line")
+  @@unique([orderId, productId]) // one line per product; add_line upserts (use-case rule)
+  @@index([productId])
+}
+
+model Product {
+  id          String    @id @default(uuid()) @map("product_id") @db.Uuid
+  description String
+  available   Boolean   @default(true)
+  categoryId  String    @map("category_id") @db.Uuid // diagram "1..1": product belongs to exactly 1 category
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  prices      Price[]
+  orderLines  OrderLine[]
+
+  @@map("product")
+  @@index([categoryId])
+}
+
+model Price {
+  id        String   @id @default(uuid()) @map("price_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sinceDate DateTime @map("since_date")
+  price     Decimal  @db.Decimal(10, 2)
+
+  @@map("price")
+  @@index([productId, sinceDate]) // current price = max(since_date) <= now
+}
+
+model Category {
+  id          String    @id @default(uuid()) @map("category_id") @db.Uuid
+  description String
+  products    Product[]
+
+  @@map("category")
+}
+
+model Discount {
+  id         String      @id @default(uuid()) @map("discount_id") @db.Uuid
+  percentage Decimal     @db.Decimal(5, 2) // 0-100
+  orderLines OrderLine[]
+
+  @@map("discount")
+}
+
+model Coupon {
+  id               String           @id @default(uuid()) @map("coupon_id") @db.Uuid
+  couponCode       String           @unique @map("coupon_code")
+  type             String // FIXED_AMOUNT | PERCENTAGE | ... - open vocab -> String
+  amount           Decimal          @db.Decimal(10, 2)
+  availableUses    Int              @map("available_uses")
+  dateOfExpiration DateTime?        @map("date_of_expiration")
+  appliedCoupons   AppliedCoupon[]
+
+  @@map("coupon")
+}
+
+model AppliedCoupon {
+  id               String    @id @default(uuid()) @map("applied_coupon_id") @db.Uuid
+  orderId          String    @map("order_id") @db.Uuid
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  couponId         String?   @map("coupon_id") @db.Uuid // nullable: snapshot survives coupon deletion
+  coupon           Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode       String    @map("coupon_code") // RN-033/034: FULL coupon snapshot
+  type             String // frozen at application time
+  amount           Decimal   @db.Decimal(10, 2)
+  discountAmount   Decimal   @map("discount_amount") @db.Decimal(10, 2)
+  availableUses    Int       @map("available_uses")
+  dateOfExpiration DateTime? @map("date_of_expiration")
+  appliedAt        DateTime  @default(now()) @map("applied_at")
+
+  @@map("applied_coupon")
+  @@index([orderId])
+}
+
+model Payment {
+  id         String        @id @default(uuid()) @map("payment_id") @db.Uuid
+  orderId    String        @map("order_id") @db.Uuid
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider   String
+  externalId String?       @map("external_id")
+  status     PaymentStatus @default(PENDIENTE)
+  amount     Decimal       @db.Decimal(10, 2)
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  @@map("payment")
+  @@index([orderId])
+}
