@@ -1,0 +1,1 @@
+"""Domain error package for the coupon bounded context."""

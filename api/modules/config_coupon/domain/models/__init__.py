@@ -1,0 +1,1 @@
+"""Domain models package for the coupon bounded context."""

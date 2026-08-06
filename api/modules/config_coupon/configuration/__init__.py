@@ -1,0 +1,1 @@
+"""Configuration layer — composition root for the config_coupon module."""

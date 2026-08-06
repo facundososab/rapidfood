@@ -1,0 +1,1 @@
+"""Coupon application package — use cases orchestrate the domain."""

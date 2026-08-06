@@ -228,9 +228,11 @@ model Coupon {
   id               String          @id @default(uuid()) @map("coupon_id") @db.Uuid
   couponCode       String          @unique @map("coupon_code")
   type             String // FIXED_AMOUNT | PERCENTAGE | ... - open vocab -> String
-  amount           Decimal         @db.Decimal(10, 2)
-  availableUses    Int             @map("available_uses")
-  dateOfExpiration DateTime?       @map("date_of_expiration")
+  amount           Decimal          @db.Decimal(10, 2)
+  minOrderAmount   Decimal?         @map("min_order_amount") @db.Decimal(10, 2)
+  availableUses    Int              @map("available_uses")
+  dateOfExpiration DateTime?        @map("date_of_expiration")
+  isActive         Boolean          @default(true) @map("is_active")
   appliedCoupons   AppliedCoupon[]
 
   @@map("coupon")

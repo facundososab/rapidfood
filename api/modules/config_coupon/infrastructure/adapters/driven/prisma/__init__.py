@@ -1,0 +1,1 @@
+"""Prisma driven adapters for the coupon module."""
