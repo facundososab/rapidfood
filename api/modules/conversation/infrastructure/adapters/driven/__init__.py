@@ -1,0 +1,1 @@
+"""Conversation outbound adapters."""

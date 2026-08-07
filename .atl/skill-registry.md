@@ -13,10 +13,10 @@ See `_shared/skill-resolver.md` for the full resolution protocol.
 | Creating a GitHub issue, reporting a bug, requesting a feature | issue-creation | C:/Users/renzo/.config/opencode/skills/issue-creation/SKILL.md |
 | Creating a pull request, opening a PR, preparing changes for review | branch-pr | C:/Users/renzo/.config/opencode/skills/branch-pr/SKILL.md |
 | Creating a new AI skill, adding agent instructions, documenting patterns for AI | skill-creator | C:/Users/renzo/.config/opencode/skills/skill-creator/SKILL.md |
-| "how do I do X", "find a skill for X", "is there a skill that can...", extending capabilities | find-skills | C:/Users/renzo/.agents/skills/find-skills/SKILL.md |
-| Ports & Adapters / hexagonal architecture design and refactoring | hexagonal-architecture | skills/hexagonal-architecture/SKILL.md |
+| "how do I do X", "find a skill for X", "is there a skill that can...", extending capabilities | find-skills | C:/Users/renzo/.config/opencode/skills/find-skills/SKILL.md |
+| Implementing a Django module, creating/modifying a use case, adding REST endpoints, creating repositories, modifying domain logic, reviewing hexagonal architecture | django-hexagonal-modular-architecture | skills/hexagonal-architecture/SKILL.md |
 
-> Note: judgment-day, go-testing, issue-creation, branch-pr, and skill-creator are mirrored across `~/.claude/skills`, `~/.gemini/skills`, `~/.cursor/skills`, and `~/.copilot/skills` (identical content). `find-skills` lives only in `~/.agents/skills`. The canonical path listed is the opencode install. `hexagonal-architecture` is a **project-level** skill and wins over any user-level duplicate.
+> Note: SDD workflow skills, `_shared`, and `skill-registry` are intentionally omitted. The project-level `django-hexagonal-modular-architecture` skill wins for Rapidfood implementation/review work.
 
 ## Compact Rules
 
@@ -67,7 +67,7 @@ Pre-digested rules per skill. Delegators copy matching blocks into sub-agent pro
 - Verify quality before recommending: 1K+ installs (skeptical under 100), official sources (vercel-labs, anthropics, microsoft), GitHub stars
 - Present each option with: name + what it does, install count + source, install command, skills.sh link
 
-### hexagonal-architecture
+### django-hexagonal-modular-architecture
 - Dependency direction is ALWAYS inward: adapters → application/domain; application → port interfaces; domain → nothing external; domain must NOT import framework/ORM/web types
 - Model every side effect as an outbound port (persistence, gateways, clock, logger) — ports model capabilities, not technologies
 - Use cases = pure orchestration: receive ports via constructor/arguments, validate app-level invariants, return plain data structures
@@ -76,13 +76,21 @@ Pre-digested rules per skill. Delegators copy matching blocks into sub-agent pro
 - Feature-first layout: `domain/`, `application/ports/{inbound,outbound}`, `application/use-cases/`, `adapters/{inbound,outbound}/`, `composition/`
 - Anti-patterns: domain importing ORM/framework types, use cases reading `req`/`res`, returning DB rows directly, adapters calling each other directly
 - Test per boundary: unit test use cases with fake ports, integration test adapters with real infra, E2E through inbound adapters
+- Before implementation, identify the responsible bounded context, business rule, aggregate, ports, use case, adapters, container wiring, REST exposure, and tests.
+- Do not add generic `shared` code unless the concept is genuinely common and justified.
 
 ## Project Conventions
 
 | File | Path | Notes |
 |------|------|-------|
-| — | — | No convention files found at project root (no AGENTS.md / CLAUDE.md / .cursorrules / GEMINI.md / copilot-instructions.md yet) |
+| AGENTS.md | AGENTS.md | Project index — package manager, language, Prisma ownership, architecture gate, and skill auto-invoke rules |
+| Architecture guide | docs/ARCHITECTURE-GUIDE.md | Referenced by AGENTS.md; architectural source for Django shell, Prisma data layer, module boundaries |
+| Domain model | docs/modelo-dominio.md | User-mandated implementation guidance source under `./docs` |
+| Order state machine | docs/order-state-machine.md | User-mandated implementation guidance source under `./docs` |
+| Business rules | docs/reglas-negocio.md | User-mandated implementation guidance source under `./docs` |
+| Functional requirements | docs/req-funcionales.md | User-mandated implementation guidance source under `./docs` |
+| Project skill | skills/hexagonal-architecture/SKILL.md | Referenced by AGENTS.md; implementation/review rules for Django hexagonal modules |
 
-Domain reference docs exist under `docs/` (modelo-dominio.md, order-state-machine.md, reglas-negocio.md, req-funcionales.md) — they describe the business domain, not agent conventions. The project's own architecture skill is registered above (`skills/hexagonal-architecture/SKILL.md`).
+Implementation MUST be guided absolutely by `./docs` per user instruction. If docs and code disagree, surface the mismatch before implementation and prefer updating/clarifying the docs-driven spec instead of silently coding against stale assumptions.
 
 Read the convention files listed above for project-specific patterns and rules. All referenced paths have been extracted — no need to read index files to discover more.

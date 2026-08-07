@@ -13,7 +13,7 @@ data layer (single source of truth: ``schema.prisma``). Therefore:
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 def _load_dotenv() -> None:
@@ -52,11 +52,6 @@ INSTALLED_APPS = [
     # Only contrib app — Django never owns tables; Prisma does (ADR-8/ADR-9).
     "django.contrib.staticfiles",
     "rest_framework",
-    "apps.client",
-    "apps.conversation",
-    "apps.order",
-    "apps.catalog",
-    "apps.config_coupon",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -68,10 +63,12 @@ DATABASES = {
     }
 }
 
-ROOT_URLCONF = "config.urls"
+DJANGO_SETTINGS_MODULE = "api.config.settings"
+ROOT_URLCONF = "api.config.urls"
 
-WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
+WSGI_APPLICATION = "api.config.wsgi.application"
+ASGI_APPLICATION = "api.config.asgi.application"
+STATIC_URL = "static/"
 
 # No sessions/auth/admin → nothing to process.
 MIDDLEWARE: list[str] = []
@@ -80,4 +77,5 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     # No sessions → CSRF not enforced; token auth later if needed (design).
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "UNAUTHENTICATED_USER": None,
 }

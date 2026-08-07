@@ -9,6 +9,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // --- Enums: ONLY doc-fixed vocabularies (native PG enums are costly to alter) ---

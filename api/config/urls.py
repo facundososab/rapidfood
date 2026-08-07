@@ -1,12 +1,19 @@
-"""URL routing — Rapidfood.
+"""URL routing — Rapidfood."""
 
-Route layout: ``/health`` plus per-app inbound adapters added by later changes.
-"""
+from django.urls import include, path
 
-from django.urls import path
+from api.config import views
+from api.modules.conversation.configuration.container import build_container
+from api.modules.conversation.infrastructure.adapters.driver.rest.views import (
+    ConversationMessagesView,
+    ConversationWebhookView,
+)
 
-from config import views
+_conversation_container = build_container()
+ConversationWebhookView.container = _conversation_container
+ConversationMessagesView.container = _conversation_container
 
 urlpatterns = [
     path("health/", views.health, name="health"),
+    path("conversation/", include("api.modules.conversation.infrastructure.adapters.driver.rest.urls")),
 ]

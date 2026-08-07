@@ -8,6 +8,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .import_linter_cache/
+.atl/
 
 # Environment / secrets
 .env

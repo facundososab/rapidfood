@@ -17,12 +17,18 @@ owns its own connection pool); each test cleans up after itself.
 
 import os
 import subprocess
+from pathlib import Path
 from urllib.parse import urlparse
 
 import psycopg
 from psycopg import sql
 import pytest
 from prisma import Prisma
+
+
+PRISMA_SCHEMA = (
+    Path(__file__).resolve().parents[1] / "schema.prisma"
+)
 
 
 def _test_database_url() -> str:
@@ -63,7 +69,15 @@ def prisma_test_db(django_db_setup, django_db_blocker):
     _ensure_test_database_exists(test_url)
     with django_db_blocker.unblock():
         subprocess.run(
-            ["uv", "run", "prisma", "migrate", "deploy"],
+            [
+                "uv",
+                "run",
+                "prisma",
+                "migrate",
+                "deploy",
+                "--schema",
+                str(PRISMA_SCHEMA),
+            ],
             env={**os.environ, "DATABASE_URL": test_url},
             check=True,
         )
