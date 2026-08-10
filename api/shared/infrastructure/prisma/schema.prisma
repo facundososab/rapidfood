@@ -3,12 +3,14 @@
 // NOTE: comments are ASCII-only (Windows cp1252 limitation of the generator).
 
 generator client {
-  provider = "prisma-client-py"
-  output   = "./generated"
+  provider                    = "prisma-client-py"
+  output                      = "./generated"
+  enable_experimental_decimal = true
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // --- Enums: ONLY doc-fixed vocabularies (native PG enums are costly to alter) ---
@@ -95,14 +97,36 @@ model Address {
 }
 
 model Client {
-  id            String  @id @default(uuid()) @map("client_id") @db.Uuid
+  id            String          @id @default(uuid()) @map("client_id") @db.Uuid
   name          String
-  lastName      String  @map("last_name")
-  phoneNumber   String  @unique @map("phone_number")
+  lastName      String          @map("last_name")
+  phoneNumber   String          @unique @map("phone_number")
   conversations Conversation[]
   orders        Order[]
+  addresses     ClientAddress[]
 
   @@map("client")
+}
+
+model ClientAddress {
+  id                   String  @id @default(uuid()) @map("client_address_id") @db.Uuid
+  clientId             String  @map("client_id") @db.Uuid
+  client               Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  street               String
+  streetNumber         String  @map("street_number")
+  floor                String?
+  apartment            String?
+  city                 String
+  province             String
+  postalCode           String? @map("postal_code")
+  latitude             Decimal @map("latitude") @db.Decimal(10, 7)
+  longitude            Decimal @map("longitude") @db.Decimal(10, 7)
+  deliveryInstructions String? @map("delivery_instructions")
+  label                String? // e.g. "Casa", "Trabajo"
+  isDefault            Boolean @default(false) @map("is_default")
+
+  @@map("client_address")
+  @@index([clientId])
 }
 
 model Conversation {

@@ -52,11 +52,11 @@ INSTALLED_APPS = [
     # Only contrib app — Django never owns tables; Prisma does (ADR-8/ADR-9).
     "django.contrib.staticfiles",
     "rest_framework",
-    "apps.client",
-    "apps.conversation",
-    "apps.order",
-    "apps.catalog",
-    "apps.config_coupon",
+    "modules.client",
+    "modules.conversation",
+    "modules.order",
+    "modules.catalog",
+    "modules.config_coupon",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -80,4 +80,5 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     # No sessions → CSRF not enforced; token auth later if needed (design).
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "EXCEPTION_HANDLER": "modules.client.infrastructure.adapters.driver.rest.exception_handlers.client_exception_handler",
 }
