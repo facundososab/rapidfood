@@ -5,10 +5,12 @@
 generator client {
   provider = "prisma-client-py"
   output   = "./generated"
+  enable_experimental_decimal = true
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // --- Enums: ONLY doc-fixed vocabularies (native PG enums are costly to alter) ---
@@ -182,6 +184,7 @@ model Product {
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   prices      Price[]
   orderLines  OrderLine[]
+  discounts   Discount[]
 
   @@map("product")
   @@index([categoryId])
@@ -209,6 +212,8 @@ model Category {
 model Discount {
   id         String      @id @default(uuid()) @map("discount_id") @db.Uuid
   percentage Decimal     @db.Decimal(5, 2) // 0-100
+  productId  String?     @map("product_id") @db.Uuid
+  product    Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderLines OrderLine[]
 
   @@map("discount")
