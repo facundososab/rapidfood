@@ -49,14 +49,13 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
-    # Only contrib app — Django never owns tables; Prisma does (ADR-8/ADR-9).
     "django.contrib.staticfiles",
     "rest_framework",
-    "apps.client",
-    "apps.conversation",
-    "apps.order",
-    "apps.catalog",
-    "apps.config_coupon",
+    "modules.client",
+    "modules.conversation",
+    "modules.order",
+    "modules.catalog",
+    "modules.config_coupon",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
