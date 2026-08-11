@@ -5,7 +5,7 @@ from typing import Protocol
 from modules.catalog.domain.models.product import ProductState
 
 
-@dataclass(fronzen=True)
+@dataclass(frozen=True)
 class CreateProductCommand:
     description: str
     category_id: str
@@ -40,3 +40,20 @@ class ProductQueryPort(Protocol):
     def get_current_price(self, product_id: str) -> Decimal: ...
 
     def is_available(self, product_id: str) -> bool: ...
+
+@dataclass(frozen=True)
+class ListProductsQuery:
+    category_id: str | None = None
+    state: ProductState | None = None
+
+
+@dataclass(frozen=True)
+class ProductSummary:
+    id: str
+    description: str
+    state: str
+    category_id: str
+
+
+class ListProductsPort(Protocol):
+    def execute(self, query: ListProductsQuery) -> list[ProductSummary]: ...

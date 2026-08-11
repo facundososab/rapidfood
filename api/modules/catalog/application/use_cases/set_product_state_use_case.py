@@ -12,7 +12,7 @@ from modules.catalog.domain.models.product import ProductState
 
 class SetProductStateUseCase(SetProductStatePort):
     def __init__(self, products: ProductRepositoryPort) -> None:
-        self.products = products
+        self._products = products
 
     def execute(self, command: SetProductStateCommand) -> SetProductStateResponse:
         product = self._products.find_by_id(command.product_id)

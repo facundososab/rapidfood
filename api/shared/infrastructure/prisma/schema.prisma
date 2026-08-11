@@ -4,7 +4,7 @@
 
 generator client {
   provider = "prisma-client-py"
-  output   = "./generated"
+  interface = "sync"
   enable_experimental_decimal = true
 }
 

@@ -6,7 +6,7 @@ from decimal import Decimal
 class Price:
     id: str
     product_id: str
-    since_data: date
+    since_date: date
     price: Decimal
 
     def __post_init__(self) -> None:

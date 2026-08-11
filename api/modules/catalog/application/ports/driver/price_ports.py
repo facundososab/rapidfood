@@ -19,3 +19,11 @@ class AddPriceResponse:
 
 class AddPricePort(Protocol):
     def execute(self, command: AddPriceCommand) -> AddPriceResponse: ...
+
+@dataclass(frozen=True)
+class ListPricesQuery:
+    product_id: str
+
+
+class ListPricesPort(Protocol):
+    def execute(self, query: ListPricesQuery) -> list[AddPriceResponse]: ...
