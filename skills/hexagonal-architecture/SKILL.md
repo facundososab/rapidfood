@@ -5,10 +5,7 @@ license: MIT
 metadata:
 author: project-team
 version: '1.0'
-scope:
-  - api
-  - backend
-  - django
+scope: [api]
 auto_invoke:
   - 'Implementing a Django module'
   - 'Creating a use case'
