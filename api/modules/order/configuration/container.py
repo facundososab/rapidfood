@@ -7,7 +7,9 @@ from modules.order.application.use_cases.confirm_order_use_case import ConfirmOr
 from modules.order.application.use_cases.apply_coupon_use_case import ApplyCouponUseCase
 from modules.order.application.use_cases.cancel_order_use_case import CancelOrderUseCase
 from modules.order.application.use_cases.advance_state_use_case import AdvanceStateUseCase
-from modules.order.infrastructure.adapters.driven.django_orm.order_repository import DjangoOrderRepository
+from modules.order.infrastructure.adapters.driven.prisma.order_repository import (
+    PrismaOrderRepository,
+)
 from modules.order.infrastructure.adapters.driven.fakes.fakes import (
     FakeClientQuery, FakeCatalogQuery, FakeBusinessConfigQuery, FakeCouponQuery
 )
@@ -20,7 +22,7 @@ class OrderContainer:
 
     def __init__(self):
         # Driven Adapters
-        self.order_repository = DjangoOrderRepository()
+        self.order_repository = PrismaOrderRepository()
         self.client_query = FakeClientQuery()
         self.catalog_query = FakeCatalogQuery()
         self.config_query = FakeBusinessConfigQuery()
@@ -36,7 +38,8 @@ class OrderContainer:
             catalog_query=self.catalog_query
         )
         self.update_line_quantity_use_case = UpdateLineQuantityUseCase(
-            order_repo=self.order_repository
+            order_repo=self.order_repository,
+            catalog_query=self.catalog_query
         )
         self.remove_line_use_case = RemoveLineUseCase(
             order_repo=self.order_repository

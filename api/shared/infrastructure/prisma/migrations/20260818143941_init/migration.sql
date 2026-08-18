@@ -1,17 +1,17 @@
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('BORRADOR', 'PENDIENTE', 'PAGADO', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO', 'RETIRADO', 'CANCELADO');
+CREATE TYPE "OrderStatus" AS ENUM ('DRAFT', 'PENDING', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY', 'DELIVERED', 'PICKED_UP', 'CANCELLED');
 
 -- CreateEnum
-CREATE TYPE "DeliveryType" AS ENUM ('ENVIO', 'RETIRO');
+CREATE TYPE "DeliveryType" AS ENUM ('DELIVERY', 'PICKUP');
 
 -- CreateEnum
-CREATE TYPE "PaymentType" AS ENUM ('EFECTIVO', 'ONLINE');
+CREATE TYPE "PaymentType" AS ENUM ('CASH', 'ONLINE');
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('PENDIENTE', 'APROBADO', 'RECHAZADO', 'FALLIDO', 'VENCIDO');
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'FAILED', 'EXPIRED');
 
 -- CreateEnum
-CREATE TYPE "WeekDay" AS ENUM ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO');
+CREATE TYPE "WeekDay" AS ENUM ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY');
 
 -- CreateTable
 CREATE TABLE "business_configuration" (
@@ -91,12 +91,17 @@ CREATE TABLE "order" (
     "estimated_time" INTEGER,
     "delivery_type" "DeliveryType",
     "payment_type" "PaymentType",
-    "status" "OrderStatus" NOT NULL DEFAULT 'BORRADOR',
+    "status" "OrderStatus" NOT NULL DEFAULT 'DRAFT',
+    "subtotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "discount" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "shipping_cost" DECIMAL(10,2),
     "total_amount" DECIMAL(10,2),
     "client_id" UUID,
     "address_id" UUID,
     "conversation_id" UUID,
+    "applied_coupon_id" UUID,
+    "confirmed_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "order_pkey" PRIMARY KEY ("order_id")
 );
@@ -106,7 +111,7 @@ CREATE TABLE "order_line" (
     "order_line_id" UUID NOT NULL,
     "order_id" UUID NOT NULL,
     "product_id" UUID NOT NULL,
-    "amount" INTEGER NOT NULL,
+    "quantity" INTEGER NOT NULL,
     "unit_price" DECIMAL(10,2),
     "subtotal" DECIMAL(10,2) NOT NULL,
     "discount_id" UUID,
@@ -146,6 +151,7 @@ CREATE TABLE "category" (
 CREATE TABLE "discount" (
     "discount_id" UUID NOT NULL,
     "percentage" DECIMAL(5,2) NOT NULL,
+    "product_id" UUID,
 
     CONSTRAINT "discount_pkey" PRIMARY KEY ("discount_id")
 );
@@ -184,7 +190,7 @@ CREATE TABLE "payment" (
     "order_id" UUID NOT NULL,
     "provider" TEXT NOT NULL,
     "external_id" TEXT,
-    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDIENTE',
+    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
     "amount" DECIMAL(10,2) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -263,6 +269,9 @@ ALTER TABLE "product" ADD CONSTRAINT "product_category_id_fkey" FOREIGN KEY ("ca
 
 -- AddForeignKey
 ALTER TABLE "price" ADD CONSTRAINT "price_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "product"("product_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "discount" ADD CONSTRAINT "discount_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "product"("product_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "applied_coupon" ADD CONSTRAINT "applied_coupon_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "order"("order_id") ON DELETE CASCADE ON UPDATE CASCADE;

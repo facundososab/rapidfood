@@ -17,3 +17,19 @@ class InvalidLineError(OrderDomainError):
 class CouponApplicationError(OrderDomainError):
     """Raised when a coupon cannot be applied."""
     pass
+
+class OrderNotModifiableError(OrderStateError):
+    """Raised when an operation is invalid because the order is not modifiable."""
+    pass
+
+class InvalidCouponError(CouponApplicationError):
+    """Raised when a coupon itself is invalid."""
+    pass
+
+class BusinessClosedError(OrderDomainError):
+    """Raised when the business is not accepting orders right now."""
+    pass
+
+class MinimumOrderNotMetError(OrderDomainError):
+    """Raised when the order subtotal is below the configured minimum."""
+    pass
