@@ -11,11 +11,13 @@ class PrismaProductRepository(ProductRepositoryPort):
             data={
                 "create": {
                     "id": product.id,
+                    "name": product.name,
                     "description": product.description,
                     "available": product.state == ProductState.AVAILABLE,
                     "categoryId": product.category_id,
                 },
                 "update": {
+                    "name": product.name,
                     "description": product.description,
                     "available": product.state == ProductState.AVAILABLE,
                 },
@@ -47,6 +49,7 @@ class PrismaProductRepository(ProductRepositoryPort):
     def _to_domain(record) -> Product:
         return Product(
             id=record.id,
+            name=record.name,
             description=record.description,
             state=ProductState.AVAILABLE if record.available else ProductState.UNAVAILABLE,
             category_id=record.categoryId,

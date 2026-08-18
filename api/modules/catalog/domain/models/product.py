@@ -8,6 +8,7 @@ class ProductState(str, Enum):
 @dataclass #reemplaza al __init__
 class Product:
     id: str
+    name: str
     description: str
     state: ProductState
     category_id: str

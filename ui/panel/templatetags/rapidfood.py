@@ -20,7 +20,7 @@ register = template.Library()
 @register.filter
 def money(value) -> str:
     """Argentine peso formatting: $ 1.234,56 — with a non-breaking thin gap."""
-    if value is None:
+    if value in (None, ""):
         return "—"
     if not isinstance(value, Decimal):
         value = Decimal(str(value))

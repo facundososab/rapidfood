@@ -1,17 +1,19 @@
-"""HttpRapidfoodClient — consumes the EXISTING backend API.
+"""HttpRapidfoodClient — consumes the real backend API.
 
 This is the production implementation: it maps each interface method to an HTTP
 call against the backend that owns the domain/Prisma/PostgreSQL, and parses the
 JSON responses back into the same DTOs the mock returns. It deliberately does NOT
 reimplement any business rule — it only transports and maps.
 
-It is a working skeleton: wire the concrete endpoint paths to match the real API
-contract. Selecting it (RAPIDFOOD_CLIENT=http) must not require any change to
-views or templates.
+Products and orders are wired to the real catalog/order endpoints
+(``api/catalog/*``, ``api/orders/*``) mapping their canonical snake_case /
+``state`` payloads into the UI DTOs. The remaining modules (clients, coupons,
+payments, conversations, business configuration) have no backend endpoints yet,
+so their read methods return empty/neutral values to keep the panel navigable.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -23,12 +25,24 @@ def _parse_dt(value):
     if value in (None, ""):
         return None
     if isinstance(value, datetime):
-        return value
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = value
+    else:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    # The rest of the panel works with local naive datetimes (mock uses
+    # datetime.now()), so drop tz info to keep comparisons consistent.
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
 
 
 def _dec(value):
     return None if value is None else Decimal(str(value))
+
+
+def _paginate_items(items: list, page: int, page_size: int) -> Page:
+    total = len(items)
+    start = (page - 1) * page_size
+    return Page(items=items[start:start + page_size], total=total, page=page, page_size=page_size)
 
 
 class HttpRapidfoodClient(RapidfoodClient):
@@ -42,23 +56,35 @@ class HttpRapidfoodClient(RapidfoodClient):
             if token:
                 session.headers["Authorization"] = f"Bearer {token}"
         self.session = session
+        self._cats = None
 
     # -- transport helpers --------------------------------------------------
     def _get(self, path: str, **params) -> object:
         clean = {k: v for k, v in params.items() if v not in (None, "")}
         resp = self.session.get(f"{self.base_url}{path}", params=clean, timeout=15)
-        resp.raise_for_status()
+        self._raise_if_error(resp)
         return resp.json()
 
     def _post(self, path: str, payload: dict) -> object:
         resp = self.session.post(f"{self.base_url}{path}", json=payload, timeout=15)
-        resp.raise_for_status()
+        self._raise_if_error(resp)
         return resp.json()
 
     def _patch(self, path: str, payload: dict) -> object:
         resp = self.session.patch(f"{self.base_url}{path}", json=payload, timeout=15)
-        resp.raise_for_status()
+        self._raise_if_error(resp)
         return resp.json()
+
+    @staticmethod
+    def _raise_if_error(resp) -> None:
+        if resp.ok:
+            return
+        try:
+            body = resp.json()
+            message = body.get("detail") or body.get("error") or resp.text
+        except Exception:
+            message = resp.text
+        raise RuntimeError(f"{resp.request.method} {resp.url} -> {resp.status_code}: {message}")
 
     # -- mappers (JSON -> DTO) ---------------------------------------------
     def _client(self, d) -> Optional[dtos.Client]:
@@ -71,20 +97,24 @@ class HttpRapidfoodClient(RapidfoodClient):
         return None if not d else dtos.Category(id=d["id"], description=d["description"])
 
     def _price(self, d) -> dtos.Price:
-        return dtos.Price(id=d["id"], productId=d["productId"],
-                          sinceDate=_parse_dt(d["sinceDate"]), price=_dec(d["price"]))
+        return dtos.Price(id=d["id"], productId=d["product_id"],
+                          sinceDate=_parse_dt(d["since_date"]), price=_dec(d["price"]))
 
     def _product(self, d) -> Optional[dtos.Product]:
         if not d:
             return None
-        return dtos.Product(id=d["id"], description=d["description"], available=d["available"],
-                            categoryId=d["categoryId"], category=self._category(d.get("category")),
+        state = d.get("state")
+        available = d.get("available")
+        if available is None:
+            available = state == "available"
+        return dtos.Product(id=d["id"], name=d["name"], description=d["description"], available=bool(available),
+                            categoryId=d["category_id"], category=self._category(d.get("category")),
                             prices=[self._price(p) for p in d.get("prices", [])])
 
     def _line(self, d) -> dtos.OrderLine:
-        return dtos.OrderLine(id=d["id"], orderId=d["orderId"], productId=d["productId"],
+        return dtos.OrderLine(id=d["id"], orderId=d["order_id"], productId=d["product_id"],
                               quantity=d["quantity"], subtotal=_dec(d["subtotal"]),
-                              unitPrice=_dec(d.get("unitPrice")), discountId=d.get("discountId"),
+                              unitPrice=_dec(d.get("unit_price")), discountId=d.get("discount_id"),
                               product=self._product(d.get("product")))
 
     def _applied_coupon(self, d) -> dtos.AppliedCoupon:
@@ -111,12 +141,12 @@ class HttpRapidfoodClient(RapidfoodClient):
             return None
         return dtos.Order(
             id=d["id"], status=d["status"], subtotal=_dec(d["subtotal"]), discount=_dec(d["discount"]),
-            createdAt=_parse_dt(d["createdAt"]), estimatedTime=d.get("estimatedTime"),
-            deliveryType=d.get("deliveryType"), paymentType=d.get("paymentType"),
-            shippingCost=_dec(d.get("shippingCost")), totalAmount=_dec(d.get("totalAmount")),
-            clientId=d.get("clientId"), addressId=d.get("addressId"),
-            conversationId=d.get("conversationId"), appliedCouponId=d.get("appliedCouponId"),
-            confirmedAt=_parse_dt(d.get("confirmedAt")), client=self._client(d.get("client")),
+            createdAt=_parse_dt(d["created_at"]), estimatedTime=d.get("estimated_time"),
+            deliveryType=d.get("delivery_type"), paymentType=d.get("payment_type"),
+            shippingCost=_dec(d.get("shipping_cost")), totalAmount=_dec(d.get("total_amount")),
+            clientId=d.get("client_id"), addressId=d.get("address_id"),
+            conversationId=d.get("conversation_id"), appliedCouponId=d.get("applied_coupon_id"),
+            confirmedAt=_parse_dt(d.get("confirmed_at")), client=self._client(d.get("client")),
             address=self._address(d.get("address")),
             lines=[self._line(x) for x in d.get("lines", [])],
             appliedCoupons=[self._applied_coupon(x) for x in d.get("appliedCoupons", [])],
@@ -145,103 +175,187 @@ class HttpRapidfoodClient(RapidfoodClient):
                                  messages=[self._message(m) for m in d.get("messages", [])],
                                  orders=[self._order(o) for o in d.get("orders", [])])
 
-    def _business(self, d) -> dtos.BusinessConfiguration:
-        return dtos.BusinessConfiguration(
-            id=d["id"], businessName=d["businessName"], minOrder=_dec(d["minOrder"]),
-            shippingCost=_dec(d["shippingCost"]), availableZone=d["availableZone"],
-            businessHours=[dtos.BusinessHours(id=h["id"], openWeekDay=h["openWeekDay"],
-                           openFromHour=h["openFromHour"], openToHour=h["openToHour"])
-                           for h in d.get("businessHours", [])],
-            addresses=[self._address(a) for a in d.get("addresses", [])])
-
     def _page(self, d, mapper) -> Page:
         return Page(items=[mapper(x) for x in d.get("items", [])], total=d.get("total", 0),
                     page=d.get("page", 1), page_size=d.get("pageSize", 15))
 
+    # -- helpers ------------------------------------------------------------
+    def _categories_map(self) -> dict:
+        if self._cats is None:
+            data = self._get("/api/catalog/categories/")
+            self._cats = {cat["id"]: self._category(cat) for cat in data}
+        return self._cats
+
+    def _enrich_line_products(self, order: dtos.Order) -> dtos.Order:
+        for line in order.lines:
+            try:
+                line.product = self.get_product(line.productId) or line.product
+            except Exception:
+                line.product = line.product
+        return order
+
     # -- interface ----------------------------------------------------------
     def list_orders(self, *, status=None, delivery_type=None, payment_type=None, client_id=None,
                     search=None, date_from=None, date_to=None, page=1, page_size=15) -> Page:
-        return self._page(self._get("/orders", status=status, deliveryType=delivery_type,
-                          paymentType=payment_type, clientId=client_id, search=search,
-                          dateFrom=date_from, dateTo=date_to, page=page, pageSize=page_size), self._order)
+        rows = [self._order(x) for x in self._get(
+            "/api/orders/", status=status, delivery_type=delivery_type, payment_type=payment_type,
+            search=search, date_from=date_from, date_to=date_to)]
+        rows = [o for o in rows if o is not None]
+        if client_id:
+            rows = [o for o in rows if o.clientId == client_id]
+        return _paginate_items(rows, page, page_size)
 
-    def get_order(self, order_id): return self._order(self._get(f"/orders/{order_id}"))
+    def get_order(self, order_id):
+        order = self._order(self._get(f"/api/orders/{order_id}/"))
+        return self._enrich_line_products(order) if order else None
 
     def update_order_status(self, order_id, status):
-        return self._order(self._patch(f"/orders/{order_id}", {"status": status}))
+        self._patch(f"/api/orders/{order_id}/status/", {"status": status})
+        return self.get_order(order_id)
 
-    def create_order(self, payload): return self._order(self._post("/orders", payload))
+    def create_order(self, payload):
+        body = {}
+        if payload.get("client_id"):
+            body["client_id"] = payload["client_id"]
+        draft = self._post("/api/orders/draft/", body)
+        order_id = draft["order_id"]
 
-    def all_orders(self): return [self._order(x) for x in self._get("/orders/all")]
+        for item in payload.get("lines", []):
+            self._post(f"/api/orders/{order_id}/lines/", {
+                "product_id": item["product_id"], "quantity": int(item["quantity"]),
+            })
+
+        delivery = payload.get("delivery_type")
+        if delivery:
+            delivery_body = {"delivery_type": delivery}
+            if payload.get("address_id"):
+                delivery_body["address_id"] = payload["address_id"]
+            self._patch(f"/api/orders/{order_id}/delivery/", delivery_body)
+
+        self._post(f"/api/orders/{order_id}/confirm/", {})
+        return self.get_order(order_id)
+
+    def all_orders(self):
+        orders = [self._order(x) for x in self._get("/api/orders/all/")]
+        return [o for o in orders if o is not None]
 
     def list_products(self, *, search=None, category_id=None, only_available=False, page=1, page_size=20):
-        return self._page(self._get("/products", search=search, categoryId=category_id,
-                          onlyAvailable=only_available, page=page, pageSize=page_size), self._product)
+        data = self._get("/api/catalog/products/", category_id=category_id,
+                         available="true" if only_available else None)
+        cats = self._categories_map()
+        rows = []
+        for raw in data:
+            product = self._product(raw)
+            if product is None:
+                continue
+            product.category = cats.get(product.categoryId)
+            if search:
+                needle = search.lower().strip()
+                haystack = f"{product.name} {product.description}".lower()
+                if needle not in haystack and not (
+                    product.category and needle in product.category.description.lower()
+                ):
+                    continue
+            rows.append(product)
+        rows.sort(key=lambda p: p.description)
+        return _paginate_items(rows, page, page_size)
 
-    def get_product(self, product_id): return self._product(self._get(f"/products/{product_id}"))
+    def get_product(self, product_id):
+        return self._product(self._get(f"/api/catalog/products/{product_id}/"))
 
     def set_product_availability(self, product_id, available):
-        return self._product(self._patch(f"/products/{product_id}", {"available": available}))
+        return self._product(self._patch(f"/api/catalog/products/{product_id}/",
+                                         {"available": bool(available)}))
 
     def save_product(self, payload):
-        if payload.get("id"):
-            return self._product(self._patch(f"/products/{payload['id']}", payload))
-        return self._product(self._post("/products", payload))
+        product_id = payload.get("id")
+        if product_id:
+            body = {"name": payload["name"], "description": payload["description"],
+                    "category_id": payload["category_id"]}
+            if payload.get("available") is not None:
+                body["available"] = bool(payload["available"])
+            self._patch(f"/api/catalog/products/{product_id}/", body)
+            return self.get_product(product_id)
+        created = self._post("/api/catalog/products/", {
+            "name": payload["name"], "description": payload["description"], "category_id": payload["category_id"],
+        })
+        new_id = created["id"]
+        if payload.get("available") is not None:
+            self._patch(f"/api/catalog/products/{new_id}/", {"available": bool(payload["available"])})
+        if payload.get("price"):
+            self.add_product_price(new_id, payload["price"])
+        return self.get_product(new_id)
 
     def add_product_price(self, product_id, price):
-        return self._product(self._post(f"/products/{product_id}/prices", {"price": str(price)}))
+        self._post(f"/api/catalog/products/{product_id}/prices/", {
+            "price": str(price), "since_date": date.today().isoformat(),
+        })
+        return self.get_product(product_id)
 
-    def list_categories(self): return [self._category(x) for x in self._get("/categories")]
+    def list_categories(self):
+        return list(self._categories_map().values())
 
     def save_category(self, payload):
         if payload.get("id"):
-            return self._category(self._patch(f"/categories/{payload['id']}", payload))
-        return self._category(self._post("/categories", payload))
+            raise RuntimeError("Actualizar categorías aún no está soportado por el backend.")
+        return self._category(self._post("/api/catalog/categories/",
+                                         {"description": payload["description"]}))
 
+    # -- payments (not in scope yet) ---------------------------------------
     def list_payments(self, *, status=None, provider=None, date_from=None, date_to=None, page=1, page_size=15):
-        return self._page(self._get("/payments", status=status, provider=provider, dateFrom=date_from,
-                          dateTo=date_to, page=page, pageSize=page_size), self._payment)
+        return _paginate_items([], page, page_size)
 
-    def get_payment(self, payment_id): return self._payment(self._get(f"/payments/{payment_id}"))
+    def get_payment(self, payment_id):
+        return None
 
-    def all_payments(self): return [self._payment(x) for x in self._get("/payments/all")]
+    def all_payments(self):
+        return []
 
+    # -- clients (not in scope yet) ----------------------------------------
     def list_clients(self, *, search=None, page=1, page_size=15):
-        return self._page(self._get("/clients", search=search, page=page, pageSize=page_size), self._client)
+        return _paginate_items([], page, page_size)
 
-    def get_client(self, client_id): return self._client(self._get(f"/clients/{client_id}"))
+    def get_client(self, client_id):
+        return None
 
     def create_client(self, name, last_name, phone):
-        return self._client(self._post("/clients", {"name": name, "lastName": last_name, "phoneNumber": phone}))
+        raise NotImplementedError("El módulo de clientes no existe en el backend todavía.")
 
-    def search_clients(self, query): return [self._client(x) for x in self._get("/clients/search", q=query)]
+    def search_clients(self, query):
+        return []
 
-    def list_coupons(self): return [self._coupon(x) for x in self._get("/coupons")]
+    # -- coupons (not in scope yet) ----------------------------------------
+    def list_coupons(self):
+        return []
 
-    def get_coupon(self, coupon_id): return self._coupon(self._get(f"/coupons/{coupon_id}"))
+    def get_coupon(self, coupon_id):
+        return None
 
-    def get_coupon_by_code(self, code): return self._coupon(self._get("/coupons/by-code", code=code))
+    def get_coupon_by_code(self, code):
+        return None
 
     def save_coupon(self, payload):
-        if payload.get("id"):
-            return self._coupon(self._patch(f"/coupons/{payload['id']}", payload))
-        return self._coupon(self._post("/coupons", payload))
+        raise NotImplementedError("El módulo de cupones no existe en el backend todavía.")
 
     def validate_coupon(self, code, subtotal):
-        d = self._post("/coupons/validate", {"code": code, "subtotal": str(subtotal)})
-        return CouponValidation(valid=d["valid"], reason=d.get("reason", ""),
-                                coupon=self._coupon(d.get("coupon")),
-                                discount_amount=_dec(d.get("discountAmount")))
+        return CouponValidation(valid=False,
+                                reason="Módulo de cupones no disponible en el backend.")
 
     def list_applied_coupons(self, *, coupon_id=None):
-        return [self._applied_coupon(x) for x in self._get("/applied-coupons", couponId=coupon_id)]
+        return []
 
-    def list_conversations(self): return [self._conversation(x) for x in self._get("/conversations")]
+    # -- conversations (not in scope yet) ----------------------------------
+    def list_conversations(self):
+        return []
 
     def get_conversation(self, conversation_id):
-        return self._conversation(self._get(f"/conversations/{conversation_id}"))
+        return None
 
-    def get_business_config(self): return self._business(self._get("/business-configuration"))
+    # -- business configuration (not in scope yet) -------------------------
+    def get_business_config(self):
+        return dtos.BusinessConfiguration(
+            id="", businessName="", minOrder=Decimal("0"), shippingCost=Decimal("0"),
+            availableZone="", businessHours=[], addresses=[])
 
     def save_business_config(self, payload):
-        return self._business(self._patch("/business-configuration", payload))
+        raise NotImplementedError("El módulo de configuración no existe en el backend todavía.")

@@ -183,6 +183,7 @@ model OrderLine {
 
 model Product {
   id          String      @id @default(uuid()) @map("product_id") @db.Uuid
+  name        String
   description String
   available   Boolean     @default(true)
   categoryId  String      @map("category_id") @db.Uuid // diagram "1..1": product belongs to exactly 1 category

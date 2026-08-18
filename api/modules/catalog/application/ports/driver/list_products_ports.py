@@ -13,6 +13,7 @@ class ListProductsQuery:
 @dataclass(frozen=True)
 class ProductSummary:
     id: str
+    name: str
     description: str
     state: str
     category_id: str

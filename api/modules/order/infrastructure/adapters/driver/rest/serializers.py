@@ -30,3 +30,7 @@ class CancelOrderSerializer(serializers.Serializer):
 
 class AdvanceStateSerializer(serializers.Serializer):
     target_state = serializers.CharField()
+
+
+class UpdateOrderStatusSerializer(serializers.Serializer):
+    status = serializers.CharField()

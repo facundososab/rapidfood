@@ -128,13 +128,13 @@ class MockRapidfoodClient(RapidfoodClient):
         rows = [self._decorate_product(p) for p in self.db.products]
         if search:
             q = search.lower().strip()
-            rows = [p for p in rows if q in p.description.lower()
+            rows = [p for p in rows if q in p.name.lower() or q in p.description.lower()
                     or (p.category and q in p.category.description.lower())]
         if category_id:
             rows = [p for p in rows if p.categoryId == category_id]
         if only_available:
             rows = [p for p in rows if p.available]
-        rows.sort(key=lambda p: p.description)
+        rows.sort(key=lambda p: p.name)
         return _paginate(rows, page, page_size)
 
     def get_product(self, product_id: str) -> Optional[dtos.Product]:
@@ -153,12 +153,14 @@ class MockRapidfoodClient(RapidfoodClient):
         pid = payload.get("id")
         if pid:
             p = self.get_product(pid)
+            p.name = payload["name"]
             p.description = payload["description"]
             p.categoryId = payload["category_id"]
             p.available = payload.get("available", p.available)
             p.category = next((c for c in db.categories if c.id == p.categoryId), None)
             return p
-        p = dtos.Product(id=db.next_id("prod"), description=payload["description"],
+        p = dtos.Product(id=db.next_id("prod"), name=payload["name"],
+                         description=payload["description"],
                          available=payload.get("available", True),
                          categoryId=payload["category_id"])
         p.category = next((c for c in db.categories if c.id == p.categoryId), None)

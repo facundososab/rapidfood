@@ -4,6 +4,7 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class CreateProductCommand:
+    name: str
     description: str
     category_id: str
 
@@ -11,6 +12,7 @@ class CreateProductCommand:
 @dataclass(frozen=True)
 class CreateProductResponse:
     id: str
+    name: str
     description: str
     state: str
     category_id: str

@@ -1,9 +1,12 @@
-from typing import Optional
+from typing import List, Optional
 
 from prisma import enums
 from shared.infrastructure.prisma.db import db
 
-from modules.order.application.ports.driven.order_repository import OrderRepository
+from modules.order.application.ports.driven.order_repository import (
+    OrderFilter,
+    OrderRepository,
+)
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
@@ -32,6 +35,30 @@ class PrismaOrderRepository(OrderRepository):
         if record is None:
             return None
         return _to_domain(record)
+
+    def list(self, filter: Optional[OrderFilter] = None) -> List[Order]:
+        filter = filter or OrderFilter()
+        where: dict = {}
+        if filter.status is not None:
+            where["status"] = enums.OrderStatus(filter.status.value)
+        if filter.delivery_type is not None:
+            where["deliveryType"] = enums.DeliveryType(filter.delivery_type.value)
+        if filter.payment_type is not None:
+            where["paymentType"] = enums.PaymentType(filter.payment_type.value)
+        created_at: dict = {}
+        if filter.date_from is not None:
+            created_at["gte"] = filter.date_from
+        if filter.date_to is not None:
+            created_at["lte"] = filter.date_to
+        if created_at:
+            where["createdAt"] = created_at
+
+        records = db.client.order.find_many(
+            where=where,
+            order={"createdAt": "desc"},
+            include={"lines": True},
+        )
+        return [_to_domain(record) for record in records]
 
 
 def _to_prisma_data(order: Order) -> dict:

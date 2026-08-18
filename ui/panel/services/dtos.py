@@ -106,6 +106,7 @@ class Price:
 @dataclass
 class Product:
     id: str
+    name: str
     description: str
     available: bool
     categoryId: str

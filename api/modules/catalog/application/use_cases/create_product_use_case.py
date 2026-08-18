@@ -32,6 +32,7 @@ class CreateProductUseCase(CreateProductPort):
 
         product = Product(
             id=self._id_generator.generate(),
+            name=command.name,
             description=command.description,
             state=ProductState.UNAVAILABLE,
             category_id=command.category_id,
@@ -40,6 +41,7 @@ class CreateProductUseCase(CreateProductPort):
 
         return CreateProductResponse(
             id=product.id,
+            name=product.name,
             description=product.description,
             state=product.state.value,
             category_id=product.category_id

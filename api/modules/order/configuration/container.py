@@ -9,6 +9,11 @@ from modules.order.application.use_cases.confirm_order_use_case import ConfirmOr
 from modules.order.application.use_cases.apply_coupon_use_case import ApplyCouponUseCase
 from modules.order.application.use_cases.cancel_order_use_case import CancelOrderUseCase
 from modules.order.application.use_cases.advance_state_use_case import AdvanceStateUseCase
+from modules.order.application.use_cases.get_order_use_case import GetOrderUseCase
+from modules.order.application.use_cases.list_orders_use_case import ListOrdersUseCase
+from modules.order.application.use_cases.update_order_status_use_case import (
+    UpdateOrderStatusUseCase,
+)
 from modules.order.application.ports.driven.catalog_query import CatalogQuery
 from modules.order.infrastructure.adapters.driven.prisma.order_repository import (
     PrismaOrderRepository,
@@ -68,6 +73,11 @@ class OrderContainer:
             order_repo=self.order_repository
         )
         self.advance_state_use_case = AdvanceStateUseCase(
+            order_repo=self.order_repository
+        )
+        self.list_orders_use_case = ListOrdersUseCase(order_repo=self.order_repository)
+        self.get_order_use_case = GetOrderUseCase(order_repo=self.order_repository)
+        self.update_order_status = UpdateOrderStatusUseCase(
             order_repo=self.order_repository
         )
 

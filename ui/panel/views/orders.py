@@ -19,7 +19,15 @@ def change_status(request,order_id):
     if request.method!='POST': return HttpResponseBadRequest()
     get_client().update_order_status(order_id,request.POST.get('status','PENDING')); return redirect('order_detail',order_id=order_id)
 def new_order(request):
-    return page(request,'orders/new.html',{**_ctx(request),'clients':get_client().search_clients(''),'products':get_client().list_products(only_available=True,page_size=100).items,'coupons':get_client().list_coupons()})
+    c=get_client()
+    products=[]
+    for p in c.list_products(only_available=True,page_size=200).items:
+        price=pricing.current_price(p)
+        if price is None:
+            full=c.get_product(p.id)
+            price=pricing.current_price(full) if full else None
+        products.append({'id':p.id,'name':p.name,'category':p.category.description if p.category else '','price':price})
+    return page(request,'orders/new.html',{**_ctx(request),'clients':c.search_clients(''),'products':products,'coupons':c.list_coupons()})
 def wizard_client_search(request):
     return page(request,'orders/partials/client_results.html',{**_ctx(request),'clients':get_client().search_clients(request.GET.get('q',''))})
 def wizard_client_create(request):
