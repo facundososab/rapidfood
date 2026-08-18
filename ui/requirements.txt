@@ -1,0 +1,7 @@
+# Dependencias de la capa de presentación Django de Rapidfood.
+# No incluye ORM ni drivers de base de datos: el dominio/backend se consume por HTTP.
+Django==4.2.16
+asgiref==3.8.1
+sqlparse==0.5.3
+requests==2.32.3
+python-dotenv==1.0.1

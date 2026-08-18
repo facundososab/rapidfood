@@ -1,0 +1,12 @@
+{% comment %}kind label value sub icon accent(optional) derived(optional){% endcomment %}
+<div class="card p-4 flex flex-col gap-2">
+  <div class="flex items-center justify-between">
+    <span class="th">{{ label }}</span>
+    {% if icon %}<span class="text-ink-faint">{% include 'components/icon.html' with name=icon cls='w-4 h-4' %}</span>{% endif %}
+  </div>
+  <div class="font-display font-bold text-[22px] leading-none text-ink tnum">{{ value }}</div>
+  <div class="flex items-center gap-1.5 min-h-[16px]">
+    {% if derived %}<span class="badge" style="background:var(--color-subtle);color:var(--color-ink-faint);font-size:.625rem;padding:.0625rem .375rem">Calculado</span>{% endif %}
+    {% if sub %}<span class="text-[12px] text-ink-muted">{{ sub }}</span>{% endif %}
+  </div>
+</div>

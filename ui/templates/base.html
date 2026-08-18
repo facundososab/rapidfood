@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Rapidfood{% endblock %} · Rapidfood</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
+</head>
+<body x-data="{ sidebar: false }" hx-headers='{"X-Requested-With": "htmx"}'>
+  <div class="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+
+    {# ---- Sidebar ---- #}
+    <aside
+      class="fixed inset-y-0 left-0 z-40 w-[260px] bg-surface border-r border-line flex flex-col
+             transition-transform lg:static lg:translate-x-0"
+      :class="sidebar ? 'translate-x-0' : '-translate-x-full'">
+      <div class="h-16 flex items-center gap-2.5 px-5 border-b border-line">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary text-white text-sm font-bold">R</span>
+        <div class="leading-tight">
+          <div class="font-display font-extrabold text-[15px] text-ink tracking-tight">Rapidfood</div>
+          <div class="text-[11px] text-ink-faint -mt-0.5">Panel de operaciones</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-0.5">
+        <div class="th px-2.5 pb-2">Operación</div>
+        {% for item in nav_items %}
+          <a href="{% url item.url %}" class="nav-item {% if item.key == active_section %}active{% endif %}">
+            {% include 'components/icon.html' with name=item.icon %}
+            <span>{{ item.label }}</span>
+          </a>
+        {% endfor %}
+        <div class="th px-2.5 pt-5 pb-2">Sistema</div>
+        {% for item in secondary_nav %}
+          <a href="{% url item.url %}" class="nav-item {% if item.key == active_section %}active{% endif %}">
+            {% include 'components/icon.html' with name=item.icon %}
+            <span>{{ item.label }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+      <div class="px-3 py-3 border-t border-line">
+        <div class="flex items-center gap-2.5 px-2.5 py-2 rounded-[10px]">
+          <span class="w-8 h-8 rounded-full bg-primary-softer text-primary grid place-items-center text-xs font-bold">CG</span>
+          <div class="leading-tight min-w-0">
+            <div class="text-[13px] font-semibold text-ink truncate">Casa Central</div>
+            <div class="text-[11px] text-ink-faint truncate">Rapidfood Palermo</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    {# backdrop for mobile #}
+    <div x-show="sidebar" x-transition.opacity @click="sidebar = false"
+         class="fixed inset-0 z-30 bg-ink/30 lg:hidden" style="display:none"></div>
+
+    {# ---- Main ---- #}
+    <div class="min-w-0 flex flex-col">
+      <header class="sticky top-0 z-20 h-16 bg-bg/80 backdrop-blur border-b border-line flex items-center gap-3 px-4 lg:px-8">
+        <button @click="sidebar = true" class="lg:hidden btn btn-ghost !px-2">
+          {% include 'components/icon.html' with name='menu' %}
+        </button>
+        <div class="min-w-0 flex-1">
+          {% block header %}
+            <h1 class="font-display font-bold text-lg text-ink truncate">{% block heading %}{% endblock %}</h1>
+            {% block subheading %}{% endblock %}
+          {% endblock %}
+        </div>
+        <div class="flex items-center gap-2">
+          {% block header_actions %}{% endblock %}
+          <span id="htmx-indicator" class="global-indicator text-ink-faint">
+            {% include 'components/icon.html' with name='loader' %}
+          </span>
+        </div>
+      </header>
+
+      <main class="flex-1 px-4 lg:px-8 py-6">
+        {% block breadcrumbs %}{% endblock %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  {# global toast area #}
+  <div id="toast" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+</body>
+</html>
