@@ -1,4 +1,4 @@
-from modules.catalog.application.ports.driver.discount_ports import (
+from modules.catalog.application.ports.driver.set_discount_ports import (
     SetDiscountCommand,
     SetDiscountPort,
     SetDiscountResponse,

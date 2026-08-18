@@ -2,17 +2,19 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from modules.catalog.application.ports.driver.category_ports import (
+from modules.catalog.application.ports.driver.add_price_ports import AddPriceCommand
+from modules.catalog.application.ports.driver.create_category_ports import (
     CreateCategoryCommand,
 )
-from modules.catalog.application.ports.driver.discount_ports import SetDiscountCommand
-from modules.catalog.application.ports.driver.price_ports import (
-    AddPriceCommand,
-    ListPricesQuery,
-)
-from modules.catalog.application.ports.driver.product_ports import (
+from modules.catalog.application.ports.driver.create_product_ports import (
     CreateProductCommand,
+)
+from modules.catalog.application.ports.driver.list_prices_ports import ListPricesQuery
+from modules.catalog.application.ports.driver.list_products_ports import (
     ListProductsQuery,
+)
+from modules.catalog.application.ports.driver.set_discount_ports import SetDiscountCommand
+from modules.catalog.application.ports.driver.set_product_state_ports import (
     SetProductStateCommand,
 )
 from modules.catalog.configuration.container import get_catalog_container

@@ -1,4 +1,4 @@
-from modules.catalog.application.ports.driver.category_ports import (
+from modules.catalog.application.ports.driver.create_category_ports import (
     CreateCategoryCommand,
     CreateCategoryPort,
     CreateCategoryResponse,

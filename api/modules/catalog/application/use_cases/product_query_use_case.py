@@ -1,7 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
-from modules.catalog.application.ports.driver.product_ports import ProductQueryPort
+from modules.catalog.application.ports.driver.product_query_ports import (
+    ProductQueryPort,
+)
 from modules.catalog.application.ports.driven.price_repository_port import (
     PriceRepositoryPort,
 )

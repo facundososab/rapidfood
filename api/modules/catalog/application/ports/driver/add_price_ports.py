@@ -10,6 +10,7 @@ class AddPriceCommand:
     since_date: date
     price: Decimal
 
+
 @dataclass(frozen=True)
 class AddPriceResponse:
     id: str
@@ -17,13 +18,6 @@ class AddPriceResponse:
     since_date: date
     price: Decimal
 
+
 class AddPricePort(Protocol):
     def execute(self, command: AddPriceCommand) -> AddPriceResponse: ...
-
-@dataclass(frozen=True)
-class ListPricesQuery:
-    product_id: str
-
-
-class ListPricesPort(Protocol):
-    def execute(self, query: ListPricesQuery) -> list[AddPriceResponse]: ...

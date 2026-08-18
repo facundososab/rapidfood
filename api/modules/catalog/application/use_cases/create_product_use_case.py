@@ -1,4 +1,4 @@
-from modules.catalog.application.ports.driver.product_ports import (
+from modules.catalog.application.ports.driver.create_product_ports import (
     CreateProductCommand,
     CreateProductPort,
     CreateProductResponse

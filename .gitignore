@@ -28,3 +28,6 @@ Thumbs.db
 .gemini
 .codex
 .github
+
+#UI
+**/vendor/**

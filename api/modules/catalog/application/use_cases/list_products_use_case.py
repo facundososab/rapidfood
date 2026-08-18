@@ -1,4 +1,4 @@
-from modules.catalog.application.ports.driver.product_ports import (
+from modules.catalog.application.ports.driver.list_products_ports import (
     ListProductsPort,
     ListProductsQuery,
     ProductSummary,

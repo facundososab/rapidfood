@@ -1,5 +1,7 @@
-from modules.catalog.application.ports.driver.price_ports import (
+from modules.catalog.application.ports.driver.add_price_ports import (
     AddPriceResponse,
+)
+from modules.catalog.application.ports.driver.list_prices_ports import (
     ListPricesPort,
     ListPricesQuery,
 )
