@@ -42,6 +42,7 @@ services:
       - ./api/manage.py:/app/manage.py
       - ./api/modules:/app/modules
       - ./api/shared:/app/shared
+      - ./api/composition:/app/composition
 
   ui:
     build: ./ui

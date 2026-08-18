@@ -17,7 +17,7 @@ from modules.catalog.application.ports.driver.set_discount_ports import SetDisco
 from modules.catalog.application.ports.driver.set_product_state_ports import (
     SetProductStateCommand,
 )
-from modules.catalog.configuration.container import get_catalog_container
+from composition.container import get_app_catalog_container
 from modules.catalog.domain.errors.catalog_errors import (
     CategoryNotFoundError,
     ProductNotFoundError,
@@ -47,7 +47,8 @@ class ProductListCreateView(APIView):
             )
 
         query = ListProductsQuery(category_id=category_id, state=state)
-        results = get_catalog_container().list_products.execute(query)
+        container = get_app_catalog_container()
+        results = container.list_products.execute(query)
 
         return Response([r.__dict__ for r in results])
 
@@ -57,8 +58,9 @@ class ProductListCreateView(APIView):
 
         command = CreateProductCommand(**serializer.validated_data)
 
+        container = get_app_catalog_container()
         try:
-            result = get_catalog_container().create_product.execute(command)
+            result = container.create_product.execute(command)
         except CategoryNotFoundError:
             return Response(
                 {"detail": "La categoria no existe"}, status=status.HTTP_400_BAD_REQUEST
@@ -75,8 +77,9 @@ class SetProductStateView(APIView):
         state = ProductState(serializer.validated_data["state"])
         command = SetProductStateCommand(product_id=product_id, state=state)
 
+        container = get_app_catalog_container()
         try:
-            result = get_catalog_container().set_product_state.execute(command)
+            result = container.set_product_state.execute(command)
         except ProductNotFoundError:
             return Response(
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
@@ -88,7 +91,8 @@ class SetProductStateView(APIView):
 class PriceListCreateView(APIView):
     def get(self, request, product_id: str):
         query = ListPricesQuery(product_id=product_id)
-        results = get_catalog_container().list_prices.execute(query)
+        container = get_app_catalog_container()
+        results = container.list_prices.execute(query)
 
         return Response([r.__dict__ for r in results])
 
@@ -98,8 +102,9 @@ class PriceListCreateView(APIView):
 
         command = AddPriceCommand(product_id=product_id, **serializer.validated_data)
 
+        container = get_app_catalog_container()
         try:
-            result = get_catalog_container().add_price.execute(command)
+            result = container.add_price.execute(command)
         except ProductNotFoundError:
             return Response(
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
@@ -114,7 +119,8 @@ class CreateCategoryView(APIView):
         serializer.is_valid(raise_exception=True)
 
         command = CreateCategoryCommand(**serializer.validated_data)
-        result = get_catalog_container().create_category.execute(command)
+        container = get_app_catalog_container()
+        result = container.create_category.execute(command)
 
         return Response(result.__dict__, status=status.HTTP_201_CREATED)
 
@@ -126,8 +132,9 @@ class SetDiscountView(APIView):
 
         command = SetDiscountCommand(**serializer.validated_data)
 
+        container = get_app_catalog_container()
         try:
-            result = get_catalog_container().set_discount.execute(command)
+            result = container.set_discount.execute(command)
         except ProductNotFoundError:
             return Response(
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from modules.order.configuration.container import get_container
+from composition.container import get_app_container
 from modules.order.application.ports.driver.start_draft_order_ports import StartDraftOrderCommand
 from modules.order.application.ports.driver.add_line_port import AddLineCommand
 from modules.order.application.ports.driver.update_line_quantity_port import UpdateLineQuantityCommand
@@ -27,7 +27,7 @@ class StartDraftOrderView(APIView):
         
         command = StartDraftOrderCommand(**serializer.validated_data)
         
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.start_draft_order_use_case.execute(command)
             return Response(
@@ -50,13 +50,13 @@ class AddLineView(APIView):
         validated['product_id'] = str(validated['product_id'])
         
         command = AddLineCommand(
-            order_id=order_id,
+            order_id=str(order_id),
             **validated
         )
         
-        container = get_container()
+        container = get_app_container()
         try:
-            response = container.manage_lines_use_case.add_line(command)
+            response = container.add_line_use_case.add_line(command)
             return Response(
                 {
                     "order_id": response.order_id,
@@ -75,14 +75,14 @@ class UpdateLineQuantityView(APIView):
         serializer.is_valid(raise_exception=True)
         
         command = UpdateLineQuantityCommand(
-            order_id=order_id,
-            product_id=product_id,
+            order_id=str(order_id),
+            product_id=str(product_id),
             **serializer.validated_data
         )
         
-        container = get_container()
+        container = get_app_container()
         try:
-            response = container.manage_lines_use_case.update_line_quantity(command)
+            response = container.update_line_quantity_use_case.update_line_quantity(command)
             return Response(
                 {
                     "order_id": response.order_id,
@@ -101,11 +101,11 @@ class SetDeliveryDetailsView(APIView):
         serializer.is_valid(raise_exception=True)
         
         command = SetDeliveryDetailsCommand(
-            order_id=order_id,
+            order_id=str(order_id),
             **serializer.validated_data
         )
         
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.configure_order_use_case.set_delivery_details(command)
             return Response(
@@ -128,10 +128,10 @@ class ConfirmOrderView(APIView):
         serializer.is_valid(raise_exception=True)
         
         command = ConfirmOrderCommand(
-            order_id=order_id
+            order_id=str(order_id)
         )
         
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.confirm_order_use_case.execute(command)
             return Response(
@@ -153,7 +153,7 @@ class RemoveLineView(APIView):
             order_id=str(order_id),
             product_id=str(product_id)
         )
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.remove_line_use_case.execute(command)
             return Response(
@@ -176,7 +176,7 @@ class ApplyCouponView(APIView):
             order_id=str(order_id),
             **serializer.validated_data
         )
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.apply_coupon_use_case.apply(command)
             return Response(
@@ -200,7 +200,7 @@ class CancelOrderView(APIView):
             order_id=str(order_id),
             **serializer.validated_data
         )
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.cancel_order_use_case.execute(command)
             return Response(
@@ -219,7 +219,7 @@ class AdvanceStateView(APIView):
             order_id=str(order_id),
             **serializer.validated_data
         )
-        container = get_container()
+        container = get_app_container()
         try:
             response = container.advance_state_use_case.execute(command)
             return Response(

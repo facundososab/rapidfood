@@ -1,3 +1,5 @@
+from typing import Optional
+
 from modules.order.application.use_cases.start_draft_order_use_case import StartDraftOrderUseCase
 from modules.order.application.use_cases.add_line_use_case import AddLineUseCase
 from modules.order.application.use_cases.update_line_quantity_use_case import UpdateLineQuantityUseCase
@@ -7,6 +9,7 @@ from modules.order.application.use_cases.confirm_order_use_case import ConfirmOr
 from modules.order.application.use_cases.apply_coupon_use_case import ApplyCouponUseCase
 from modules.order.application.use_cases.cancel_order_use_case import CancelOrderUseCase
 from modules.order.application.use_cases.advance_state_use_case import AdvanceStateUseCase
+from modules.order.application.ports.driven.catalog_query import CatalogQuery
 from modules.order.infrastructure.adapters.driven.prisma.order_repository import (
     PrismaOrderRepository,
 )
@@ -18,15 +21,19 @@ class OrderContainer:
     """
     Dependency Injection Container for the Order module (ADR-Hexagonal).
     Wires driver ports (use cases) with driven ports (adapters).
+
+    Cross-module driven ports (catalog, client, config, coupon) default to
+    in-memory fakes; the app-level composition root injects the real adapters
+    via the constructor.
     """
 
-    def __init__(self):
+    def __init__(self, catalog_query: Optional[CatalogQuery] = None):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
         self.client_query = FakeClientQuery()
-        self.catalog_query = FakeCatalogQuery()
         self.config_query = FakeBusinessConfigQuery()
         self.coupon_query = FakeCouponQuery()
+        self.catalog_query = catalog_query if catalog_query is not None else FakeCatalogQuery()
         
         # Use Cases
         self.start_draft_order_use_case = StartDraftOrderUseCase(

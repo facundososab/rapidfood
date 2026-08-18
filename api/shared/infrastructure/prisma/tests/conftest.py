@@ -63,7 +63,15 @@ def prisma_test_db(django_db_setup, django_db_blocker):
     _ensure_test_database_exists(test_url)
     with django_db_blocker.unblock():
         subprocess.run(
-            ["uv", "run", "prisma", "migrate", "deploy"],
+            [
+                "uv",
+                "run",
+                "prisma",
+                "migrate",
+                "deploy",
+                "--schema",
+                "shared/infrastructure/prisma/schema.prisma",
+            ],
             env={**os.environ, "DATABASE_URL": test_url},
             check=True,
         )

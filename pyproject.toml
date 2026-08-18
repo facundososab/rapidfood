@@ -46,12 +46,12 @@ containers = [
   "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon",
 ]
 layers = [
-  "adapters.driver",             # DRF views/serializers (highest)
-  "adapters.driven",             # Prisma repositories/gateways
-  "application.ports.driver",    # driver port interfaces
-  "application.use_cases",       # orchestration
-  "application.ports.driven",    # driven port interfaces
-  "domain",                      # pure domain (lowest)
+  "(infrastructure.adapters.driver)",   # DRF views/serializers (highest)
+  "(infrastructure.adapters.driven)",   # Prisma repositories/gateways
+  "(application.use_cases)",            # orchestration (implements driver ports)
+  "(application.ports.driver)",         # driver port interfaces
+  "(application.ports.driven)",         # driven port interfaces
+  "(domain)",                           # pure domain (lowest)
 ]
 # NOTE: composition/ is intentionally outside this contract — it is the wiring root.
 # If lint-imports flags composition imports, add "composition" as the top layer.

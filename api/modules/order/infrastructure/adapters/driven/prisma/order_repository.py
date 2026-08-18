@@ -102,15 +102,15 @@ def _to_domain(record) -> Order:
     ]
     return Order(
         id=record.id,
-        status=OrderState(record.status.value),
+        status=OrderState(_enum_value(record.status)),
         subtotal=record.subtotal,
         discount=record.discount,
         client_id=record.clientId,
         address_id=record.addressId,
         conversation_id=record.conversationId,
         estimated_time=record.estimatedTime,
-        delivery_type=DeliveryType(record.deliveryType.value) if record.deliveryType else None,
-        payment_type=PaymentMethod(record.paymentType.value) if record.paymentType else None,
+        delivery_type=_optional_enum(DeliveryType, record.deliveryType),
+        payment_type=_optional_enum(PaymentMethod, record.paymentType),
         shipping_cost=record.shippingCost,
         total_amount=record.totalAmount,
         applied_coupon_id=record.appliedCouponId,
@@ -118,3 +118,13 @@ def _to_domain(record) -> Order:
         created_at=record.createdAt,
         lines=lines,
     )
+
+
+def _enum_value(value) -> str:
+    return value.value if hasattr(value, "value") else value
+
+
+def _optional_enum(enum_cls, value):
+    if value is None:
+        return None
+    return enum_cls(_enum_value(value))
