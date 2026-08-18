@@ -2,8 +2,8 @@ import pytest
 
 
 def test_message_requires_conversation_id_and_content():
-    from api.modules.conversation.domain.errors import MessageValidationError
-    from api.modules.conversation.domain.models.message import Message
+    from modules.conversation.domain.errors import MessageValidationError
+    from modules.conversation.domain.models.message import Message
 
     with pytest.raises(MessageValidationError):
         Message(message_id="msg-1", conversation_id="", role="USER", content="Hola")
@@ -13,8 +13,8 @@ def test_message_requires_conversation_id_and_content():
 
 
 def test_message_rejects_invalid_role_status_and_intent():
-    from api.modules.conversation.domain.errors import MessageValidationError
-    from api.modules.conversation.domain.models.message import Message
+    from modules.conversation.domain.errors import MessageValidationError
+    from modules.conversation.domain.models.message import Message
 
     with pytest.raises(MessageValidationError):
         Message(message_id="msg-1", conversation_id="conv-1", role="BOT", content="Hola")
@@ -33,8 +33,8 @@ def test_message_rejects_invalid_role_status_and_intent():
 
 
 def test_message_accepts_valid_domain_values():
-    from api.modules.conversation.domain.models.message import Message
-    from api.modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
+    from modules.conversation.domain.models.message import Message
+    from modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
 
     message = Message(
         message_id="msg-1",

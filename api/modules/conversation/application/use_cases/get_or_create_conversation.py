@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import asdict
 from uuid import uuid4
 
-from api.modules.conversation.application.ports.driver.conversation_commands import GetOrCreateConversationCommand
-from api.modules.conversation.application.ports.driver.conversation_responses import (
+from modules.conversation.application.ports.driver.conversation_commands import GetOrCreateConversationCommand
+from modules.conversation.application.ports.driver.conversation_responses import (
     ConversationDTO,
     GetOrCreateConversationResult,
 )
-from api.modules.conversation.application.ports.driven.conversation_repository import ConversationRepositoryPort
-from api.modules.conversation.domain.models.conversation import Conversation
+from modules.conversation.application.ports.driven.conversation_repository import ConversationRepositoryPort
+from modules.conversation.domain.models.conversation import Conversation
 
 
 class GetOrCreateConversationUseCase:

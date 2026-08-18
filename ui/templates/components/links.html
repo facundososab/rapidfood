@@ -1,0 +1,12 @@
+{% comment %}Cross-entity links. kind: order|client|payment|product|conversation{% endcomment %}
+{% if kind == 'order' %}
+  {% if obj %}<a href="{% url 'order_detail' obj.id %}" class="font-mono text-[13px] font-medium text-primary hover:underline">{{ obj.id|short_id }}</a>{% else %}<span class="text-ink-faint">—</span>{% endif %}
+{% elif kind == 'client' %}
+  {% if obj %}<a href="{% url 'client_detail' obj.id %}" class="text-[13px] font-medium text-ink hover:text-primary hover:underline">{{ obj|client_name }}</a>{% else %}<span class="text-[13px] text-ink-faint italic">Cliente no identificado</span>{% endif %}
+{% elif kind == 'payment' %}
+  <a href="{% url 'payment_detail' obj.id %}" class="font-mono text-[13px] font-medium text-primary hover:underline">{{ obj.id|short_id }}</a>
+{% elif kind == 'product' %}
+  <a href="{% url 'product_detail' obj.id %}" class="text-[13px] font-medium text-ink hover:text-primary hover:underline">{{ obj.description }}</a>
+{% elif kind == 'conversation' %}
+  <a href="{% url 'conversation_detail' obj.id %}" class="font-mono text-[13px] font-medium text-primary hover:underline">{{ obj.id|short_id }}</a>
+{% endif %}

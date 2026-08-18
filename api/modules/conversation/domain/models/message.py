@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from api.modules.conversation.domain.errors import MessageValidationError
-from api.modules.conversation.domain.value_objects import (
+from modules.conversation.domain.errors import MessageValidationError
+from modules.conversation.domain.value_objects import (
     DetectedIntent,
     MessageRole,
     MessageStatus,

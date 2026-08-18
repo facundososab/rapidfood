@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from api.modules.conversation.application.use_cases.add_message import AddMessageUseCase
-from api.modules.conversation.application.use_cases.get_or_create_conversation import GetOrCreateConversationUseCase
-from api.modules.conversation.application.use_cases.list_messages import ListMessagesUseCase
-from api.modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
-from api.modules.conversation.infrastructure.adapters.driven.clock import SystemClock
-from api.modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
+from modules.conversation.application.use_cases.add_message import AddMessageUseCase
+from modules.conversation.application.use_cases.get_or_create_conversation import GetOrCreateConversationUseCase
+from modules.conversation.application.use_cases.list_messages import ListMessagesUseCase
+from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
+from modules.conversation.infrastructure.adapters.driven.clock import SystemClock
+from modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
     DeterministicIntentDetector,
 )
 

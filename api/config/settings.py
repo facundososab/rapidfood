@@ -49,9 +49,13 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
-    # Only contrib app — Django never owns tables; Prisma does (ADR-8/ADR-9).
     "django.contrib.staticfiles",
     "rest_framework",
+    "modules.client",
+    "modules.conversation",
+    "modules.order",
+    "modules.catalog",
+    "modules.config_coupon",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -63,11 +67,10 @@ DATABASES = {
     }
 }
 
-DJANGO_SETTINGS_MODULE = "api.config.settings"
-ROOT_URLCONF = "api.config.urls"
+ROOT_URLCONF = "config.urls"
 
-WSGI_APPLICATION = "api.config.wsgi.application"
-ASGI_APPLICATION = "api.config.asgi.application"
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 STATIC_URL = "static/"
 
 # No sessions/auth/admin → nothing to process.

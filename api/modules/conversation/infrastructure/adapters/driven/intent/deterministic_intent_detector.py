@@ -1,4 +1,4 @@
-from api.modules.conversation.domain.value_objects import DetectedIntent
+from modules.conversation.domain.value_objects import DetectedIntent
 
 
 class DeterministicIntentDetector:

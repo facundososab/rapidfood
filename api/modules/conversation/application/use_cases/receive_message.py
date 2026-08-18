@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from api.modules.conversation.application.ports.driver.conversation_commands import (
+from modules.conversation.application.ports.driver.conversation_commands import (
     AddMessageCommand,
     GetOrCreateConversationCommand,
     ReceiveMessageCommand,
 )
-from api.modules.conversation.application.ports.driver.conversation_responses import ReceiveMessageResult
-from api.modules.conversation.application.ports.driven.clock import ClockPort
-from api.modules.conversation.application.ports.driven.conversation_repository import ConversationRepositoryPort
-from api.modules.conversation.application.ports.driven.cross_module import (
+from modules.conversation.application.ports.driver.conversation_responses import ReceiveMessageResult
+from modules.conversation.application.ports.driven.clock import ClockPort
+from modules.conversation.application.ports.driven.conversation_repository import ConversationRepositoryPort
+from modules.conversation.application.ports.driven.cross_module import (
     BusinessConfigurationPort,
     CatalogProductQueryPort,
     ClientIdentityPort,
     CouponValidationPort,
     OrderDraftPort,
 )
-from api.modules.conversation.application.ports.driven.intent_detector import IntentDetectorPort
-from api.modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
-from api.modules.conversation.application.use_cases.add_message import AddMessageUseCase
-from api.modules.conversation.application.use_cases.get_or_create_conversation import GetOrCreateConversationUseCase
-from api.modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus
+from modules.conversation.application.ports.driven.intent_detector import IntentDetectorPort
+from modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
+from modules.conversation.application.use_cases.add_message import AddMessageUseCase
+from modules.conversation.application.use_cases.get_or_create_conversation import GetOrCreateConversationUseCase
+from modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus
 
 
 class ReceiveMessageUseCase:

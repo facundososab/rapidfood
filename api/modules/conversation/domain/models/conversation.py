@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from api.modules.conversation.domain.errors import ConversationValidationError
-from api.modules.conversation.domain.value_objects import DetectedIntent, Sentiment, coerce_enum
+from modules.conversation.domain.errors import ConversationValidationError
+from modules.conversation.domain.value_objects import DetectedIntent, Sentiment, coerce_enum
 
 
 @dataclass(slots=True)

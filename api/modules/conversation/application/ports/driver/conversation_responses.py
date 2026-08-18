@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from api.modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
+from modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
 
 
 @dataclass(frozen=True, slots=True)

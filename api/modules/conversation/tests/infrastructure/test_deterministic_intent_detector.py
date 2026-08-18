@@ -1,8 +1,8 @@
 def test_deterministic_intent_detector_maps_keywords():
-    from api.modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
+    from modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
         DeterministicIntentDetector,
     )
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     detector = DeterministicIntentDetector()
 
@@ -12,10 +12,10 @@ def test_deterministic_intent_detector_maps_keywords():
 
 
 def test_deterministic_intent_detector_falls_back_to_unknown():
-    from api.modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
+    from modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
         DeterministicIntentDetector,
     )
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     detector = DeterministicIntentDetector()
 

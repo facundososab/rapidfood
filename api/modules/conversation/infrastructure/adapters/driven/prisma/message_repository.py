@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from api.modules.conversation.domain.models.message import Message
+from modules.conversation.domain.models.message import Message
 
 
 class PrismaMessageRepository:

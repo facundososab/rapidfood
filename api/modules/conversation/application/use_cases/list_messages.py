@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from api.modules.conversation.application.ports.driver.conversation_commands import ListMessagesQuery
-from api.modules.conversation.application.ports.driver.conversation_responses import ListMessagesResult
-from api.modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
-from api.modules.conversation.application.use_cases.add_message import _to_message_dto
+from modules.conversation.application.ports.driver.conversation_commands import ListMessagesQuery
+from modules.conversation.application.ports.driver.conversation_responses import ListMessagesResult
+from modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
+from modules.conversation.application.use_cases.add_message import _to_message_dto
 
 
 class ListMessagesUseCase:

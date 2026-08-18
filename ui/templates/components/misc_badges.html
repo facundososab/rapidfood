@@ -1,0 +1,23 @@
+{% comment %}Small reusable badges included by name via kind.{% endcomment %}
+{% if kind == 'delivery' %}
+  {% if value == 'DELIVERY' %}<span class="badge" style="background:var(--color-primary-soft);color:var(--color-primary)">{% include 'components/icon.html' with name='map-pin' cls='w-3 h-3' %}Envío</span>
+  {% elif value == 'PICKUP' %}<span class="badge" style="background:var(--color-subtle);color:var(--color-ink-soft)">{% include 'components/icon.html' with name='shopping-bag' cls='w-3 h-3' %}Retiro</span>
+  {% else %}<span class="text-ink-faint text-xs">—</span>{% endif %}
+{% elif kind == 'payment_type' %}
+  {% if value == 'CASH' %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)">{% include 'components/icon.html' with name='wallet' cls='w-3 h-3' %}Efectivo</span>
+  {% elif value == 'ONLINE' %}<span class="badge" style="background:var(--color-info-soft);color:var(--color-info)">{% include 'components/icon.html' with name='credit-card' cls='w-3 h-3' %}Online</span>
+  {% else %}<span class="text-ink-faint text-xs">—</span>{% endif %}
+{% elif kind == 'availability' %}
+  {% if value %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)"><span class="badge-dot" style="background:var(--color-success)"></span>Disponible</span>
+  {% else %}<span class="badge" style="background:var(--color-neutral-soft);color:var(--color-neutral)"><span class="badge-dot" style="background:var(--color-neutral)"></span>No disponible</span>{% endif %}
+{% elif kind == 'coupon' %}
+  {% if value == 'available' %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)"><span class="badge-dot" style="background:var(--color-success)"></span>Disponible</span>
+  {% elif value == 'expired' %}<span class="badge" style="background:var(--color-danger-soft);color:var(--color-danger)"><span class="badge-dot" style="background:var(--color-danger)"></span>Vencido</span>
+  {% elif value == 'exhausted' %}<span class="badge" style="background:var(--color-neutral-soft);color:var(--color-neutral)"><span class="badge-dot" style="background:var(--color-neutral)"></span>Agotado</span>{% endif %}
+{% elif kind == 'sentiment' %}
+  {% if value == 'positive' %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)">Positivo</span>
+  {% elif value == 'negative' %}<span class="badge" style="background:var(--color-danger-soft);color:var(--color-danger)">Negativo</span>
+  {% elif value == 'neutral' %}<span class="badge" style="background:var(--color-subtle);color:var(--color-ink-soft)">Neutral</span>
+  {% elif value %}<span class="badge" style="background:var(--color-subtle);color:var(--color-ink-soft)">{{ value }}</span>
+  {% else %}<span class="text-ink-faint text-xs">—</span>{% endif %}
+{% endif %}

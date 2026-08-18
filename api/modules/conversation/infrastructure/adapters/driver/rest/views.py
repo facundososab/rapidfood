@@ -3,11 +3,11 @@ from __future__ import annotations
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.modules.conversation.application.ports.driver.conversation_commands import (
+from modules.conversation.application.ports.driver.conversation_commands import (
     ListMessagesQuery,
     ReceiveMessageCommand,
 )
-from api.modules.conversation.infrastructure.adapters.driver.rest.serializers import WebhookSerializer
+from modules.conversation.infrastructure.adapters.driver.rest.serializers import WebhookSerializer
 
 
 class ConversationWebhookView(APIView):

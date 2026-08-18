@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from api.modules.conversation.domain.models.conversation import Conversation
-from api.modules.conversation.domain.value_objects import ConversationRecord
+from modules.conversation.domain.models.conversation import Conversation
+from modules.conversation.domain.value_objects import ConversationRecord
 
 
 class PrismaConversationRepository:

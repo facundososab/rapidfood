@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from api.modules.conversation.application.ports.driver.conversation_commands import AddMessageCommand
-from api.modules.conversation.application.ports.driver.conversation_responses import AddMessageResult, MessageDTO
-from api.modules.conversation.application.ports.driven.clock import ClockPort
-from api.modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
-from api.modules.conversation.domain.models.message import Message
+from modules.conversation.application.ports.driver.conversation_commands import AddMessageCommand
+from modules.conversation.application.ports.driver.conversation_responses import AddMessageResult, MessageDTO
+from modules.conversation.application.ports.driven.clock import ClockPort
+from modules.conversation.application.ports.driven.message_repository import MessageRepositoryPort
+from modules.conversation.domain.models.message import Message
 
 
 class AddMessageUseCase:

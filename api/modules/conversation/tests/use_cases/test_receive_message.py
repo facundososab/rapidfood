@@ -1,7 +1,7 @@
 def test_receive_message_stores_user_then_agent_and_detects_intent():
-    from api.modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
-    from api.modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
+    from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     class ConversationRepo:
         def __init__(self):
@@ -75,9 +75,9 @@ def test_receive_message_stores_user_then_agent_and_detects_intent():
 def test_receive_message_disambiguates_active_draft_using_order_related_ports():
     from datetime import datetime, timezone
 
-    from api.modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
-    from api.modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
+    from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     class ConversationRepo:
         def find_by_channel_identity(self, channel: str, channel_identity: str):
@@ -161,9 +161,9 @@ def test_receive_message_disambiguates_active_draft_using_order_related_ports():
 
 
 def test_receive_message_requires_explicit_confirmation_before_confirming_draft():
-    from api.modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
-    from api.modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
+    from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     class ConversationRepo:
         def find_by_channel_identity(self, channel: str, channel_identity: str):
@@ -224,9 +224,9 @@ def test_receive_message_requires_explicit_confirmation_before_confirming_draft(
 def test_receive_message_confirms_active_draft_through_order_port_when_confirmation_is_explicit():
     from datetime import datetime, timezone
 
-    from api.modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
-    from api.modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
-    from api.modules.conversation.domain.value_objects import DetectedIntent
+    from modules.conversation.application.ports.driver.conversation_commands import ReceiveMessageCommand
+    from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
+    from modules.conversation.domain.value_objects import DetectedIntent
 
     class ConversationRepo:
         def find_by_channel_identity(self, channel: str, channel_identity: str):

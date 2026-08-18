@@ -23,3 +23,12 @@ node_modules/
 Thumbs.db
 .idea/
 .vscode/
+
+# Skills
+.claude
+.gemini
+.codex
+.github
+
+#UI
+**/vendor/**

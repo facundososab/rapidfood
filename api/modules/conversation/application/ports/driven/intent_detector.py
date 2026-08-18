@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from api.modules.conversation.domain.value_objects import DetectedIntent
+from modules.conversation.domain.value_objects import DetectedIntent
 
 
 @runtime_checkable

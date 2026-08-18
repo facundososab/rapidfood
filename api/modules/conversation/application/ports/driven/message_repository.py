@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from api.modules.conversation.domain.models.message import Message
+from modules.conversation.domain.models.message import Message
 
 
 @runtime_checkable

@@ -36,40 +36,40 @@ dev = [
 #   between apps".
 # ---------------------------------------------------------------------------
 [tool.importlinter]
-root_package = "api"
+root_package = "modules"
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Hexagonal layers inside each app"
 type = "layers"
 containers = [
-  "api.modules.client", "api.modules.conversation", "api.modules.order", "api.modules.catalog", "api.modules.config_coupon",
+  "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon",
 ]
 layers = [
-  "infrastructure.adapters.driver.rest",
-  "infrastructure.adapters.driven",
-  "application.use_cases",
-  "application.ports.driver",
-  "application.ports.driven",
+  "adapters.driver",             # DRF views/serializers (highest)
+  "adapters.driven",             # Prisma repositories/gateways
+  "application.ports.driver",    # driver port interfaces
+  "application.use_cases",       # orchestration
+  "application.ports.driven",    # driven port interfaces
   "domain",                      # pure domain (lowest)
 ]
 # NOTE: composition/ is intentionally outside this contract — it is the wiring root.
 # If lint-imports flags composition imports, add "composition" as the top layer.
 
 [[tool.importlinter.contracts]]
-name = "No inbound HTTP adapter to outbound adapter (views never touch the DB)"
+name = "No driver adapter to driven adapter (views never touch the DB)"
 type = "forbidden"
-source_modules = ["apps.*.adapters.inbound.http"]
-forbidden_modules = ["api.modules.*.infrastructure.adapters.driven"]
+source_modules = ["modules.*.adapters.driver"]
+forbidden_modules = ["modules.*.adapters.driven"]
 as_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Domain, ports and use cases must not import frameworks"
 type = "forbidden"
 source_modules = [
-  "api.modules.*.domain",
-  "api.modules.*.application.ports",
-  "api.modules.*.application.use_cases",
+  "modules.*.domain",
+  "modules.*.application.ports",
+  "modules.*.application.use_cases",
 ]
 forbidden_modules = ["django", "rest_framework", "prisma"]
 as_packages = true
@@ -80,59 +80,59 @@ as_packages = true
 [[tool.importlinter.contracts]]
 name = "conversation consumes siblings only via application.ports"
 type = "forbidden"
-source_modules = ["api.modules.conversation"]
-forbidden_modules = ["api.modules.order", "api.modules.client", "api.modules.catalog", "api.modules.config_coupon"]
+source_modules = ["modules.conversation"]
+forbidden_modules = ["modules.order", "modules.client", "modules.catalog", "modules.config_coupon"]
 as_packages = true
 unmatched_ignore_imports_alerting = "warn"
 ignore_imports = [
-  "api.modules.conversation.** -> api.modules.order.application.ports.**",
-  "api.modules.conversation.** -> api.modules.client.application.ports.**",
-  "api.modules.conversation.** -> api.modules.catalog.application.ports.**",
-  "api.modules.conversation.** -> api.modules.config_coupon.application.ports.**",
+  "modules.conversation.** -> modules.order.application.ports.**",
+  "modules.conversation.** -> modules.client.application.ports.**",
+  "modules.conversation.** -> modules.catalog.application.ports.**",
+  "modules.conversation.** -> modules.config_coupon.application.ports.**",
 ]
 
 [[tool.importlinter.contracts]]
 name = "order consumes siblings only via application.ports"
 type = "forbidden"
-source_modules = ["api.modules.order"]
-forbidden_modules = ["api.modules.client", "api.modules.catalog", "api.modules.config_coupon"]
+source_modules = ["modules.order"]
+forbidden_modules = ["modules.client", "modules.catalog", "modules.config_coupon"]
 as_packages = true
 unmatched_ignore_imports_alerting = "warn"
 ignore_imports = [
-  "api.modules.order.** -> api.modules.client.application.ports.**",
-  "api.modules.order.** -> api.modules.catalog.application.ports.**",
-  "api.modules.order.** -> api.modules.config_coupon.application.ports.**",
+  "modules.order.** -> modules.client.application.ports.**",
+  "modules.order.** -> modules.catalog.application.ports.**",
+  "modules.order.** -> modules.config_coupon.application.ports.**",
 ]
 
 [[tool.importlinter.contracts]]
 name = "client consumes siblings only via application.ports"
 type = "forbidden"
-source_modules = ["api.modules.client"]
-forbidden_modules = ["api.modules.conversation", "api.modules.order", "api.modules.catalog", "api.modules.config_coupon"]
+source_modules = ["modules.client"]
+forbidden_modules = ["modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon"]
 as_packages = true
 
 [[tool.importlinter.contracts]]
 name = "catalog consumes siblings only via application.ports"
 type = "forbidden"
-source_modules = ["api.modules.catalog"]
-forbidden_modules = ["api.modules.client", "api.modules.conversation", "api.modules.order", "api.modules.config_coupon"]
+source_modules = ["modules.catalog"]
+forbidden_modules = ["modules.client", "modules.conversation", "modules.order", "modules.config_coupon"]
 as_packages = true
 
 [[tool.importlinter.contracts]]
 name = "config_coupon consumes siblings only via application.ports"
 type = "forbidden"
-source_modules = ["api.modules.config_coupon"]
-forbidden_modules = ["api.modules.client", "api.modules.conversation", "api.modules.order", "api.modules.catalog"]
+source_modules = ["modules.config_coupon"]
+forbidden_modules = ["modules.client", "modules.conversation", "modules.order", "modules.catalog"]
 as_packages = true
 
 [[tool.importlinter.contracts]]
 name = "No circular imports between apps"
 type = "acyclic_siblings"
-ancestors = ["api.modules"]
+ancestors = ["modules"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "api.config.settings"
-pythonpath = ["."]              # makes `apps.*` and `config.*` importable
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["api"]              # makes `modules.*` and `config.*` importable
 testpaths = ["tests", "api/modules", "api/shared/infrastructure/prisma/tests"]
 addopts = "-ra --strict-markers"
 markers = [

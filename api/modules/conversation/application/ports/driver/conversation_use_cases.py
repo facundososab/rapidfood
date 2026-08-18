@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from api.modules.conversation.application.ports.driver.conversation_commands import (
+from modules.conversation.application.ports.driver.conversation_commands import (
     AddMessageCommand,
     GetOrCreateConversationCommand,
     ListMessagesQuery,
     ReceiveMessageCommand,
 )
-from api.modules.conversation.application.ports.driver.conversation_responses import (
+from modules.conversation.application.ports.driver.conversation_responses import (
     AddMessageResult,
     GetOrCreateConversationResult,
     ListMessagesResult,

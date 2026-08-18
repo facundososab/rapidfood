@@ -1,5 +1,5 @@
 def test_container_explicitly_wires_use_cases():
-    from api.modules.conversation.configuration.container import build_container
+    from modules.conversation.configuration.container import build_container
 
     container = build_container()
 

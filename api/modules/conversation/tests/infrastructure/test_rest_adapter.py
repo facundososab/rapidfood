@@ -1,5 +1,5 @@
 def test_webhook_serializer_rejects_missing_payload_fields():
-    from api.modules.conversation.infrastructure.adapters.driver.rest.serializers import WebhookSerializer
+    from modules.conversation.infrastructure.adapters.driver.rest.serializers import WebhookSerializer
 
     serializer = WebhookSerializer(data={"channel": "WHATSAPP"})
     assert serializer.is_valid() is False
@@ -16,8 +16,8 @@ def test_webhook_view_route_is_resolvable():
 
 def test_webhook_endpoint_persists_and_returns_transport_safe_payload():
     from django.test import Client
-    from api.modules.conversation.configuration.container import build_container
-    from api.modules.conversation.infrastructure.adapters.driver.rest.views import (
+    from modules.conversation.configuration.container import build_container
+    from modules.conversation.infrastructure.adapters.driver.rest.views import (
         ConversationMessagesView,
         ConversationWebhookView,
     )
@@ -43,8 +43,8 @@ def test_webhook_endpoint_persists_and_returns_transport_safe_payload():
 
 def test_messages_endpoint_returns_chronological_history():
     from django.test import Client
-    from api.modules.conversation.configuration.container import build_container
-    from api.modules.conversation.infrastructure.adapters.driver.rest.views import (
+    from modules.conversation.configuration.container import build_container
+    from modules.conversation.infrastructure.adapters.driver.rest.views import (
         ConversationMessagesView,
         ConversationWebhookView,
     )

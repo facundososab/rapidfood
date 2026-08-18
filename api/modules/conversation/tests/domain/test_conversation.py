@@ -2,8 +2,8 @@ import pytest
 
 
 def test_conversation_rejects_empty_id_and_channel():
-    from api.modules.conversation.domain.errors import ConversationValidationError
-    from api.modules.conversation.domain.models.conversation import Conversation
+    from modules.conversation.domain.errors import ConversationValidationError
+    from modules.conversation.domain.models.conversation import Conversation
 
     with pytest.raises(ConversationValidationError):
         Conversation(conversation_id="", channel="WHATSAPP")
@@ -13,8 +13,8 @@ def test_conversation_rejects_empty_id_and_channel():
 
 
 def test_conversation_accepts_valid_last_intent_and_sentiment():
-    from api.modules.conversation.domain.models.conversation import Conversation
-    from api.modules.conversation.domain.value_objects import DetectedIntent, Sentiment
+    from modules.conversation.domain.models.conversation import Conversation
+    from modules.conversation.domain.value_objects import DetectedIntent, Sentiment
 
     conversation = Conversation(
         conversation_id="conv-1",
@@ -29,8 +29,8 @@ def test_conversation_accepts_valid_last_intent_and_sentiment():
 
 
 def test_conversation_rejects_invalid_last_intent():
-    from api.modules.conversation.domain.errors import ConversationValidationError
-    from api.modules.conversation.domain.models.conversation import Conversation
+    from modules.conversation.domain.errors import ConversationValidationError
+    from modules.conversation.domain.models.conversation import Conversation
 
     with pytest.raises(ConversationValidationError):
         Conversation(conversation_id="conv-1", channel="WHATSAPP", last_intent="oops")

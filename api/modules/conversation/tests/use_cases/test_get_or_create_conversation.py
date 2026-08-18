@@ -1,12 +1,12 @@
 def test_get_or_create_reuses_existing_conversation():
-    from api.modules.conversation.application.use_cases.get_or_create_conversation import (
+    from modules.conversation.application.use_cases.get_or_create_conversation import (
         GetOrCreateConversationUseCase,
     )
-    from api.modules.conversation.application.ports.driver.conversation_commands import (
+    from modules.conversation.application.ports.driver.conversation_commands import (
         GetOrCreateConversationCommand,
     )
-    from api.modules.conversation.domain.models.conversation import Conversation
-    from api.modules.conversation.domain.value_objects import ConversationRecord
+    from modules.conversation.domain.models.conversation import Conversation
+    from modules.conversation.domain.value_objects import ConversationRecord
 
     class ConversationRepo:
         def __init__(self):
@@ -30,10 +30,10 @@ def test_get_or_create_reuses_existing_conversation():
 
 
 def test_get_or_create_creates_new_conversation():
-    from api.modules.conversation.application.use_cases.get_or_create_conversation import (
+    from modules.conversation.application.use_cases.get_or_create_conversation import (
         GetOrCreateConversationUseCase,
     )
-    from api.modules.conversation.application.ports.driver.conversation_commands import (
+    from modules.conversation.application.ports.driver.conversation_commands import (
         GetOrCreateConversationCommand,
     )
 

@@ -44,22 +44,6 @@ uv run pytest                                # incluye smoke test de DB vía Pri
 uv run lint-imports                          # contracts de import-linter verdes
 ```
 
-## Estructura
-
-```
-rapidfood/
-├── config/                 # shell Django: settings, urls (/health), wsgi/asgi, db.py (singleton Prisma)
-├── apps/{client,conversation,order,catalog,config_coupon}/
-│   ├── domain/             # entidades puras (sin imports de frameworks)
-│   ├── application/ports/{inbound,outbound}/   # Protocolos + DTOs (contratos)
-│   ├── application/use_cases/                  # orquestación pura
-│   ├── adapters/{inbound/http,outbound/prisma}/# adaptadores de borde
-│   └── composition/        # wiring root (container.py)
-├── schema.prisma           # fuente de verdad del modelo de datos (15 entidades)
-├── migrations/             # migraciones commiteadas (schema en la raíz → CLI usa ./migrations)
-└── tests/                  # conftest (test DB + migrate deploy) + smoke tests
-```
-
 Reglas de arquitectura (verificadas por `uv run lint-imports`):
 
 - Las apps se comunican entre sí SOLO vía `application/ports` (nunca `adapters/`, `use_cases/`, `domain/`).

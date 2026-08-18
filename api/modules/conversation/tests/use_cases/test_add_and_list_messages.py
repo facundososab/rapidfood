@@ -2,13 +2,13 @@ from datetime import datetime, timezone
 
 
 def test_add_message_returns_plain_dto_and_list_is_chronological():
-    from api.modules.conversation.application.ports.driver.conversation_commands import (
+    from modules.conversation.application.ports.driver.conversation_commands import (
         AddMessageCommand,
         ListMessagesQuery,
     )
-    from api.modules.conversation.application.use_cases.add_message import AddMessageUseCase
-    from api.modules.conversation.application.use_cases.list_messages import ListMessagesUseCase
-    from api.modules.conversation.domain.value_objects import MessageRole, MessageStatus, Sentiment
+    from modules.conversation.application.use_cases.add_message import AddMessageUseCase
+    from modules.conversation.application.use_cases.list_messages import ListMessagesUseCase
+    from modules.conversation.domain.value_objects import MessageRole, MessageStatus, Sentiment
 
     class MessageRepo:
         def __init__(self):

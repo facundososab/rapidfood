@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from api.modules.conversation.domain.models.conversation import Conversation
-from api.modules.conversation.domain.value_objects import ConversationRecord, DetectedIntent
+from modules.conversation.domain.models.conversation import Conversation
+from modules.conversation.domain.value_objects import ConversationRecord, DetectedIntent
 
 
 @runtime_checkable
