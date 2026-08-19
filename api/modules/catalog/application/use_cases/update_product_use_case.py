@@ -40,6 +40,9 @@ class UpdateProductUseCase(UpdateProductPort):
         if command.description is not None:
             product.description = command.description
 
+        if command.image_url is not None:
+            product.image_url = command.image_url or None
+
         if command.category_id is not None and command.category_id != product.category_id:
             if self._categories.find_by_id(command.category_id) is None:
                 raise CategoryNotFoundError(command.category_id)
@@ -60,6 +63,7 @@ class UpdateProductUseCase(UpdateProductPort):
             id=product.id,
             name=product.name,
             description=product.description,
+            image_url=product.image_url,
             state=product.state.value,
             category_id=product.category_id,
             category=category,

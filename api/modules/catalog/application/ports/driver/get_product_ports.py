@@ -10,6 +10,7 @@ class ProductDetail:
     id: str
     name: str
     description: str
+    image_url: Optional[str]
     state: str
     category_id: str
     category: Optional[Category]

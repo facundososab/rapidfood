@@ -15,3 +15,8 @@ class ProductWithoutPriceError(DomainError):
     def __init__(self, product_id: str) -> None:
         super().__init__(f"El producto {product_id} no tiene un precio vigente")
         self.product_id = product_id
+
+class ProductInUseError(DomainError):
+    def __init__(self, product_id: str) -> None:
+        super().__init__(f"El producto {product_id} no puede eliminarse porque está en uso")
+        self.product_id = product_id

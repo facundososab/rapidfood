@@ -9,6 +9,7 @@ class UpdateProductCommand:
     product_id: str
     name: Optional[str] = None
     description: Optional[str] = None
+    image_url: Optional[str] = None
     category_id: Optional[str] = None
     available: Optional[bool] = None
 

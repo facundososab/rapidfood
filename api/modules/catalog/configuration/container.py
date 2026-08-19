@@ -7,6 +7,9 @@ from modules.catalog.application.use_cases.create_category_use_case import (
 from modules.catalog.application.use_cases.create_product_use_case import (
     CreateProductUseCase,
 )
+from modules.catalog.application.use_cases.delete_product_use_case import (
+    DeleteProductUseCase,
+)
 from modules.catalog.application.use_cases.get_product_use_case import (
     GetProductUseCase,
 )
@@ -55,6 +58,7 @@ class CatalogContainer:
         id_generator = UuidGenerator()
 
         self.create_product = CreateProductUseCase(products, categories, id_generator)
+        self.delete_product = DeleteProductUseCase(products)
         self.set_product_state = SetProductStateUseCase(products)
         self.add_price = AddPriceUseCase(products, prices, id_generator)
         self.create_category = CreateCategoryUseCase(categories, id_generator)

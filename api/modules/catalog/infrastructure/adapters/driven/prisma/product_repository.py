@@ -1,5 +1,10 @@
+from prisma.errors import ForeignKeyViolationError
+
 from modules.catalog.application.ports.driven.product_repository_port import (
     ProductRepositoryPort,
+)
+from modules.catalog.domain.errors.catalog_errors import (
+    ProductInUseError,
 )
 from modules.catalog.domain.models.product import Product, ProductState
 from shared.infrastructure.prisma.db import db
@@ -13,12 +18,14 @@ class PrismaProductRepository(ProductRepositoryPort):
                     "id": product.id,
                     "name": product.name,
                     "description": product.description,
+                    "imageUrl": product.image_url,
                     "available": product.state == ProductState.AVAILABLE,
                     "categoryId": product.category_id,
                 },
                 "update": {
                     "name": product.name,
                     "description": product.description,
+                    "imageUrl": product.image_url,
                     "available": product.state == ProductState.AVAILABLE,
                 },
             },
@@ -44,6 +51,13 @@ class PrismaProductRepository(ProductRepositoryPort):
         records = db.client.product.find_many(where=where)
         return [self._to_domain(record) for record in records]
 
+    def delete(self, product_id: str) -> None:
+        try:
+            db.client.product.delete(where={"id": product_id})
+        except ForeignKeyViolationError as exc:
+            # OrderLine.product keeps a Restrict relation: history protects products.
+            raise ProductInUseError(product_id) from exc
+
 
     @staticmethod
     def _to_domain(record) -> Product:
@@ -53,4 +67,5 @@ class PrismaProductRepository(ProductRepositoryPort):
             description=record.description,
             state=ProductState.AVAILABLE if record.available else ProductState.UNAVAILABLE,
             category_id=record.categoryId,
+            image_url=record.imageUrl,
         )

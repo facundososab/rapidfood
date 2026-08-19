@@ -96,6 +96,33 @@
   }
   .badge-dot { width: .375rem; height: .375rem; border-radius: 999px; }
 
+  .badge-cat {
+    display: inline-flex; align-items: center; gap: .375rem;
+    font-size: .8125rem; font-weight: 600; line-height: 1;
+    padding: .5rem .875rem; border-radius: 999px; white-space: nowrap;
+    background: var(--color-surface); color: var(--color-ink-soft);
+    border: 1px solid var(--color-line);
+    transition: background-color .15s, border-color .15s, color .15s;
+    cursor: pointer;
+  }
+  .badge-cat:hover { border-color: var(--color-line-strong); color: var(--color-ink); }
+  .badge-cat.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+  .toggle {
+    display: grid; gap: 2px; padding: 3px;
+    background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: 12px;
+  }
+  .toggle.inline { grid-auto-flow: column; }
+  .toggle button {
+    display: flex; align-items: center; justify-content: center; gap: .5rem;
+    font-size: .8125rem; font-weight: 600; color: var(--color-ink-soft);
+    padding: .625rem .75rem; border-radius: 9px; cursor: pointer; width: 100%;
+    transition: background-color .15s, color .15s, box-shadow .15s;
+  }
+  .toggle button:hover { background: var(--color-subtle); color: var(--color-ink); }
+  .toggle button.active { background: var(--color-primary); color: #fff; box-shadow: 0 1px 3px rgba(47,109,246,.35); }
+  .toggle button.active svg { color: #fff; }
+
   .field {
     width: 100%; font-size: .875rem; color: var(--color-ink);
     background: var(--color-surface); border: 1px solid var(--color-line-strong);
@@ -115,6 +142,16 @@
   .nav-item:hover { background: var(--color-subtle); color: var(--color-ink); }
   .nav-item.active { background: var(--color-primary-soft); color: var(--color-primary); font-weight: 600; }
   .nav-item.active svg { color: var(--color-primary); }
+
+  .order-index {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--color-ink-faint);
+    min-width: 1.9rem;
+  }
 }
 
 /* htmx swap fade */
@@ -122,3 +159,6 @@
 .htmx-settling { opacity: 1; transition: opacity .15s ease; }
 #htmx-indicator { opacity: 0; transition: opacity .15s; }
 .htmx-request #htmx-indicator, .htmx-request.global-indicator { opacity: 1; }
+
+/* order listing grid loading state */
+#orders-grid.htmx-request { opacity: .5; transition: opacity .15s ease; }

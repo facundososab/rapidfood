@@ -3,6 +3,7 @@ from rest_framework import serializers
 class CreateProductSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     description = serializers.CharField(max_length=255)
+    image_url = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     category_id = serializers.CharField()
 
 class SetProductStateSerializer(serializers.Serializer):
@@ -21,6 +22,7 @@ class CreateCategorySerializer(serializers.Serializer):
 class UpdateProductSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(max_length=255, required=False)
+    image_url = serializers.CharField(max_length=2000, required=False, allow_blank=True, allow_null=True)
     category_id = serializers.CharField(required=False)
     available = serializers.BooleanField(required=False)
 

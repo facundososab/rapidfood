@@ -16,6 +16,16 @@
       <textarea id="product-description" class="field resize-none" name="description" rows="3" placeholder="Detalle del producto, ingredientes, tamaño…">{{ product.description }}</textarea>
     </div>
     <div>
+      <label for="product-image" class="th block mb-2">Imagen (URL) <span class="text-ink-faint font-normal">— opcional</span></label>
+      <input id="product-image" class="field" name="image_url" type="url" value="{{ product.imageUrl|default:'' }}" placeholder="https://…" x-data="{ img: '{{ product.imageUrl|default:'' }}' }" x-model="img">
+      <div class="mt-2 flex items-center gap-2.5">
+        <template x-if="img">
+          <img :src="img" @error="$el.style.display='none'" referrerpolicy="no-referrer" class="w-14 h-14 rounded-lg object-cover border border-line bg-muted" alt="Vista previa">
+        </template>
+        <p class="text-[12px] text-ink-faint">Se muestra en el listado y en la ficha del producto.</p>
+      </div>
+    </div>
+    <div>
       <label for="product-category" class="th block mb-2">Categoría</label>
       <select id="product-category" class="field" name="category_id" required>
         {% for c in categories %}

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Optional, Protocol
 
 from modules.catalog.domain.models.product import ProductState
 
@@ -15,6 +15,7 @@ class ProductSummary:
     id: str
     name: str
     description: str
+    image_url: Optional[str]
     state: str
     category_id: str
 

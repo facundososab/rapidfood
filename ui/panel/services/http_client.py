@@ -5,11 +5,11 @@ call against the backend that owns the domain/Prisma/PostgreSQL, and parses the
 JSON responses back into the same DTOs the mock returns. It deliberately does NOT
 reimplement any business rule — it only transports and maps.
 
-Products and orders are wired to the real catalog/order endpoints
-(``api/catalog/*``, ``api/orders/*``) mapping their canonical snake_case /
-``state`` payloads into the UI DTOs. The remaining modules (clients, coupons,
-payments, conversations, business configuration) have no backend endpoints yet,
-so their read methods return empty/neutral values to keep the panel navigable.
+Products, orders and clients are wired to the real catalog/order/client endpoints
+(``api/catalog/*``, ``api/orders/*``, ``api/clients/*``) mapping their canonical
+payloads into the UI DTOs. The remaining modules (coupons, payments,
+conversations, business configuration) have no backend endpoints yet, so their
+read methods return empty/neutral values to keep the panel navigable.
 """
 from __future__ import annotations
 
@@ -75,6 +75,10 @@ class HttpRapidfoodClient(RapidfoodClient):
         self._raise_if_error(resp)
         return resp.json()
 
+    def _delete(self, path: str) -> None:
+        resp = self.session.delete(f"{self.base_url}{path}", timeout=15)
+        self._raise_if_error(resp)
+
     @staticmethod
     def _raise_if_error(resp) -> None:
         if resp.ok:
@@ -84,7 +88,7 @@ class HttpRapidfoodClient(RapidfoodClient):
             message = body.get("detail") or body.get("error") or resp.text
         except Exception:
             message = resp.text
-        raise RuntimeError(f"{resp.request.method} {resp.url} -> {resp.status_code}: {message}")
+        raise RuntimeError(message)
 
     # -- mappers (JSON -> DTO) ---------------------------------------------
     def _client(self, d) -> Optional[dtos.Client]:
@@ -109,7 +113,8 @@ class HttpRapidfoodClient(RapidfoodClient):
             available = state == "available"
         return dtos.Product(id=d["id"], name=d["name"], description=d["description"], available=bool(available),
                             categoryId=d["category_id"], category=self._category(d.get("category")),
-                            prices=[self._price(p) for p in d.get("prices", [])])
+                            prices=[self._price(p) for p in d.get("prices", [])],
+                            imageUrl=d.get("image_url") or None)
 
     def _line(self, d) -> dtos.OrderLine:
         return dtos.OrderLine(id=d["id"], orderId=d["order_id"], productId=d["product_id"],
@@ -213,6 +218,10 @@ class HttpRapidfoodClient(RapidfoodClient):
         self._patch(f"/api/orders/{order_id}/status/", {"status": status})
         return self.get_order(order_id)
 
+    def cancel_order(self, order_id, reason=""):
+        self._post(f"/api/orders/{order_id}/cancel/", {"reason": reason})
+        return self.get_order(order_id)
+
     def create_order(self, payload):
         body = {}
         if payload.get("client_id"):
@@ -267,17 +276,23 @@ class HttpRapidfoodClient(RapidfoodClient):
         return self._product(self._patch(f"/api/catalog/products/{product_id}/",
                                          {"available": bool(available)}))
 
+    def delete_product(self, product_id):
+        self._delete(f"/api/catalog/products/{product_id}/")
+
     def save_product(self, payload):
         product_id = payload.get("id")
         if product_id:
             body = {"name": payload["name"], "description": payload["description"],
                     "category_id": payload["category_id"]}
+            if payload.get("image_url") is not None:
+                body["image_url"] = payload["image_url"]
             if payload.get("available") is not None:
                 body["available"] = bool(payload["available"])
             self._patch(f"/api/catalog/products/{product_id}/", body)
             return self.get_product(product_id)
         created = self._post("/api/catalog/products/", {
-            "name": payload["name"], "description": payload["description"], "category_id": payload["category_id"],
+            "name": payload["name"], "description": payload["description"],
+            "category_id": payload["category_id"], "image_url": payload.get("image_url") or "",
         })
         new_id = created["id"]
         if payload.get("available") is not None:
@@ -311,18 +326,28 @@ class HttpRapidfoodClient(RapidfoodClient):
     def all_payments(self):
         return []
 
-    # -- clients (not in scope yet) ----------------------------------------
+    # -- clients ------------------------------------------------------------
     def list_clients(self, *, search=None, page=1, page_size=15):
-        return _paginate_items([], page, page_size)
+        rows = [self._client(x) for x in self._get("/api/clients/", search=search)]
+        rows = [c for c in rows if c is not None]
+        rows.sort(key=lambda c: (c.name, c.lastName))
+        return _paginate_items(rows, page, page_size)
 
     def get_client(self, client_id):
-        return None
+        return self._client(self._get(f"/api/clients/{client_id}/"))
+
+    def delete_client(self, client_id):
+        self._delete(f"/api/clients/{client_id}/")
 
     def create_client(self, name, last_name, phone):
-        raise NotImplementedError("El módulo de clientes no existe en el backend todavía.")
+        raise NotImplementedError("Crear clientes no está soportado por el backend todavía.")
 
     def search_clients(self, query):
-        return []
+        return self.list_clients(search=query, page=1, page_size=8).items
+
+    # -- delivery addresses (not in scope yet) ----------------------------
+    def create_address(self, payload):
+        raise NotImplementedError("El módulo de direcciones no existe en el backend todavía.")
 
     # -- coupons (not in scope yet) ----------------------------------------
     def list_coupons(self):

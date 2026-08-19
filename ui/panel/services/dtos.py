@@ -113,6 +113,8 @@ class Product:
     prices: List[Price] = field(default_factory=list)
     # convenience (resolved by the client, not a schema field)
     category: Optional[Category] = None
+    # optional; schema Product.imageUrl
+    imageUrl: Optional[str] = None
 
 
 @dataclass

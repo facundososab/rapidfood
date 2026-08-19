@@ -11,6 +11,7 @@ from modules.catalog.configuration.container import (
     CatalogContainer,
     get_catalog_container,
 )
+from modules.client.configuration.container import ClientContainer
 from modules.order.configuration.container import OrderContainer
 from modules.order.infrastructure.adapters.driven.catalog.catalog_product_query import (
     CatalogProductQuery,
@@ -21,6 +22,12 @@ from modules.order.infrastructure.adapters.driven.catalog.catalog_product_query 
 def get_app_catalog_container() -> CatalogContainer:
     """Exposes the catalog wiring root so its views stay out of modules.*."""
     return get_catalog_container()
+
+
+@lru_cache(maxsize=1)
+def get_app_client_container() -> ClientContainer:
+    """Exposes the client wiring root so its views stay out of modules.*."""
+    return ClientContainer()
 
 
 @lru_cache(maxsize=1)

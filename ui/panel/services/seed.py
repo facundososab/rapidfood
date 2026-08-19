@@ -69,7 +69,8 @@ class Dataset:
         cat_by_id = {c.id: c for c in self.categories}
         for pid, name, desc, cat, prices, available in product_spec:
             prod = dtos.Product(id=pid, name=name, description=desc, available=available,
-                                categoryId=cat, category=cat_by_id[cat])
+                                categoryId=cat, category=cat_by_id[cat],
+                                imageUrl="https://picsum.photos/seed/rapidfood/400")
             for days_ago, price in prices:
                 pr = dtos.Price(id=self.next_id("price"), productId=pid,
                                 sinceDate=_dt(days_ago), price=D(price))

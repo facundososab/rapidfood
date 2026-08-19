@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 class ProductState(str, Enum):
     AVAILABLE = "available"
@@ -12,6 +13,7 @@ class Product:
     description: str
     state: ProductState
     category_id: str
+    image_url: Optional[str] = None
 
     def mark_available(self) -> None:
         self.state = ProductState.AVAILABLE

@@ -68,6 +68,26 @@ def date_fmt(value) -> str:
 
 
 @register.filter
+def date_short_fmt(value) -> str:
+    """Short Spanish date: 19 ago 2026 (locale-independent)."""
+    if value is None:
+        return "—"
+    if isinstance(value, datetime):
+        month = ("ene feb mar abr may jun jul ago sep oct nov dic".split())[value.month - 1]
+        return f"{value.day} {month} {value.year}"
+    return str(value)
+
+
+@register.filter
+def time_fmt(value) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    return str(value)
+
+
+@register.filter
 def time_ago(value) -> str:
     if not isinstance(value, datetime):
         return "—"

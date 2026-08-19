@@ -9,7 +9,12 @@
 {% block content %}
 <div class="max-w-2xl space-y-4" x-data="{ priceModal: false, historyModal: false, options: false }" @keydown.escape.window="options = false">
 
-  <div class="card p-5">
+  <div class="card overflow-hidden">
+    {% if product.imageUrl %}
+      <img src="{{ product.imageUrl }}" referrerpolicy="no-referrer" onerror="this.style.display='none'"
+           class="h-48 w-full object-cover bg-muted" alt="Foto de {{ product.name }}">
+    {% endif %}
+    <div class="p-5">
     <div class="relative flex items-center justify-between gap-3 mb-4 border-b border-line pb-3">
       <span class="badge {% if product.available %}bg-success-soft text-success{% else %}bg-neutral-soft text-neutral{% endif %}">
         <span class="badge-dot {% if product.available %}bg-success{% else %}bg-neutral{% endif %}"></span>
@@ -32,6 +37,14 @@
           {% include 'components/icon.html' with name='settings' cls='w-4 h-4 text-ink-muted' %}
           Editar producto
         </a>
+        <form method="post" action="{% url 'product_delete' product.id %}" onsubmit="return confirm('¿Eliminar «{{ product.name|escapejs }}»? Esta acción no se puede deshacer.')">
+          {% csrf_token %}
+          <button type="submit" role="menuitem"
+                  class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-danger hover:bg-subtle transition-colors cursor-pointer">
+            {% include 'components/icon.html' with name='trash' cls='w-4 h-4' %}
+            Eliminar producto
+          </button>
+        </form>
       </div>
     </div>
     <div class="grid sm:grid-cols-2 gap-4">
@@ -47,6 +60,7 @@
     <div class="mt-4">
       <label for="product-description" class="th block mb-1.5">Descripción</label>
       <textarea id="product-description" class="field resize-none" rows="3" disabled>{{ product.description }}</textarea>
+    </div>
     </div>
   </div>
 

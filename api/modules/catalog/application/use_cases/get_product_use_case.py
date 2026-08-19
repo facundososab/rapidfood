@@ -37,6 +37,7 @@ class GetProductUseCase(GetProductPort):
             id=product.id,
             name=product.name,
             description=product.description,
+            image_url=product.image_url,
             state=product.state.value,
             category_id=product.category_id,
             category=category,

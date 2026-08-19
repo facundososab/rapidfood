@@ -11,6 +11,9 @@ from modules.catalog.application.ports.driver.create_category_ports import (
 from modules.catalog.application.ports.driver.create_product_ports import (
     CreateProductCommand,
 )
+from modules.catalog.application.ports.driver.delete_product_ports import (
+    DeleteProductCommand,
+)
 from modules.catalog.application.ports.driver.get_product_ports import ProductDetail
 from modules.catalog.application.ports.driver.list_prices_ports import ListPricesQuery
 from modules.catalog.application.ports.driver.list_products_ports import (
@@ -26,6 +29,7 @@ from modules.catalog.application.ports.driver.update_product_ports import (
 from composition.container import get_app_catalog_container
 from modules.catalog.domain.errors.catalog_errors import (
     CategoryNotFoundError,
+    ProductInUseError,
     ProductNotFoundError,
 )
 from modules.catalog.domain.models.product import ProductState
@@ -45,6 +49,7 @@ def _serialize_product(detail: ProductDetail) -> dict:
         "id": detail.id,
         "name": detail.name,
         "description": detail.description,
+        "image_url": detail.image_url,
         "state": detail.state,
         "category_id": detail.category_id,
         "category": (
@@ -177,6 +182,23 @@ class ProductDetailView(APIView):
             )
 
         return Response(_serialize_product(result))
+
+    def delete(self, request, product_id: str):
+        command = DeleteProductCommand(product_id=product_id)
+
+        container = get_app_catalog_container()
+        try:
+            container.delete_product.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except ProductInUseError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_409_CONFLICT
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CategoryListCreateView(APIView):
