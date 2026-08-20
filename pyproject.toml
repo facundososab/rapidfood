@@ -133,7 +133,7 @@ ancestors = ["modules"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["api"]              # makes `modules.*` and `config.*` importable
-testpaths = ["tests"]
+testpaths = ["tests", "api/modules", "api/shared/infrastructure/prisma/tests"]
 addopts = "-ra --strict-markers"
 markers = [
   "db: test that requires the Prisma-managed test database",

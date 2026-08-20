@@ -17,15 +17,23 @@ owns its own connection pool); each test cleans up after itself.
 
 import os
 import subprocess
+from pathlib import Path
 from urllib.parse import urlparse
 
 import psycopg
-from psycopg import sql
 import pytest
 from prisma import Prisma
+from psycopg import sql
+
+
+PRISMA_SCHEMA = (
+    Path(__file__).resolve().parents[1]
+    / "schema.prisma"
+)
 
 
 def _test_database_url() -> str:
+    """Build the dedicated Prisma test database URL from DATABASE_URL."""
     try:
         raw = os.environ["DATABASE_URL"]
     except KeyError:
@@ -33,34 +41,52 @@ def _test_database_url() -> str:
             "DATABASE_URL is not set. Create .env (`cp .env.example .env`) "
             "and make sure `docker compose up -d db` is running."
         ) from None
+
     parsed = urlparse(raw)
-    return parsed._replace(path=f"/test_{parsed.path.lstrip('/')}").geturl()
+    return parsed._replace(
+        path=f"/test_{parsed.path.lstrip('/')}"
+    ).geturl()
 
 
 def _ensure_test_database_exists(test_url: str) -> None:
-    """Create the test database if missing (connect via the maintenance DB)."""
+    """Create the test database if missing.
+
+    Connects through PostgreSQL's maintenance database (`postgres`) because
+    PostgreSQL cannot create a database while connected to that same database.
+    """
     parsed = urlparse(test_url)
     dbname = parsed.path.lstrip("/")
     maintenance_url = parsed._replace(path="/postgres").geturl()
-    # Explicit connect_timeout: Docker Desktop keeps a proxy listening on the
-    # port even when the container is stopped, so a plain connect would hang
-    # instead of failing fast. 5s x 2 stacks (~10s) = "fast failure" without
-    # Postgres.
-    with psycopg.connect(maintenance_url, autocommit=True, connect_timeout=5) as conn:
+
+    # Explicit connect_timeout:
+    # Docker Desktop may keep a proxy listening on the port even when the
+    # Postgres container is stopped. Without a timeout the connection could
+    # hang instead of failing quickly.
+    with psycopg.connect(
+        maintenance_url,
+        autocommit=True,
+        connect_timeout=5,
+    ) as conn:
         exists = conn.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s", (dbname,)
+            "SELECT 1 FROM pg_database WHERE datname = %s",
+            (dbname,),
         ).fetchone()
+
         if not exists:
             conn.execute(
-                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname))
+                sql.SQL("CREATE DATABASE {}").format(
+                    sql.Identifier(dbname)
+                )
             )
 
 
 @pytest.fixture(scope="session", autouse=True)
 def prisma_test_db(django_db_setup, django_db_blocker):
-    """pytest-django sets Django up; we then create the test DB + ALL Prisma tables."""
+    """Create/migrate the Prisma test database once per pytest session."""
     test_url = _test_database_url()
+
     _ensure_test_database_exists(test_url)
+
     with django_db_blocker.unblock():
         subprocess.run(
             [
@@ -70,19 +96,36 @@ def prisma_test_db(django_db_setup, django_db_blocker):
                 "migrate",
                 "deploy",
                 "--schema",
-                "shared/infrastructure/prisma/schema.prisma",
+                str(PRISMA_SCHEMA),
             ],
-            env={**os.environ, "DATABASE_URL": test_url},
+            env={
+                **os.environ,
+                "DATABASE_URL": test_url,
+            },
             check=True,
         )
-    yield  # pytest-django tears the test DB down at session end
+
+    yield
 
 
 @pytest.fixture(scope="session")
 def db(prisma_test_db):
-    """Session-scoped Prisma client bound to the test database."""
-    os.environ["DATABASE_URL"] = _test_database_url()  # resolved by Prisma at connect()
+    """Expose a session-scoped Prisma client bound to the test database."""
+    test_url = _test_database_url()
+
+    previous_database_url = os.environ.get("DATABASE_URL")
+
+    os.environ["DATABASE_URL"] = test_url
+
     client = Prisma()
     client.connect()
-    yield client
-    client.disconnect()
+
+    try:
+        yield client
+    finally:
+        client.disconnect()
+
+        if previous_database_url is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database_url
