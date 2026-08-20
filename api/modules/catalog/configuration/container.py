@@ -7,6 +7,18 @@ from modules.catalog.application.use_cases.create_category_use_case import (
 from modules.catalog.application.use_cases.create_product_use_case import (
     CreateProductUseCase,
 )
+from modules.catalog.application.use_cases.delete_product_use_case import (
+    DeleteProductUseCase,
+)
+from modules.catalog.application.use_cases.get_product_use_case import (
+    GetProductUseCase,
+)
+from modules.catalog.application.use_cases.list_categories_use_case import (
+    ListCategoriesUseCase,
+)
+from modules.catalog.application.use_cases.update_product_use_case import (
+    UpdateProductUseCase,
+)
 from modules.catalog.application.use_cases.product_query_use_case import (
     ProductQueryUseCase,
 )
@@ -46,6 +58,7 @@ class CatalogContainer:
         id_generator = UuidGenerator()
 
         self.create_product = CreateProductUseCase(products, categories, id_generator)
+        self.delete_product = DeleteProductUseCase(products)
         self.set_product_state = SetProductStateUseCase(products)
         self.add_price = AddPriceUseCase(products, prices, id_generator)
         self.create_category = CreateCategoryUseCase(categories, id_generator)
@@ -53,6 +66,9 @@ class CatalogContainer:
         self.product_query = ProductQueryUseCase(products, prices)
         self.list_products = ListProductsUseCase(products)
         self.list_prices = ListPricesUseCase(prices)
+        self.list_categories = ListCategoriesUseCase(categories)
+        self.get_product = GetProductUseCase(products, categories, prices)
+        self.update_product = UpdateProductUseCase(products, categories, prices)
 
 @lru_cache(maxsize=1)
 def get_catalog_container() -> CatalogContainer:

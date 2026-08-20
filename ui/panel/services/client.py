@@ -77,6 +77,9 @@ class RapidfoodClient(ABC):
     def create_order(self, payload: dict) -> dtos.Order: ...
 
     @abstractmethod
+    def cancel_order(self, order_id: str) -> dtos.Order: ...
+
+    @abstractmethod
     def all_orders(self) -> List[dtos.Order]: ...
 
     # ---- Products / categories -------------------------------------------
@@ -91,6 +94,9 @@ class RapidfoodClient(ABC):
 
     @abstractmethod
     def set_product_availability(self, product_id: str, available: bool) -> dtos.Product: ...
+
+    @abstractmethod
+    def delete_product(self, product_id: str) -> None: ...
 
     @abstractmethod
     def save_product(self, payload: dict) -> dtos.Product: ...
@@ -125,10 +131,16 @@ class RapidfoodClient(ABC):
     def get_client(self, client_id: str) -> Optional[dtos.Client]: ...
 
     @abstractmethod
+    def delete_client(self, client_id: str) -> None: ...
+
+    @abstractmethod
     def create_client(self, name: str, last_name: str, phone: str) -> dtos.Client: ...
 
     @abstractmethod
     def search_clients(self, query: str) -> List[dtos.Client]: ...
+
+    @abstractmethod
+    def create_address(self, payload: dict) -> Optional[dtos.Address]: ...
 
     # ---- Coupons ----------------------------------------------------------
     @abstractmethod

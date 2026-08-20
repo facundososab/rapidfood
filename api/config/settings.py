@@ -13,7 +13,7 @@ data layer (single source of truth: ``schema.prisma``). Therefore:
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 def _load_dotenv() -> None:
@@ -67,11 +67,11 @@ DATABASES = {
     }
 }
 
-STATIC_URL = "static/"
 ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+STATIC_URL = "static/"
 
 # No sessions/auth/admin → nothing to process.
 MIDDLEWARE: list[str] = []

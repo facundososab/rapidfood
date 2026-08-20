@@ -69,6 +69,7 @@ ORDER_STATUS_LABELS = {
     "CANCELLED": "Cancelado",
 }
 DELIVERY_TYPE_LABELS = {"DELIVERY": "Envío", "PICKUP": "Retiro"}
+ORDER_ORIGIN_LABELS = {"IN_PLACE": "En mostrador", "AGENT": "Agente"}
 PAYMENT_TYPE_LABELS = {"CASH": "Efectivo", "ONLINE": "Online"}
 PAYMENT_STATUS_LABELS = {
     "PENDING": "Pendiente",
@@ -106,12 +107,15 @@ class Price:
 @dataclass
 class Product:
     id: str
+    name: str
     description: str
     available: bool
     categoryId: str
     prices: List[Price] = field(default_factory=list)
     # convenience (resolved by the client, not a schema field)
     category: Optional[Category] = None
+    # optional; schema Product.imageUrl
+    imageUrl: Optional[str] = None
 
 
 @dataclass
@@ -188,6 +192,7 @@ class Order:
     subtotal: Decimal
     discount: Decimal
     createdAt: datetime
+    origin: str = "IN_PLACE"  # OrderOrigin value
     estimatedTime: Optional[int] = None  # minutes
     deliveryType: Optional[str] = None
     paymentType: Optional[str] = None

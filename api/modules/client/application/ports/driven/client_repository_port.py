@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from modules.client.domain.models.client import Client
+
+
+class ClientRepositoryPort(Protocol):
+    def find_by_id(self, client_id: str) -> Client | None: ...
+
+    def list(self, search: str | None = None) -> list[Client]: ...
+
+    def delete(self, client_id: str) -> None: ...
+
+    def client_exists(self, client_id: str) -> bool: ...

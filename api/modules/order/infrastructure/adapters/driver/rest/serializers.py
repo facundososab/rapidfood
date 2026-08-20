@@ -3,6 +3,9 @@ from rest_framework import serializers
 class StartDraftOrderSerializer(serializers.Serializer):
     client_id = serializers.UUIDField(required=False, allow_null=True)
     conversation_id = serializers.UUIDField(required=False, allow_null=True)
+    origin = serializers.ChoiceField(
+        choices=["IN_PLACE", "AGENT"], required=False, allow_null=True
+    )
 
 class AddLineSerializer(serializers.Serializer):
     product_id = serializers.UUIDField(required=True)
@@ -30,3 +33,7 @@ class CancelOrderSerializer(serializers.Serializer):
 
 class AdvanceStateSerializer(serializers.Serializer):
     target_state = serializers.CharField()
+
+
+class UpdateOrderStatusSerializer(serializers.Serializer):
+    status = serializers.CharField()

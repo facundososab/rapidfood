@@ -9,6 +9,7 @@ from modules.order.application.ports.driven.order_repository import OrderReposit
 from modules.order.application.ports.driven.client_query import ClientQuery
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_state import OrderState
+from modules.order.domain.models.order_origin import OrderOrigin
 
 
 class StartDraftOrderUseCase(StartDraftOrderPort):
@@ -28,6 +29,7 @@ class StartDraftOrderUseCase(StartDraftOrderPort):
             discount=Decimal("0.0"),
             client_id=command.client_id,
             conversation_id=command.conversation_id,
+            origin=OrderOrigin(command.origin) if command.origin else OrderOrigin.IN_PLACE,
             created_at=datetime.utcnow()
         )
         

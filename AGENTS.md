@@ -52,4 +52,5 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 | After creating/modifying a skill | `skill-sync` |
 | Creating new skills | `skill-creator` |
 | Regenerate AGENTS.md Auto-invoke tables (sync.sh) | `skill-sync` |
+| Reviewing or auditing UI/UX | `ui-ux-pro-max` |
 | Troubleshoot why a skill is missing from AGENTS.md auto-invoke | `skill-sync` |

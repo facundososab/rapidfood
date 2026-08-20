@@ -7,6 +7,7 @@ from typing import Optional
 class StartDraftOrderCommand:
     client_id: Optional[str] = None
     conversation_id: Optional[str] = None
+    origin: Optional[str] = None
 
 
 @dataclass

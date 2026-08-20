@@ -6,7 +6,7 @@
 {% elif kind == 'payment' %}
   <a href="{% url 'payment_detail' obj.id %}" class="font-mono text-[13px] font-medium text-primary hover:underline">{{ obj.id|short_id }}</a>
 {% elif kind == 'product' %}
-  <a href="{% url 'product_detail' obj.id %}" class="text-[13px] font-medium text-ink hover:text-primary hover:underline">{{ obj.description }}</a>
+  <a href="{% url 'product_detail' obj.id %}" class="text-[13px] font-medium text-ink hover:text-primary hover:underline">{{ obj.name }}</a>
 {% elif kind == 'conversation' %}
   <a href="{% url 'conversation_detail' obj.id %}" class="font-mono text-[13px] font-medium text-primary hover:underline">{{ obj.id|short_id }}</a>
 {% endif %}

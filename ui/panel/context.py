@@ -4,7 +4,15 @@ from __future__ import annotations
 
 NAV_ITEMS = [
     {"key": "dashboard", "label": "Dashboard", "url": "dashboard", "icon": "layout-dashboard"},
-    {"key": "orders", "label": "Pedidos", "url": "orders", "icon": "receipt"},
+    {
+        "key": "orders",
+        "label": "Pedidos",
+        "url": "orders",
+        "icon": "receipt",
+        "children": [
+            {"key": "orders-list", "label": "Listado", "url": "orders_listing"},
+        ],
+    },
     {"key": "products", "label": "Productos", "url": "products", "icon": "utensils"},
     {"key": "payments", "label": "Pagos", "url": "payments", "icon": "credit-card"},
     {"key": "clients", "label": "Clientes", "url": "clients", "icon": "users"},

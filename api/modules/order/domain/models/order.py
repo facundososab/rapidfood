@@ -6,6 +6,7 @@ from typing import List, Optional
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.payment_method import PaymentMethod
+from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.errors.order_errors import OrderStateError, InvalidLineError
 
@@ -26,6 +27,7 @@ class Order:
     estimated_time: Optional[int] = None
     delivery_type: Optional[DeliveryType] = None
     payment_type: Optional[PaymentMethod] = None
+    origin: OrderOrigin = OrderOrigin.IN_PLACE
     shipping_cost: Optional[Decimal] = None
     total_amount: Optional[Decimal] = None
     applied_coupon_id: Optional[str] = None

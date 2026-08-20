@@ -53,10 +53,11 @@ services:
         condition: service_started
     environment:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      # "mock" = in-memory seeded data (panel works standalone);
-      # "http"  = consume the real backend (endpoint paths in http_client are still a skeleton).
-      RAPIDFOOD_CLIENT: ${RAPIDFOOD_CLIENT:-mock}
-      RAPIDFOOD_API_BASE_URL: ${RAPIDFOOD_API_BASE_URL:-http://backend:8000}
+      # This stack runs the panel against the real backend. Fixed values on
+      # purpose: the repo-root .env (loaded by compose) still sets
+      # RAPIDFOOD_CLIENT=mock for standalone local dev.
+      RAPIDFOOD_CLIENT: http
+      RAPIDFOOD_API_BASE_URL: http://backend:8000
     ports:
       - "${UI_PORT:-8001}:8000"
     # Dev: the whole ./ui dir is the container /app (same layout as the image).
