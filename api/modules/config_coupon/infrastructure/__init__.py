@@ -1,0 +1,1 @@
+"""Infrastructure package — concrete adapters for the config_coupon module."""

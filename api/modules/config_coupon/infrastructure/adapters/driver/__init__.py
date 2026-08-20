@@ -1,0 +1,1 @@
+"""Driver (inbound) adapters — receive external traffic into the module."""
