@@ -72,16 +72,26 @@ class MockRapidfoodClient(RapidfoodClient):
             order.confirmedAt = datetime.now()
         return order
 
+    def cancel_order(self, order_id: str) -> dtos.Order:
+        order = self.get_order(order_id)
+        if order is None:
+            raise ValueError("order not found")
+        order.status = "CANCELLED"
+        return order
+
     def create_order(self, payload: dict) -> dtos.Order:
         db = self.db
         oid = db.next_id("ord")
         client = self.get_client(payload["client_id"]) if payload.get("client_id") else None
         delivery = payload.get("delivery_type")
+        addr_id = payload.get("address_id")
         order = dtos.Order(
             id=oid, status="PENDING", subtotal=D("0"), discount=D("0"),
-            createdAt=datetime.now(), deliveryType=delivery,
+            createdAt=datetime.now(), origin=payload.get("origin") or "IN_PLACE",
+            deliveryType=delivery,
             paymentType=payload.get("payment_type"), clientId=payload.get("client_id"),
-            addressId=payload.get("address_id"), client=client,
+            addressId=addr_id, client=client,
+            address=next((a for a in db.addresses if a.id == addr_id), None) if addr_id else None,
         )
         subtotal = D("0")
         for item in payload.get("lines", []):
@@ -128,13 +138,13 @@ class MockRapidfoodClient(RapidfoodClient):
         rows = [self._decorate_product(p) for p in self.db.products]
         if search:
             q = search.lower().strip()
-            rows = [p for p in rows if q in p.description.lower()
+            rows = [p for p in rows if q in p.name.lower() or q in p.description.lower()
                     or (p.category and q in p.category.description.lower())]
         if category_id:
             rows = [p for p in rows if p.categoryId == category_id]
         if only_available:
             rows = [p for p in rows if p.available]
-        rows.sort(key=lambda p: p.description)
+        rows.sort(key=lambda p: p.name)
         return _paginate(rows, page, page_size)
 
     def get_product(self, product_id: str) -> Optional[dtos.Product]:
@@ -148,19 +158,32 @@ class MockRapidfoodClient(RapidfoodClient):
         p.available = available
         return p
 
+    def delete_product(self, product_id: str) -> None:
+        db = self.db
+        if all(p.id != product_id for p in db.products):
+            raise ValueError("product not found")
+        if any(line.productId == product_id for line in db.order_lines):
+            raise ValueError("product in use")
+        db.products = [p for p in db.products if p.id != product_id]
+        db.prices = [p for p in db.prices if p.productId != product_id]
+        db.discounts = [d for d in db.discounts if d.productId != product_id]
+
     def save_product(self, payload: dict) -> dtos.Product:
         db = self.db
         pid = payload.get("id")
         if pid:
             p = self.get_product(pid)
+            p.name = payload["name"]
             p.description = payload["description"]
+            p.imageUrl = payload.get("image_url") or p.imageUrl
             p.categoryId = payload["category_id"]
             p.available = payload.get("available", p.available)
             p.category = next((c for c in db.categories if c.id == p.categoryId), None)
             return p
-        p = dtos.Product(id=db.next_id("prod"), description=payload["description"],
+        p = dtos.Product(id=db.next_id("prod"), name=payload["name"],
+                         description=payload["description"],
                          available=payload.get("available", True),
-                         categoryId=payload["category_id"])
+                         categoryId=payload["category_id"], imageUrl=payload.get("image_url"))
         p.category = next((c for c in db.categories if c.id == p.categoryId), None)
         if payload.get("price"):
             pr = dtos.Price(id=db.next_id("price"), productId=p.id,
@@ -226,6 +249,12 @@ class MockRapidfoodClient(RapidfoodClient):
     def get_client(self, client_id: str) -> Optional[dtos.Client]:
         return next((c for c in self.db.clients if c.id == client_id), None)
 
+    def delete_client(self, client_id: str) -> None:
+        db = self.db
+        if all(c.id != client_id for c in db.clients):
+            raise ValueError("client not found")
+        db.clients = [c for c in db.clients if c.id != client_id]
+
     def create_client(self, name: str, last_name: str, phone: str) -> dtos.Client:
         c = dtos.Client(id=self.db.next_id("cli"), name=name, lastName=last_name,
                         phoneNumber=phone)
@@ -234,6 +263,21 @@ class MockRapidfoodClient(RapidfoodClient):
 
     def search_clients(self, query: str) -> List[dtos.Client]:
         return self.list_clients(search=query, page=1, page_size=8).items
+
+    def create_address(self, payload: dict) -> dtos.Address:
+        db = self.db
+        addr = dtos.Address(
+            id=db.next_id("addr"),
+            street=payload.get("street", ""),
+            streetNumber=payload.get("street_number", ""),
+            city=payload.get("city", ""),
+            province=payload.get("province", ""),
+            floor=payload.get("floor") or None,
+            apartment=payload.get("apartment") or None,
+            postalCode=payload.get("postal_code") or None,
+        )
+        db.addresses.append(addr)
+        return addr
 
     # ---- Coupons ----------------------------------------------------------
     def list_coupons(self) -> List[dtos.Coupon]:

@@ -16,7 +16,8 @@ class ListProductsUseCase(ListProductsPort):
         products = self._products.list(category_id=query.category_id, state=query.state)
         return [
             ProductSummary(
-                id=p.id, description=p.description, state=p.state.value, category_id=p.category_id
+                id=p.id, name=p.name, description=p.description, image_url=p.image_url,
+                state=p.state.value, category_id=p.category_id
             )
             for p in products
         ]

@@ -56,20 +56,21 @@ class Dataset:
         for cid, desc in cats.values():
             self.categories.append(dtos.Category(id=cid, description=desc))
 
-        # products: (id, description, category, [(days_ago, price), ...], available)
+# products: (id, name, description, category, [(days_ago, price), ...], available)
         product_spec = [
-            ("prod-1", "Hamburguesa Clásica", "cat-burgers", [(120, "5200"), (30, "5900")], True),
-            ("prod-2", "Hamburguesa Doble Bacon", "cat-burgers", [(120, "7400"), (20, "8200")], True),
-            ("prod-3", "Pizza Napolitana", "cat-pizzas", [(90, "8900"), (10, "9600")], True),
-            ("prod-4", "Pizza Muzarella", "cat-pizzas", [(90, "7600"), (10, "8100")], True),
-            ("prod-5", "Papas con Cheddar", "cat-sides", [(120, "4200"), (15, "4800")], True),
-            ("prod-6", "Empanada de Carne", "cat-sides", [(120, "1500"), (40, "1700")], True),
-            ("prod-7", "Coca-Cola 500 ml", "cat-drinks", [(200, "1800"), (25, "2100")], False),
+            ("prod-1", "Hamburguesa Clásica", "Medallón de carne, queso, lechuga y tomate", "cat-burgers", [(120, "5200"), (30, "5900")], True),
+            ("prod-2", "Hamburguesa Doble Bacon", "Doble medallón, cheddar y bacon crocante", "cat-burgers", [(120, "7400"), (20, "8200")], True),
+            ("prod-3", "Pizza Napolitana", "Masa con tomate, muzzarella y albahaca", "cat-pizzas", [(90, "8900"), (10, "9600")], True),
+            ("prod-4", "Pizza Muzzarella", "Muzzarella, salsa de tomate y orégano", "cat-pizzas", [(90, "7600"), (10, "8100")], True),
+            ("prod-5", "Papas con Cheddar", "Papas fritas con cheddar fundido", "cat-sides", [(120, "4200"), (15, "4800")], True),
+            ("prod-6", "Empanada de Carne", "Empanada de carne cortada a cuchillo", "cat-sides", [(120, "1500"), (40, "1700")], True),
+            ("prod-7", "Coca-Cola 500 ml", "Bebida gaseosa sabor cola 500 ml", "cat-drinks", [(200, "1800"), (25, "2100")], False),
         ]
         cat_by_id = {c.id: c for c in self.categories}
-        for pid, desc, cat, prices, available in product_spec:
-            prod = dtos.Product(id=pid, description=desc, available=available,
-                                categoryId=cat, category=cat_by_id[cat])
+        for pid, name, desc, cat, prices, available in product_spec:
+            prod = dtos.Product(id=pid, name=name, description=desc, available=available,
+                                categoryId=cat, category=cat_by_id[cat],
+                                imageUrl="https://picsum.photos/seed/rapidfood/400")
             for days_ago, price in prices:
                 pr = dtos.Price(id=self.next_id("price"), productId=pid,
                                 sinceDate=_dt(days_ago), price=D(price))
@@ -266,6 +267,7 @@ class Dataset:
             for oid in order_ids:
                 if oid in ord_by_id:
                     ord_by_id[oid].conversationId = cid
+                    ord_by_id[oid].origin = "AGENT"
                     conv.orders.append(ord_by_id[oid])
             self.conversations.append(conv)
 

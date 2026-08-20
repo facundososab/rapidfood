@@ -11,7 +11,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(BASE_DIR / ".env")
+    # Local override first (ui/.env), then the repo-root .env (shared with the
+    # API and Docker Compose) — first value read wins for each key.
+    for env_file in (BASE_DIR / ".env", BASE_DIR.parent / ".env"):
+        load_dotenv(env_file)
 except Exception:  # python-dotenv optional in sandbox
     pass
 
@@ -25,7 +28,7 @@ ALLOWED_HOSTS = ["*"]
 # Views/templates depend only on the RapidfoodClient interface + DTOs, so this
 # switch is the single swap point.
 RAPIDFOOD_CLIENT = os.environ.get("RAPIDFOOD_CLIENT", "mock")
-RAPIDFOOD_API_BASE_URL = os.environ.get("RAPIDFOOD_API_BASE_URL", "http://localhost:4000")
+RAPIDFOOD_API_BASE_URL = os.environ.get("RAPIDFOOD_API_BASE_URL", "http://localhost:8000")
 RAPIDFOOD_API_TOKEN = os.environ.get("RAPIDFOOD_API_TOKEN", "")
 
 INSTALLED_APPS = [

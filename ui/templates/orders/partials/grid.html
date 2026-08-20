@@ -1,0 +1,57 @@
+{% if load_error %}
+<div id="orders-grid">
+  <div class="card">
+    <div class="flex flex-col items-center justify-center text-center py-14 px-6">
+      <div class="w-11 h-11 rounded-full bg-danger-soft text-danger grid place-items-center mb-3">
+        {% include 'components/icon.html' with name='alert-triangle' cls='w-5 h-5' %}
+      </div>
+      <div class="text-[14px] font-semibold text-ink">No pudimos cargar los pedidos.</div>
+      <div class="text-[13px] text-ink-muted mt-1">El backend no respondió. Probá de nuevo en unos segundos.</div>
+      <a href="{{ request.get_full_path }}" class="btn btn-primary mt-4">
+        {% include 'components/icon.html' with name='loader' cls='w-4 h-4' %}Reintentar
+      </a>
+    </div>
+  </div>
+</div>
+{% elif not orders.items %}
+  {% if search %}
+  <div id="orders-grid">
+    <div class="card">
+      {% include 'components/empty_state.html' with icon='search' title='Sin coincidencias' message='No encontramos pedidos que coincidan con tu búsqueda.' %}
+      <div class="pb-6 flex justify-center">
+        <a href="{% querystring request q='' page='' %}" class="btn btn-ghost">Limpiar búsqueda</a>
+      </div>
+    </div>
+  </div>
+  {% elif current_filter %}
+  <div id="orders-grid">
+    <div class="card">
+      {% include 'components/empty_state.html' with icon='receipt' title='No hay pedidos en este estado.' message='Probá con otro filtro o creá un pedido nuevo.' %}
+      <div class="pb-6 flex justify-center">
+        <a href="{% querystring request filtro='' %}" class="btn btn-ghost">Ver todos</a>
+        <a href="{% url 'orders' %}" class="btn btn-primary ml-3">Nuevo pedido</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div id="orders-grid">
+    <div class="card">
+      {% include 'components/empty_state.html' with icon='receipt' title='Todavía no hay pedidos.' message='Cuando se registren pedidos van a aparecer acá.' %}
+      <div class="pb-6 flex justify-center">
+        <a href="{% url 'orders_new' %}" class="btn btn-primary">
+          {% include 'components/icon.html' with name='plus' cls='w-4 h-4' %}Crear primer pedido
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+{% else %}
+<div id="orders-grid">
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for o in orders.items %}
+      {% include 'orders/partials/order_card.html' with order=o %}
+    {% endfor %}
+  </div>
+  {% include 'components/pagination.html' with page=orders target='#orders-grid' url='orders_listing_grid' %}
+</div>
+{% endif %}

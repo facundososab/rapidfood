@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Rapidfood{% endblock %} · Rapidfood</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260819b" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
@@ -29,10 +29,34 @@
       <nav class="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-0.5">
         <div class="th px-2.5 pb-2">Operación</div>
         {% for item in nav_items %}
+          {% if item.children %}
+          <div x-data="{ open: {% if item.key == active_section %}true{% else %}false{% endif %} }">
+            <div class="flex items-center">
+              <a href="{% url item.url %}" class="nav-item flex-1 {% if item.key == active_section %}active{% endif %}">
+                {% include 'components/icon.html' with name=item.icon %}
+                <span>{{ item.label }}</span>
+              </a>
+              <button type="button" @click="open = !open" class="shrink-0 p-2 rounded-lg text-ink-faint hover:text-ink hover:bg-subtle transition-colors" :aria-expanded="open" aria-label="Submenú de {{ item.label }}">
+                <span class="block transition-transform" :class="open ? 'rotate-180 text-primary' : ''">
+                  {% include 'components/icon.html' with name='chevron-down' cls='w-[16px] h-[16px]' %}
+                </span>
+              </button>
+            </div>
+            <div x-show="open" x-transition.opacity class="ml-3 mt-0.5 border-l border-line pl-2 flex flex-col gap-0.5">
+              {% for child in item.children %}
+              <a href="{% url child.url %}" class="nav-item {% if request.resolver_match.url_name == child.url %}active{% endif %}">
+                <span class="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0"></span>
+                <span class="truncate">{{ child.label }}</span>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
           <a href="{% url item.url %}" class="nav-item {% if item.key == active_section %}active{% endif %}">
             {% include 'components/icon.html' with name=item.icon %}
             <span>{{ item.label }}</span>
           </a>
+          {% endif %}
         {% endfor %}
         <div class="th px-2.5 pt-5 pb-2">Sistema</div>
         {% for item in secondary_nav %}

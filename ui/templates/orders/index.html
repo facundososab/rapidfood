@@ -1,1 +1,466 @@
-{% extends 'base.html' %}{% block title %}Pedidos{% endblock %}{% block heading %}Pedidos{% endblock %}{% block subheading %}<p class="text-[13px] text-ink-muted">Seguimiento y gestión de la operación.</p>{% endblock %}{% block header_actions %}<a href="{% url 'orders_new' %}" class="btn btn-primary">{% include 'components/icon.html' with name='plus' cls='w-4 h-4' %} Nuevo pedido</a>{% endblock %}{% block content %}<div id="orders-table">{% include 'orders/partials/table.html' %}</div>{% endblock %}
+{% extends 'base.html' %}{% block title %}Pedidos{% endblock %}{% block heading %}Pedidos{% endblock %}{% block subheading %}
+<p class="text-[13px] text-ink-muted">
+  Mostrador POS: buscá por categoría, sumá productos y confirmá el pedido.
+</p>
+{% endblock %}{% block content %}{{ products|json_script:"pos-products" }}{{ client_options|json_script:"pos-clients" }}
+<form
+  method="post"
+  action="{% url 'orders_new_confirm' %}"
+  x-data="pos()"
+  @submit="syncCart()"
+  class="grid gap-5 xl:grid-cols-[3fr_1fr] items-start"
+>
+  {% csrf_token %}
+  <section class="space-y-5 min-w-0">
+    <div class="card p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-display font-bold">Pedidos recientes</h2>
+        <a
+          href="{% url 'orders_listing' %}"
+          class="text-[12px] font-semibold text-primary hover:underline"
+          >Ver listado</a
+        >
+      </div>
+      <div class="mt-4 flex gap-3 overflow-x-auto snap-x pb-1">
+        {% for o in recent_orders %}
+        <a
+          href="{% url 'order_detail' o.id %}"
+          class="card p-4 w-[210px] shrink-0 snap-start block hover:border-line-strong transition-colors"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-mono text-[13px] font-bold text-primary"
+              >#{{ o.id|slice:":6"|upper }}</span
+            >
+            {% include 'components/order_status_badge.html' with status=o.status %}
+          </div>
+          <div class="mt-2.5 text-[13px] font-semibold text-ink truncate">
+            {% if o.client %}{{ o.client.name }} {{ o.client.lastName }}{% else %}Sin cliente{% endif %}
+          </div>
+          <div class="mt-0.5 text-[12px] text-ink-muted">
+            {{ o|total_units }} productos · {{ o.deliveryType|delivery_type_label }}
+          </div>
+        </a>
+        {% empty %}
+        <p class="text-[13px] text-ink-muted">Todavía no hay pedidos.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        @click="cat=''"
+        :class="cat==='' ? 'badge-cat active' : 'badge-cat'"
+      >
+        Todas
+      </button>
+      {% for c in categories %}
+      <button
+        type="button"
+        @click="cat='{{ c.id }}'"
+        :class="cat==='{{ c.id }}' ? 'badge-cat active' : 'badge-cat'"
+      >
+        {{ c.description }}
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <template x-for="p in filtered()" :key="p.id">
+        <div class="card overflow-hidden flex flex-col">
+          <div class="relative aspect-[16/10] bg-muted overflow-hidden">
+            <template x-if="p.imageUrl"
+              ><img
+                :src="p.imageUrl"
+                referrerpolicy="no-referrer"
+                @error="$el.style.display='none'"
+                class="w-full h-full object-cover"
+                alt=""
+            /></template>
+            <template x-if="!p.imageUrl"
+              ><div
+                class="w-full h-full grid place-items-center text-ink-faint"
+              >
+                {% include 'components/icon.html' with name='package' cls='w-7 h-7' %}
+              </div></template
+            >
+            <span
+              class="absolute top-2 right-2 badge"
+              :class="p.available ? 'bg-success-soft text-success' : 'bg-neutral-soft text-neutral'"
+              ><span
+                class="badge-dot"
+                :style="p.available ? 'background:#0aaf60' : 'background:#6b7280'"
+              ></span
+              ><span
+                x-text="p.available ? 'Disponible' : 'No disponible'"
+              ></span
+            ></span>
+          </div>
+          <div class="p-3.5 flex-1 flex flex-col gap-1.5">
+            <div
+              class="text-[14px] font-semibold text-ink leading-snug"
+              x-text="p.name"
+            ></div>
+            <div
+              class="text-[12px] text-ink-muted leading-snug line-clamp-2"
+              x-text="p.description"
+            ></div>
+            <div class="mt-auto pt-2 flex items-center justify-between gap-2">
+              <span
+                class="font-mono text-[14px] tnum"
+                :class="p.price === null ? 'text-ink-muted' : 'text-ink'"
+                x-text="fmt(p.price)"
+              ></span>
+              <template x-if="p.available && p.price !== null && !cart[p.id]"
+                ><button
+                  type="button"
+                  @click="add(p.id)"
+                  class="btn btn-primary !px-2.5"
+                  aria-label="Agregar"
+                >
+                  {% include 'components/icon.html' with name='plus' cls='w-4 h-4' %}
+                </button></template
+              >
+              <template x-if="p.available && p.price !== null && cart[p.id]"
+                ><div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    @click="dec(p.id)"
+                    class="btn btn-ghost !px-2"
+                    aria-label="Quitar uno"
+                  >
+                    {% include 'components/icon.html' with name='minus' cls='w-4 h-4' %}</button
+                  ><span
+                    class="w-6 text-center font-mono text-[13px] tnum"
+                    x-text="cart[p.id]"
+                  ></span
+                  ><button
+                    type="button"
+                    @click="add(p.id)"
+                    class="btn btn-ghost !px-2"
+                    aria-label="Sumar uno"
+                  >
+                    {% include 'components/icon.html' with name='plus' cls='w-4 h-4' %}
+                  </button>
+                </div></template
+              >
+              <template x-if="!p.available || p.price === null"
+                ><span
+                  class="text-[11px] text-ink-faint"
+                  x-text="p.price === null ? 'Sin precio' : 'No disponible'"
+                ></span
+              ></template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div x-show="!filtered().length" class="card">
+      {% include 'components/empty_state.html' with icon='package' title='Sin productos' message='No hay productos disponibles en esta categoría.' %}
+    </div>
+  </section>
+
+  <aside class="xl:sticky xl:top-20 space-y-5">
+    <div class="card overflow-hidden">
+      <div
+        class="px-5 py-4 border-b border-line flex items-center justify-between"
+      >
+        <div class="font-display font-bold">Pedido actual</div>
+        <span
+          class="badge bg-subtle text-ink-soft"
+          x-text="items().length ? items().length + ' productos' : ''"
+          x-show="items().length"
+        ></span>
+      </div>
+
+      <div class="px-5 py-4 border-b border-line">
+        <div class="th">Entrega</div>
+        <div class="toggle inline mt-2">
+          <button
+            type="button"
+            @click="delivery='PICKUP'"
+            :class="delivery==='PICKUP' ? 'active' : ''"
+          >
+            {% include 'components/icon.html' with name='package' cls='w-4 h-4' %} Retiro
+          </button>
+          <button
+            type="button"
+            @click="delivery='DELIVERY'"
+            :class="delivery==='DELIVERY' ? 'active' : ''"
+          >
+            {% include 'components/icon.html' with name='map-pin' cls='w-4 h-4' %} Delivery
+          </button>
+        </div>
+      </div>
+
+      <div x-show="!items().length" class="p-5">
+        {% include 'components/empty_state.html' with icon='shopping-bag' title='Vacío' message='Todavía no agregaste productos al pedido.' %}
+      </div>
+      <div x-show="items().length">
+        <template x-for="item in items()" :key="item.id">
+          <div
+            class="flex items-center gap-3 px-5 py-3 border-b border-line last:border-0"
+          >
+            <template x-if="item.image"
+              ><img
+                :src="item.image"
+                referrerpolicy="no-referrer"
+                @error="$el.style.display='none'"
+                class="w-10 h-10 rounded-lg object-cover border border-line bg-muted shrink-0"
+                alt=""
+            /></template>
+            <template x-if="!item.image"
+              ><span
+                class="w-10 h-10 rounded-lg bg-subtle grid place-items-center text-ink-faint shrink-0"
+                >{% include 'components/icon.html' with name='package' cls='w-4 h-4' %}</span
+              ></template
+            >
+            <div class="flex-1 min-w-0">
+              <div
+                class="text-[13px] font-medium text-ink truncate"
+                x-text="item.name"
+              ></div>
+              <div class="text-[11px] text-ink-muted mt-0.5">
+                <span class="font-mono" x-text="fmt(item.price)"></span> c/u
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                @click="dec(item.id)"
+                class="btn btn-ghost !px-2"
+                aria-label="Quitar uno"
+              >
+                {% include 'components/icon.html' with name='minus' cls='w-4 h-4' %}
+              </button>
+              <span
+                class="w-6 text-center font-mono text-[13px] tnum"
+                x-text="item.qty"
+              ></span>
+              <button
+                type="button"
+                @click="add(item.id)"
+                class="btn btn-ghost !px-2"
+                aria-label="Sumar uno"
+              >
+                {% include 'components/icon.html' with name='plus' cls='w-4 h-4' %}
+              </button>
+            </div>
+            <div
+              class="w-20 text-right font-mono text-[13px] tnum"
+              x-text="fmt(item.subtotal)"
+            ></div>
+            <button
+              type="button"
+              @click="remove(item.id)"
+              class="text-ink-faint hover:text-danger transition-colors"
+              aria-label="Quitar del pedido"
+            >
+              {% include 'components/icon.html' with name='trash' cls='w-4 h-4' %}
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <div x-show="items().length" class="p-5 bg-muted/60 space-y-2">
+        <div class="flex justify-between text-[13px]">
+          <span class="text-ink-muted">Subtotal</span
+          ><span class="font-mono tnum" x-text="fmt(subtotal())"></span>
+        </div>
+        <div
+          class="flex justify-between text-[13px]"
+          x-show="delivery==='DELIVERY'"
+        >
+          <span class="text-ink-muted">Envío</span
+          ><span class="font-mono tnum" x-text="fmt(shipping)"></span>
+        </div>
+        <div class="flex justify-between border-t border-line pt-2.5 font-bold">
+          <span class="font-display">Total</span
+          ><span class="font-mono tnum" x-text="fmt(total())"></span>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-line">
+        <button
+          type="button"
+          @click="confirm()"
+          class="btn btn-primary w-full justify-center h-14 text-[15px]"
+          :disabled="!items().length"
+          :class="items().length ? '' : 'opacity-40 cursor-not-allowed'"
+        >
+          Confirmar pedido
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div
+    x-show="modal"
+    x-transition.opacity
+    @keydown.escape.window="modal=false"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
+    style="display: none"
+  >
+    <div class="card w-full max-w-[340px] max-h-[92vh] overflow-y-auto">
+      <div
+        class="px-5 py-4 border-b border-line flex items-center justify-between"
+      >
+        <h3 class="font-display font-bold text-[15px]">Confirmar pedido</h3>
+        <button
+          type="button"
+          @click="modal=false"
+          class="btn btn-ghost !px-2"
+          aria-label="Cerrar"
+        >
+          {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
+        </button>
+      </div>
+      <div class="p-5 space-y-5">
+        <div>
+          <div class="th">Método de pago</div>
+          <div class="toggle mt-2">
+            <button
+              type="button"
+              @click="payment='CASH'"
+              :class="payment==='CASH' ? 'active' : ''"
+            >
+              {% include 'components/icon.html' with name='wallet' cls='w-4 h-4' %} Efectivo
+            </button>
+            <button
+              type="button"
+              @click="payment='ONLINE'"
+              :class="payment==='ONLINE' ? 'active' : ''"
+            >
+              {% include 'components/icon.html' with name='credit-card' cls='w-4 h-4' %} Online
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="th">Nombre del cliente</div>
+          <div class="relative mt-1.5">
+            <input
+              x-model="clientQ"
+              @focus="openClients=true"
+              @input="openClients=true"
+              @blur="setTimeout(()=>openClients=false,150)"
+              class="field"
+              placeholder="Buscar por nombre o teléfono…"
+              autocomplete="off"
+            />
+            <input type="hidden" name="client_id" :value="clientId" />
+            <div
+              x-show="openClients"
+              class="absolute left-0 right-0 z-10 mt-1 card overflow-hidden border-line"
+            >
+              <template x-for="c in clientResults()" :key="c.id">
+                <button
+                  type="button"
+                  @mousedown.prevent="pickClient(c)"
+                  class="block w-full text-left px-3 py-2 text-[13px] hover:bg-subtle"
+                >
+                  <span x-text="c.name + ' ' + c.lastName"></span
+                  ><span
+                    class="ml-2 font-mono text-[11px] text-ink-muted"
+                    x-text="c.phoneNumber"
+                  ></span>
+                </button>
+              </template>
+              <div
+                x-show="!clientResults().length"
+                class="px-3 py-2 text-[12px] text-ink-muted"
+              >
+                Sin coincidencias.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div x-show="delivery==='DELIVERY'">
+          <div class="th">Dirección de envío</div>
+          <div class="mt-1.5 grid grid-cols-2 gap-2">
+            <input
+              name="street"
+              class="field col-span-2"
+              placeholder="Calle"
+              required
+            />
+            <input
+              name="street_number"
+              class="field"
+              placeholder="Número"
+              required
+            />
+            <input name="floor" class="field" placeholder="Piso (opcional)" />
+            <input
+              name="apartment"
+              class="field"
+              placeholder="Departamento (opcional)"
+            />
+            <input name="city" class="field" placeholder="Ciudad" required />
+            <input
+              name="province"
+              class="field"
+              placeholder="Provincia"
+              required
+            />
+            <input
+              name="postal_code"
+              class="field col-span-2"
+              placeholder="Código postal (opcional)"
+            />
+          </div>
+        </div>
+
+        <div
+          class="flex justify-between items-center border-t border-line pt-4"
+        >
+          <div class="text-[13px] text-ink-muted">Total a pagar</div>
+          <div
+            class="font-mono text-lg font-bold tnum"
+            x-text="fmt(total())"
+          ></div>
+        </div>
+      </div>
+      <div class="px-5 py-4 border-t border-line">
+        <button
+          type="submit"
+          class="btn btn-primary w-full justify-center h-14 text-[15px]"
+        >
+          Confirmar pedido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <template x-for="(qty, id) in cart" :key="id"
+    ><input type="hidden" :name="'qty_' + id" :value="qty"
+  /></template>
+  <input type="hidden" name="delivery_type" :value="delivery" />
+  <input type="hidden" name="payment_type" :value="payment" />
+</form>
+<script>
+  document.addEventListener('alpine:init',()=>{Alpine.data('pos',()=>({
+    products: JSON.parse(document.getElementById('pos-products').textContent),
+    clients: JSON.parse(document.getElementById('pos-clients').textContent),
+    q:'', cat:'', cart:{}, delivery:'PICKUP', payment:'CASH', shipping: {{ shipping_cost }},
+    clientQ:'', clientId:'', openClients:false, modal:false,
+    filtered(){ if(!this.cat) return this.products; return this.products.filter(p=>p.categoryId===this.cat); },
+    clientResults(){ const t=this.clientQ.trim().toLowerCase();
+      if(!t) return this.clients.slice(0,5);
+      return this.clients.filter(c=>(c.name+' '+c.lastName+' '+c.phoneNumber).toLowerCase().includes(t)).slice(0,5); },
+    pickClient(c){ this.clientId=c.id; this.clientQ=c.name+' '+c.lastName; this.openClients=false; },
+    _byId(id){ return this.products.find(p=>p.id===id) || {}; },
+    add(id){ this.cart[id]=(this.cart[id]||0)+1; },
+    dec(id){ if(this.cart[id]>1) this.cart[id]-=1; else this.remove(id); },
+    remove(id){ delete this.cart[id]; },
+    items(){ return Object.entries(this.cart).filter(([,n])=>n>0).map(([id,qty])=>{ const p=this._byId(id);
+      return {id,name:p.name,image:p.imageUrl,price:p.price,qty,subtotal:(p.price||0)*qty}; }); },
+    subtotal(){ return this.items().reduce((s,i)=>s+i.subtotal,0); },
+    total(){ return this.subtotal()+(this.delivery==='DELIVERY'?this.shipping:0); },
+    confirm(){ if(this.items().length) this.modal=true; },
+    syncCart(){ document.querySelectorAll('[name^="qty_"]').forEach(i=>{ if(!this.cart[i.name.slice(4)] || this.cart[i.name.slice(4)]<1) i.remove(); else i.value=this.cart[i.name.slice(4)]; }); },
+    fmt(v){ if(!v && v!==0) return '—'; const [w,f]=Number(v).toFixed(2).split('.'); return '$ '+(w.replace(/\B(?=(\d{3})+(?!\d))/g,'.'))+','+f; }
+  }))})
+</script>
+{% endblock %}

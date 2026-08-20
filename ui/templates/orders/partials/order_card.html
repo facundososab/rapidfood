@@ -1,0 +1,71 @@
+{% comment %}Usage: {% include 'orders/partials/order_card.html' with order=o %}{% endcomment %}
+<article class="card overflow-hidden flex flex-col">
+  <div class="px-5 pt-4">
+    <div class="flex items-start gap-3.5">
+      <span class="order-index">{{ forloop.counter0|add:start_index|add:1|stringformat:"02d" }}</span>
+      <div class="min-w-0 flex-1">
+        <h3 class="text-[14px] font-semibold text-ink truncate" title="{{ order.client|client_name }}">
+          {% if order.client %}{{ order.client.name }} {{ order.client.lastName }}{% else %}Sin cliente{% endif %}
+        </h3>
+        <p class="font-mono text-[12px] text-ink-muted mt-0.5">{{ order.id|short_id }}</p>
+      </div>
+      <div class="flex flex-col items-end gap-1">
+        {% include 'components/order_status_badge.html' with status=order.status %}
+        <span class="order-origin-badge rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-muted">{{ order.origin|order_origin_label }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-5 mt-4 flex items-center justify-between gap-2">
+    <span class="text-[11px] text-ink-faint">{{ order.createdAt|date_short_fmt }}</span>
+    <span class="text-[11px] font-mono text-ink-faint tnum">{{ order.createdAt|time_fmt }}</span>
+  </div>
+  <div class="mt-3 border-t border-line"></div>
+
+  <div class="px-5 py-3 flex-1">
+    <div class="grid grid-cols-[28px_1fr_auto] gap-x-3 text-[10px] uppercase tracking-wide font-semibold text-ink-faint">
+      <span>Cant.</span><span>Producto</span><span class="text-right">Importe</span>
+    </div>
+    {% for line in order.lines|slice:":4" %}
+    <div class="grid grid-cols-[28px_1fr_auto] gap-x-3 py-1.5 text-[13px] items-baseline">
+      <span class="font-mono text-ink-muted tnum">{{ line.quantity }}</span>
+      <span class="truncate text-ink">
+        {% if line.product %}{{ line.product.name }}{% else %}<span class="text-ink-faint">#{{ line.productId|short_id }}</span>{% endif %}
+      </span>
+      <span class="text-right font-mono text-ink tnum">{{ line.subtotal|money }}</span>
+    </div>
+    {% empty %}
+    <p class="py-2 text-[12px] text-ink-muted">Sin productos en el pedido.</p>
+    {% endfor %}
+    {% if order.lines|length > 4 %}
+    <a href="{% url 'order_detail' order.id %}" class="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:underline">
+      + {{ order.lines|length|add:"-4" }} producto{{ order.lines|length|add:"-4"|pluralize }} más
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="px-5 py-3 border-t border-line bg-muted/50 space-y-1.5 text-[13px]">
+    <div class="flex justify-between"><span class="text-ink-muted">Subtotal</span><span class="font-mono tnum">{{ order.subtotal|money }}</span></div>
+    {% if order.discount and order.discount > 0 %}
+    <div class="flex justify-between"><span class="text-ink-muted">Descuento</span><span class="font-mono tnum text-danger">− {{ order.discount|money }}</span></div>
+    {% endif %}
+    {% if order.shippingCost is not None %}
+    <div class="flex justify-between"><span class="text-ink-muted">Envío</span><span class="font-mono tnum">{{ order.shippingCost|money }}</span></div>
+    {% endif %}
+    <div class="flex justify-between border-t border-line pt-1.5 text-[14px] font-bold"><span>Total</span><span class="font-mono tnum">{{ order.totalAmount|money_or_dash }}</span></div>
+  </div>
+
+  <div class="px-5 py-3.5 border-t border-line flex items-center gap-2">
+    {% if order.status in cancellable_statuses %}
+    <form method="post" action="{% url 'order_cancel' order.id %}" onsubmit="return confirm('¿Seguro que querés cancelar este pedido?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost text-danger !px-3">
+        {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}Cancelar
+      </button>
+    </form>
+    {% endif %}
+    <a href="{% url 'order_detail' order.id %}" class="btn btn-primary ml-auto">
+      {% include 'components/icon.html' with name='external-link' cls='w-4 h-4' %}Ver pedido
+    </a>
+  </div>
+</article>

@@ -1,1 +1,141 @@
-{% extends 'base.html' %}{% block title %}{{ product.description }}{% endblock %}{% block heading %}{{ product.description }}{% endblock %}{% block subheading %}<p class="text-[13px] text-ink-muted">{{ product.category.description }}</p>{% endblock %}{% block header_actions %}<a href="{% url 'product_edit' product.id %}" class="btn btn-primary">Editar</a>{% endblock %}{% block content %}<div class="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><section class="card p-5"><div class="th">Precio vigente</div><div class="mt-2 font-mono text-[28px] font-semibold">{{ current_price|money }}</div><form method="post" action="{% url 'product_add_price' product.id %}" class="mt-5 border-t border-line pt-4 flex gap-2">{% csrf_token %}<input name="price" type="number" min="0" step="0.01" class="field" placeholder="Nuevo precio"><button class="btn btn-primary">Agregar precio</button></form></section><aside class="card p-5"><div class="th">Disponibilidad</div><div class="mt-2 text-[14px] font-semibold">{{ product.available|yesno:'Disponible,No disponible' }}</div><form method="post" action="{% url 'product_toggle' product.id %}" class="mt-4">{% csrf_token %}<button class="btn btn-ghost">{{ product.available|yesno:'Marcar no disponible,Volver disponible' }}</button></form></aside></div><div class="card overflow-hidden mt-5"><div class="px-5 py-4 font-display font-bold border-b border-line">Historial de precios</div><table class="w-full"><tbody>{% for price in history %}<tr class="border-b border-line last:border-0"><td class="px-5 py-3 text-[13px] text-ink-muted">Desde {{ price.sinceDate|date_fmt }}</td><td class="px-5 py-3 text-right font-mono">{{ price.price|money }}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block header %}
+<a href="{% url 'products' %}" class="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-muted hover:text-primary transition-colors">
+  {% include 'components/icon.html' with name='arrow-left' cls='w-3.5 h-3.5' %}
+  Productos
+</a>
+{% endblock %}
+{% block content %}
+<div class="max-w-2xl space-y-4" x-data="{ priceModal: false, historyModal: false, options: false }" @keydown.escape.window="options = false">
+
+  <div class="card overflow-hidden">
+    {% if product.imageUrl %}
+      <img src="{{ product.imageUrl }}" referrerpolicy="no-referrer" onerror="this.style.display='none'"
+           class="h-48 w-full object-cover bg-muted" alt="Foto de {{ product.name }}">
+    {% endif %}
+    <div class="p-5">
+    <div class="relative flex items-center justify-between gap-3 mb-4 border-b border-line pb-3">
+      <span class="badge {% if product.available %}bg-success-soft text-success{% else %}bg-neutral-soft text-neutral{% endif %}">
+        <span class="badge-dot {% if product.available %}bg-success{% else %}bg-neutral{% endif %}"></span>
+        {{ product.available|yesno:'Disponible,No disponible' }}
+      </span>
+      <button type="button" class="btn btn-ghost shrink-0" @click="options = !options" aria-haspopup="true" :aria-expanded="options.toString()" :aria-label="'Ver opciones para ' + '{{ product.name|escapejs }}'">
+        {% include 'components/icon.html' with name='more-vertical' cls='w-4 h-4' %}
+        <span>Ver opciones</span>
+      </button>
+      <div x-show="options" x-transition.opacity @click.outside="options = false" style="display:none" role="menu" aria-label="Opciones del producto"
+           class="absolute right-0 top-full mt-1 w-56 card p-1 z-40 shadow-lg">
+        <form method="post" action="{% url 'product_toggle' product.id %}">
+          {% csrf_token %}
+          <button type="submit" role="menuitem" class="w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-ink hover:bg-subtle transition-colors cursor-pointer">
+            {{ product.available|yesno:'Marcar como no disponible,Marcar como disponible' }}
+          </button>
+        </form>
+        <a href="{% url 'product_edit' product.id %}" role="menuitem"
+           class="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-ink hover:bg-subtle transition-colors">
+          {% include 'components/icon.html' with name='settings' cls='w-4 h-4 text-ink-muted' %}
+          Editar producto
+        </a>
+        <form method="post" action="{% url 'product_delete' product.id %}" onsubmit="return confirm('¿Eliminar «{{ product.name|escapejs }}»? Esta acción no se puede deshacer.')">
+          {% csrf_token %}
+          <button type="submit" role="menuitem"
+                  class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-danger hover:bg-subtle transition-colors cursor-pointer">
+            {% include 'components/icon.html' with name='trash' cls='w-4 h-4' %}
+            Eliminar producto
+          </button>
+        </form>
+      </div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label for="product-name" class="th block mb-1.5">Nombre</label>
+        <input id="product-name" class="field" value="{{ product.name }}" disabled>
+      </div>
+      <div>
+        <label for="product-category" class="th block mb-1.5">Categoría</label>
+        <input id="product-category" class="field" value="{{ product.category.description }}" disabled>
+      </div>
+    </div>
+    <div class="mt-4">
+      <label for="product-description" class="th block mb-1.5">Descripción</label>
+      <textarea id="product-description" class="field resize-none" rows="3" disabled>{{ product.description }}</textarea>
+    </div>
+    </div>
+  </div>
+
+  <section class="card p-4 flex flex-col">
+    <div class="th">Precio vigente</div>
+    {% if current_price %}
+      <div class="mt-1.5 font-display font-bold text-[24px] leading-none tnum text-ink">{{ current_price|money }}</div>
+      {% if history %}
+        <div class="mt-1 text-[12px] text-ink-muted">Vigente desde el {{ history.0.sinceDate|date_fmt }}</div>
+      {% endif %}
+    {% else %}
+      <div class="mt-1.5 text-[13px] text-ink-muted">Este producto aún no tiene un precio cargado.</div>
+    {% endif %}
+    <div class="mt-3 border-t border-line pt-3 flex flex-wrap gap-2">
+      <button type="button" class="btn btn-primary" @click="priceModal = true">Agregar precio</button>
+      <button type="button" class="btn btn-ghost" @click="historyModal = true">
+        Ver historial
+        {% if history %}<span class="badge bg-subtle text-ink-soft">{{ history|length }}</span>{% endif %}
+      </button>
+    </div>
+  </section>
+
+  <div x-show="priceModal" x-transition.opacity @keydown.escape.window="priceModal = false"
+       class="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm grid place-items-center p-4" @click.self="priceModal = false"
+       style="display:none" role="dialog" aria-modal="true" aria-label="Agregar precio">
+    <div class="card w-full max-w-sm p-4">
+      <div class="flex items-center justify-between gap-3">
+        <div class="th">Agregar precio</div>
+        <button type="button" class="btn btn-ghost !px-2" @click="priceModal = false" aria-label="Cerrar">
+          {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
+        </button>
+      </div>
+      <form method="post" action="{% url 'product_add_price' product.id %}" class="mt-3">
+        {% csrf_token %}
+        <label for="new-price" class="th block mb-1.5">Nuevo precio</label>
+        <input id="new-price" name="price" type="number" min="0" step="0.01" class="field font-mono" placeholder="0.00" required>
+        <p class="mt-2 text-[12px] text-ink-faint">Entra en vigencia desde hoy.</p>
+        <div class="mt-3 flex justify-end gap-2">
+          <button type="button" class="btn btn-ghost" @click="priceModal = false">Cancelar</button>
+          <button class="btn btn-primary">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div x-show="historyModal" x-transition.opacity @keydown.escape.window="historyModal = false"
+       class="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm grid place-items-center p-4" @click.self="historyModal = false"
+       style="display:none" role="dialog" aria-modal="true" aria-label="Historial de precios">
+    <div class="card w-full max-w-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex items-center justify-between gap-3">
+        <div class="font-display font-bold">Historial de precios</div>
+        <button type="button" class="btn btn-ghost !px-2" @click="historyModal = false" aria-label="Cerrar">
+          {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
+        </button>
+      </div>
+      {% if history %}
+      <div class="max-h-72 overflow-y-auto">
+        <table class="w-full">
+          <tbody>
+            {% for price in history %}
+              <tr class="border-b border-line last:border-0">
+                <td class="px-4 py-2.5 text-[13px] text-ink-muted whitespace-nowrap">{{ price.sinceDate|date_fmt }}</td>
+                <td class="px-4 py-2.5 text-right font-mono tnum text-ink">{{ price.price|money }}</td>
+                {% if current_price and price.price == current_price %}
+                  <td class="px-4 py-2.5 text-right w-px"><span class="badge bg-primary-soft text-primary">Vigente</span></td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        {% include 'components/empty_state.html' with title='Sin precios registrados' message='Agregá un precio para que los clientes puedan pedir este producto.' %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
