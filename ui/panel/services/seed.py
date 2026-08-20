@@ -267,6 +267,7 @@ class Dataset:
             for oid in order_ids:
                 if oid in ord_by_id:
                     ord_by_id[oid].conversationId = cid
+                    ord_by_id[oid].origin = "AGENT"
                     conv.orders.append(ord_by_id[oid])
             self.conversations.append(conv)
 

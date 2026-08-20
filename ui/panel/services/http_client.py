@@ -145,7 +145,8 @@ class HttpRapidfoodClient(RapidfoodClient):
         if not d:
             return None
         return dtos.Order(
-            id=d["id"], status=d["status"], subtotal=_dec(d["subtotal"]), discount=_dec(d["discount"]),
+            id=d["id"], status=d["status"], origin=d.get("origin", "IN_PLACE"),
+            subtotal=_dec(d["subtotal"]), discount=_dec(d["discount"]),
             createdAt=_parse_dt(d["created_at"]), estimatedTime=d.get("estimated_time"),
             deliveryType=d.get("delivery_type"), paymentType=d.get("payment_type"),
             shippingCost=_dec(d.get("shipping_cost")), totalAmount=_dec(d.get("total_amount")),
@@ -226,6 +227,7 @@ class HttpRapidfoodClient(RapidfoodClient):
         body = {}
         if payload.get("client_id"):
             body["client_id"] = payload["client_id"]
+        body["origin"] = payload.get("origin") or "IN_PLACE"
         draft = self._post("/api/orders/draft/", body)
         order_id = draft["order_id"]
 

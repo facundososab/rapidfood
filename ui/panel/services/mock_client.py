@@ -87,7 +87,8 @@ class MockRapidfoodClient(RapidfoodClient):
         addr_id = payload.get("address_id")
         order = dtos.Order(
             id=oid, status="PENDING", subtotal=D("0"), discount=D("0"),
-            createdAt=datetime.now(), deliveryType=delivery,
+            createdAt=datetime.now(), origin=payload.get("origin") or "IN_PLACE",
+            deliveryType=delivery,
             paymentType=payload.get("payment_type"), clientId=payload.get("client_id"),
             addressId=addr_id, client=client,
             address=next((a for a in db.addresses if a.id == addr_id), None) if addr_id else None,

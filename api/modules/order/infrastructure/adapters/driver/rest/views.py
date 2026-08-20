@@ -40,6 +40,7 @@ def _order_to_dict(order: Order) -> dict:
     return {
         "id": order.id,
         "status": order.status.value,
+        "origin": order.origin.value,
         "subtotal": order.subtotal,
         "discount": order.discount,
         "client_id": order.client_id,

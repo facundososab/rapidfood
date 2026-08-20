@@ -116,6 +116,11 @@ def order_status_label(value) -> str:
 
 
 @register.filter
+def order_origin_label(value) -> str:
+    return dtos.ORDER_ORIGIN_LABELS.get(value, value)
+
+
+@register.filter
 def payment_status_label(value) -> str:
     return dtos.PAYMENT_STATUS_LABELS.get(value, value)
 

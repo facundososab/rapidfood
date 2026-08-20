@@ -136,7 +136,7 @@ def wizard_confirm(request):
     for pid,qty in request.POST.items():
         if pid.startswith('qty_') and qty and int(qty)>0: lines.append({'product_id':pid[4:],'quantity':int(qty)})
     if not lines: return HttpResponseBadRequest('Agregá al menos un producto.')
-    payload={'client_id':request.POST.get('client_id') or None,'delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':request.POST.get('coupon_code') or None,'lines':lines}
+    payload={'client_id':request.POST.get('client_id') or None,'origin':'IN_PLACE','delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':request.POST.get('coupon_code') or None,'lines':lines}
     if payload['delivery_type']=='DELIVERY' and request.POST.get('street'):
         c=get_client()
         try:

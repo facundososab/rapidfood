@@ -9,7 +9,10 @@
         </h3>
         <p class="font-mono text-[12px] text-ink-muted mt-0.5">{{ order.id|short_id }}</p>
       </div>
-      {% include 'components/order_status_badge.html' with status=order.status %}
+      <div class="flex flex-col items-end gap-1">
+        {% include 'components/order_status_badge.html' with status=order.status %}
+        <span class="order-origin-badge rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-muted">{{ order.origin|order_origin_label }}</span>
+      </div>
     </div>
   </div>
 

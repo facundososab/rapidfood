@@ -10,6 +10,7 @@ from modules.order.application.ports.driven.order_repository import (
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
+from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment_method import PaymentMethod
 
@@ -65,6 +66,7 @@ def _to_prisma_data(order: Order) -> dict:
     return {
         "id": order.id,
         "status": enums.OrderStatus(order.status.value),
+        "origin": enums.OrderOrigin(order.origin.value),
         "subtotal": order.subtotal,
         "discount": order.discount,
         "clientId": order.client_id,
@@ -138,6 +140,7 @@ def _to_domain(record) -> Order:
         estimated_time=record.estimatedTime,
         delivery_type=_optional_enum(DeliveryType, record.deliveryType),
         payment_type=_optional_enum(PaymentMethod, record.paymentType),
+        origin=_optional_enum(OrderOrigin, record.origin) or OrderOrigin.IN_PLACE,
         shipping_cost=record.shippingCost,
         total_amount=record.totalAmount,
         applied_coupon_id=record.appliedCouponId,

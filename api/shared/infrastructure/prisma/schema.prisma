@@ -27,6 +27,11 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderOrigin {
+  IN_PLACE
+  AGENT
+}
+
 enum DeliveryType {
   DELIVERY
   PICKUP
@@ -141,6 +146,7 @@ model Order {
   deliveryType    DeliveryType?   @map("delivery_type") // null until REQ-033
   paymentType     PaymentType?    @map("payment_type") // null until REQ-033
   status          OrderStatus     @default(DRAFT)
+  origin          OrderOrigin     @default(IN_PLACE) // IN_PLACE (POS) | AGENT (WhatsApp/IA)
   subtotal        Decimal         @default(0) @db.Decimal(10, 2)
   discount        Decimal         @default(0) @db.Decimal(10, 2)
   shippingCost    Decimal?        @map("shipping_cost") @db.Decimal(10, 2)
