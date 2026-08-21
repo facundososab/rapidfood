@@ -63,7 +63,6 @@ class ConfigureDeliverySerializer(serializers.Serializer):
     )
     high_demand_threshold = serializers.IntegerField(min_value=0)
     very_high_demand_threshold = serializers.IntegerField(min_value=1)
-    demand_window_minutes = serializers.IntegerField(min_value=1)
     high_demand_multiplier = serializers.DecimalField(
         max_digits=5, decimal_places=2, min_value=0
     )
@@ -98,9 +97,9 @@ class AddressInputSerializer(serializers.Serializer):
     street_number = serializers.CharField(max_length=50)
     city = serializers.CharField(max_length=100)
     province = serializers.CharField(max_length=100)
-    floor = serializers.CharField(max_length=20, required=False, allow_null=True, default=None)
-    apartment = serializers.CharField(max_length=20, required=False, allow_null=True, default=None)
-    postal_code = serializers.CharField(max_length=20, required=False, allow_null=True, default=None)
+    floor = serializers.CharField(max_length=20, required=False, allow_null=True, allow_blank=True, default=None)
+    apartment = serializers.CharField(max_length=20, required=False, allow_null=True, allow_blank=True, default=None)
+    postal_code = serializers.CharField(max_length=20, required=False, allow_null=True, allow_blank=True, default=None)
 
 
 class CalculateDeliveryQuoteSerializer(serializers.Serializer):

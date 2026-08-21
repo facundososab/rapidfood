@@ -11,4 +11,5 @@ urlpatterns = [
     path("api/clients/", include("modules.client.infrastructure.adapters.driver.rest.urls")),
     path("api/orders/", include("modules.order.infrastructure.adapters.driver.rest.urls")),
     path("api/delivery/", include("modules.delivery.infrastructure.adapters.driver.rest.urls")),
+    path("api/business/", include("modules.business.infrastructure.adapters.driver.rest.urls")),
 ]

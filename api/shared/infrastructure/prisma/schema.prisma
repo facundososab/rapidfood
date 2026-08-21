@@ -309,9 +309,6 @@ model DeliveryPricingConfiguration {
   highDemandMultiplier     Decimal               @map("high_demand_multiplier") @db.Decimal(5, 2)
   veryHighDemandMultiplier Decimal               @map("very_high_demand_multiplier") @db.Decimal(5, 2)
 
-  // Minutes window to look back when counting active delivery orders
-  demandWindowMinutes      Int                   @map("demand_window_minutes")
-
   weekdayRules             DeliveryWeekdayPricingRule[]
 
   @@map("delivery_pricing_configuration")

@@ -144,9 +144,8 @@ class DeliveryConfigurationRepository(DeliveryConfigurationRepositoryPort):
                     price_per_km=dpc.pricePerKm,
                     high_demand_threshold=dpc.highDemandThreshold,
                     very_high_demand_threshold=dpc.veryHighDemandThreshold,
-                    high_demand_multiplier=dpc.highDemandMultiplier,
-                    very_high_demand_multiplier=dpc.veryHighDemandMultiplier,
-                    demand_window_minutes=dpc.demandWindowMinutes,
+                    high_demand_multiplier=Decimal(str(dpc.highDemandMultiplier)),
+                    very_high_demand_multiplier=Decimal(str(dpc.veryHighDemandMultiplier)),
                     weekday_multipliers=weekday_multipliers,
                 )
             except Exception as exc:
@@ -199,7 +198,6 @@ class DeliveryConfigurationRepository(DeliveryConfigurationRepositoryPort):
                     "veryHighDemandThreshold": pricing.very_high_demand_threshold,
                     "highDemandMultiplier": pricing.high_demand_multiplier,
                     "veryHighDemandMultiplier": pricing.very_high_demand_multiplier,
-                    "demandWindowMinutes": pricing.demand_window_minutes,
                 }
 
                 dpc = tx.deliverypricingconfiguration.upsert(

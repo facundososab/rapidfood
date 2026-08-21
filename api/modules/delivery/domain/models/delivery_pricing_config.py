@@ -28,7 +28,6 @@ class DeliveryPricingConfig:
     very_high_demand_threshold: int
     high_demand_multiplier: Decimal
     very_high_demand_multiplier: Decimal
-    demand_window_minutes: int
     # One entry per WeekDay; all 7 must be present.
     weekday_multipliers: Dict[WeekDay, Decimal]
 
@@ -55,10 +54,6 @@ class DeliveryPricingConfig:
         if self.very_high_demand_multiplier <= Decimal("0"):
             raise InvalidDeliveryPricingConfigurationError(
                 "very_high_demand_multiplier must be > 0"
-            )
-        if self.demand_window_minutes <= 0:
-            raise InvalidDeliveryPricingConfigurationError(
-                "demand_window_minutes must be > 0"
             )
         missing = _ALL_WEEKDAYS - set(self.weekday_multipliers.keys())
         if missing:

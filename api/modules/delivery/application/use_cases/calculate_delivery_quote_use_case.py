@@ -8,12 +8,11 @@ Main use case for delivery quote calculation. Orchestrates:
     5. If outside -> return DeliveryQuote(available=False) immediately
     6. Geocode origin address (only after zone check passes)
     7. Calculate street-distance route
-    8. Determine demand window start time
-    9. Count active delivery orders for this restaurant
-   10. Classify demand level and get multiplier
-   11. Determine weekday and get weekday multiplier
-   12. Calculate shipping cost via DeliveryPriceCalculator
-   13. Return DeliveryQuote
+    8. Count currently active delivery orders (CONFIRMED + IN_PREPARATION)
+    9. Classify demand level and get multiplier
+   10. Determine weekday and get weekday multiplier
+   11. Calculate shipping cost via DeliveryPriceCalculator
+   12. Return DeliveryQuote
 
 IMPORTANT: Routing is called ONLY after the zone check passes.
            A provider failure (geocoding/routing) raises an error —
@@ -139,24 +138,20 @@ class CalculateDeliveryQuoteUseCase(CalculateDeliveryQuotePort):
             destination=destination_coords,
         )
 
-        # Step 8: Determine demand window
-        now = self._clock.utc_now()
-        window_start = now - timedelta(minutes=pricing_config.demand_window_minutes)
-
-        # Step 9: Count active delivery orders for this restaurant
-        active_orders = self._demand_provider.count_recent_active_delivery_orders(
+        # Step 8: Count currently active delivery orders for this restaurant
+        active_orders = self._demand_provider.count_active_delivery_orders(
             business_config_id=command.business_config_id,
-            since=window_start,
         )
 
-        # Step 10: Classify demand and get multiplier
+        # Step 9: Classify demand and get multiplier
         demand_level, demand_multiplier = classify_demand(active_orders, pricing_config)
 
-        # Step 11: Determine current weekday and get multiplier
+        # Step 10: Determine current weekday and get multiplier
+        now = self._clock.utc_now()
         current_weekday = _WEEKDAY_MAP[now.weekday()]
         weekday_multiplier = pricing_config.weekday_multipliers[current_weekday]
 
-        # Step 12: Calculate shipping cost
+        # Step 11: Calculate shipping cost
         shipping_cost = self._calculator.calculate(
             base_shipping_cost=config.base_shipping_cost,
             distance_km=route.distance_km,

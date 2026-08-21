@@ -151,3 +151,6 @@ addopts = "-ra --strict-markers"
 markers = [
   "db: test that requires the Prisma-managed test database",
 ]
+
+[tool.pyright]
+extraPaths = ["api"]

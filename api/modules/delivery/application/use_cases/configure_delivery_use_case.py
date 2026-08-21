@@ -100,7 +100,6 @@ class ConfigureDeliveryUseCase(ConfigureDeliveryPort):
             very_high_demand_threshold=command.very_high_demand_threshold,
             high_demand_multiplier=command.high_demand_multiplier,
             very_high_demand_multiplier=command.very_high_demand_multiplier,
-            demand_window_minutes=command.demand_window_minutes,
             weekday_multipliers=weekday_multipliers,
         )
 

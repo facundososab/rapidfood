@@ -50,7 +50,6 @@ class ConfigureDeliveryCommand:
     very_high_demand_threshold: int
     high_demand_multiplier: Decimal
     very_high_demand_multiplier: Decimal
-    demand_window_minutes: int
     weekday_multipliers: List[WeekdayMultiplierInput]
 
 

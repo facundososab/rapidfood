@@ -137,9 +137,24 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _address(self, d) -> Optional[dtos.Address]:
         if not d:
             return None
-        return dtos.Address(id=d["id"], street=d["street"], streetNumber=d["streetNumber"],
+        return dtos.Address(id=d["id"], street=d["street"], streetNumber=d.get("streetNumber", d.get("street_number")),
                             city=d["city"], province=d["province"], floor=d.get("floor"),
-                            apartment=d.get("apartment"), postalCode=d.get("postalCode"))
+                            apartment=d.get("apartment"), postalCode=d.get("postalCode", d.get("postal_code")))
+
+    def _business_hours(self, d) -> dtos.BusinessHours:
+        return dtos.BusinessHours(id=d["id"], openWeekDay=d.get("openWeekDay", d.get("open_week_day")),
+                                  openFromHour=d.get("openFromHour", d.get("open_from_hour")), openToHour=d.get("openToHour", d.get("open_to_hour")),
+                                  businessConfigId=d.get("businessConfigId", d.get("business_config_id")))
+
+    def _business_config(self, d) -> Optional[dtos.BusinessConfiguration]:
+        if not d:
+            return None
+        return dtos.BusinessConfiguration(
+            id=d["id"], businessName=d.get("businessName", d.get("business_name")), minOrder=_dec(d.get("minOrder", d.get("min_order"))),
+            shippingCost=_dec(d.get("shippingCost", d.get("shipping_cost"))), availableZone="",
+            businessHours=[self._business_hours(h) for h in d.get("businessHours", d.get("business_hours", []))],
+            addresses=[self._address(a) for a in d.get("addresses", [])]
+        )
 
     def _order(self, d) -> Optional[dtos.Order]:
         if not d:
@@ -380,12 +395,50 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     # -- business configuration --------------------------------------------
     def get_business_config(self):
-        return dtos.BusinessConfiguration(
-            id="", businessName="", minOrder=Decimal("0"), shippingCost=Decimal("0"),
-            availableZone="", businessHours=[], addresses=[])
+        try:
+            raw = self._get("/api/business/default/")
+            return self._business_config(raw)
+        except RuntimeError:
+            return dtos.BusinessConfiguration(
+                id="default", businessName="", minOrder=Decimal("0"), shippingCost=Decimal("0"),
+                availableZone="", businessHours=[], addresses=[])
 
     def save_business_config(self, payload):
-        raise NotImplementedError("El módulo de configuración no existe en el backend todavía.")
+        # Map camelCase from UI payload to snake_case for API
+        body = {
+            "business_name": payload.get("businessName", ""),
+            "min_order": str(payload.get("minOrder", 0)),
+            "shipping_cost": str(payload.get("shippingCost", 0)),
+        }
+        self._patch("/api/business/default/", body)
+        return self.get_business_config()
+
+    def save_business_hours(self, business_config_id: str, hours: list) -> None:
+        payload = [
+            {
+                "open_week_day": h["openWeekDay"],
+                "open_from_hour": h["openFromHour"],
+                "open_to_hour": h["openToHour"]
+            }
+            for h in hours
+        ]
+        self._put(f"/api/business/{business_config_id}/hours/", payload)
+
+    def create_business_address(self, business_config_id: str, payload: dict) -> dtos.Address:
+        body = {
+            "street": payload["street"],
+            "street_number": payload["streetNumber"],
+            "city": payload["city"],
+            "province": payload["province"],
+            "floor": payload.get("floor"),
+            "apartment": payload.get("apartment"),
+            "postal_code": payload.get("postalCode")
+        }
+        res = self._post(f"/api/business/{business_config_id}/addresses/", body)
+        return self._address(res)
+
+    def delete_business_address(self, business_config_id: str, address_id: str) -> None:
+        self._delete(f"/api/business/{business_config_id}/addresses/{address_id}/")
 
     # -- delivery configuration --------------------------------------------
     def get_delivery_config(self, business_config_id):
