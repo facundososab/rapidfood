@@ -31,3 +31,7 @@ Thumbs.db
 
 #UI
 **/vendor/**
+
+# AI
+opencode.json
+.atl/**
