@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "modules.order",
     "modules.catalog",
     "modules.config_coupon",
+    "modules.delivery",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -82,3 +83,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "UNAUTHENTICATED_USER": None,
 }
+
+# Delivery module — OpenRouteService API key (required for geocoding/routing).
+OPENROUTESERVICE_API_KEY: str = os.environ.get("OPENROUTESERVICE_API_KEY", "")

@@ -68,4 +68,5 @@ urlpatterns = [
     # Configuration
     path("configuracion/", configuration.index, name="configuration"),
     path("configuracion/general/", configuration.save_general, name="configuration_general"),
+    path("configuracion/envios/", configuration.save_delivery, name="configuration_delivery"),
 ]

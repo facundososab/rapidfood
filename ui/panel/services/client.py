@@ -174,3 +174,10 @@ class RapidfoodClient(ABC):
 
     @abstractmethod
     def save_business_config(self, payload: dict) -> dtos.BusinessConfiguration: ...
+
+    # ---- Delivery configuration ------------------------------------------
+    @abstractmethod
+    def get_delivery_config(self, business_config_id: str) -> dict: ...
+
+    @abstractmethod
+    def save_delivery_config(self, business_config_id: str, payload: dict) -> dict: ...

@@ -378,7 +378,7 @@ class HttpRapidfoodClient(RapidfoodClient):
     def get_conversation(self, conversation_id):
         return None
 
-    # -- business configuration (not in scope yet) -------------------------
+    # -- business configuration --------------------------------------------
     def get_business_config(self):
         return dtos.BusinessConfiguration(
             id="", businessName="", minOrder=Decimal("0"), shippingCost=Decimal("0"),
@@ -386,3 +386,13 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     def save_business_config(self, payload):
         raise NotImplementedError("El módulo de configuración no existe en el backend todavía.")
+
+    # -- delivery configuration --------------------------------------------
+    def get_delivery_config(self, business_config_id):
+        try:
+            return self._get(f"/api/delivery/{business_config_id}/configure/")
+        except RuntimeError:
+            return None
+
+    def save_delivery_config(self, business_config_id, payload):
+        return self._post(f"/api/delivery/{business_config_id}/configure/", payload)
