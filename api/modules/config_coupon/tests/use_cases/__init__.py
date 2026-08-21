@@ -1,0 +1,1 @@
+"""Use case tests — fakes/stubs of driven ports, no infrastructure."""
