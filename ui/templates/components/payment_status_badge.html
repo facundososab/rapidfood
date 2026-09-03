@@ -1,0 +1,6 @@
+{% if status == 'APPROVED' %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)"><span class="badge-dot" style="background:var(--color-success)"></span>Aprobado</span>
+{% elif status == 'PENDING' %}<span class="badge" style="background:var(--color-warning-soft);color:var(--color-warning)"><span class="badge-dot" style="background:var(--color-warning)"></span>Pendiente</span>
+{% elif status == 'REJECTED' %}<span class="badge" style="background:var(--color-danger-soft);color:var(--color-danger)"><span class="badge-dot" style="background:var(--color-danger)"></span>Rechazado</span>
+{% elif status == 'FAILED' %}<span class="badge" style="background:var(--color-danger-soft);color:var(--color-danger)"><span class="badge-dot" style="background:var(--color-danger)"></span>Fallido</span>
+{% elif status == 'EXPIRED' %}<span class="badge" style="background:var(--color-neutral-soft);color:var(--color-neutral)"><span class="badge-dot" style="background:var(--color-neutral)"></span>Expirado</span>
+{% else %}<span class="badge" style="background:var(--color-neutral-soft);color:var(--color-neutral)">{{ status }}</span>{% endif %}

@@ -1,0 +1,1 @@
+"""Driven (outbound) adapters — concrete implementations of driven ports."""

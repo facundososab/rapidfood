@@ -1,0 +1,1 @@
+{% for c in clients %}<div class="px-3 py-2 text-[13px] border-b border-line">{{ c|client_name }} · <span class="font-mono text-ink-muted">{{ c.phoneNumber }}</span></div>{% empty %}<div class="p-3 text-[13px] text-ink-muted">Sin coincidencias.</div>{% endfor %}

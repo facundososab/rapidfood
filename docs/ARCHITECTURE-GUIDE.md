@@ -50,7 +50,7 @@ infrastructure  →  application  →  domain
 ### 4.3. Infrastructure (`infrastructure/`)
 - **Propósito:** Implementar los puertos de salida e invocar los puertos de entrada interactuando con el mundo real.
 - **Adaptadores Inbound (REST):** Las `views.py` y `serializers.py` de DRF. Analizan el JSON, validan la estructura, e invocan un caso de uso. **No contienen reglas de negocio.**
-- **Adaptadores Outbound (Datos):** Repositorios concretos que implementan los puertos utilizando Prisma o Django ORM, adaptando los modelos de base de datos a Entidades puras de dominio.
+- **Adaptadores Outbound (Datos):** Repositorios concretos que implementan los puertos utilizando Prisma o Django ORM, adaptando los modelos de base de datos a Entidades puras de dominio. La lógica de traducción entre ORM model y Domain entity **debe vivir en una carpeta `mappers/`** dentro del adaptador (ver sección 8).
 
 ### 4.4. Configuration (`configuration/`)
 - **Propósito:** El *Composition Root*.
@@ -74,3 +74,77 @@ Si ejecutás las validaciones, el linter va a abortar con error si detecta que:
 
 ---
 *Para mayor detalle técnico sobre cómo implementar entidades o casos de uso paso a paso, referirse a la skill interna del equipo (`skills/hexagonal-architecture/`).*
+
+## 7. Adaptadores Driver (REST API)
+
+Cuando se implementan vistas (Controladores) en DRF, es **obligatorio** traducir los datos del framework a un objeto puro de Python (`Command` o `Query`) antes de invocar el Caso de Uso. 
+
+Para evitar código repetitivo, la mejor práctica es hacer coincidir los campos del `Serializer` con los del `Command` y usar el desempaquetado de kwargs (`**serializer.validated_data`):
+
+```python
+# ✅ CORRECTO: Instanciar usando kwargs (idiomático y limpio)
+command = AddLineCommand(
+    order_id=order_id,
+    **serializer.validated_data
+)
+
+# ❌ INCORRECTO: Pasar el diccionario del framework crudo al caso de uso
+# container.use_case.execute(serializer.validated_data)
+```
+
+## 8. Patrón Mapper en Adaptadores Driven
+
+Todo adaptador driven que use Django ORM **debe** separar la lógica de traducción en una carpeta `mappers/`.
+
+### Estructura obligatoria
+
+```
+infrastructure/adapters/driven/
+└── django_orm/
+    ├── models.py          ← Clases ORM (managed=False, espejo del schema Prisma)
+    ├── order_repository.py ← Implementa el puerto; usa el mapper para convertir
+    └── mappers/
+        ├── __init__.py
+        └── order_mapper.py   ← Lógica de traducción ORM ↔ Domain
+```
+
+### Responsabilidades de cada archivo
+
+| Archivo | Responsabilidad |
+|---|---|
+| `models.py` | Define las clases ORM que mapean las tablas de Prisma. Siempre `managed = False`. |
+| `mappers/<entity>_mapper.py` | Traduce entre `DjangoModel` y `DomainEntity`. No contiene queries ni lógica de negocio. |
+| `<entity>_repository.py` | Ejecuta queries ORM, delega la traducción al mapper, retorna entidades puras. |
+
+### Por qué `models.py` no va dentro de `mappers/`
+
+Django requiere que los modelos sean descubiertos a través del mecanismo de app registry, que convencional­mente espera encontrarlos en `models.py`. Moverlos dentro de `mappers/` no elimina esta necesidad — solo agrega una indirección. `models.py` y `mappers/` tienen responsabilidades distintas y deben permanecer separados.
+
+### Ejemplo de mapper
+
+```python
+# mappers/order_mapper.py
+from modules.order.domain.models.order import Order
+from modules.order.infrastructure.adapters.driven.django_orm.models import OrderModel
+
+class OrderMapper:
+    @staticmethod
+    def to_domain(model: OrderModel) -> Order:
+        return Order(
+            id=str(model.id),
+            status=OrderState(model.status),
+            # ...
+        )
+
+    @staticmethod
+    def to_orm(order: Order) -> dict:
+        return {
+            "id": order.id,
+            "status": order.status.value,
+            # ...
+        }
+```
+
+### Regla clave
+
+El repositorio es el **único** lugar que interacúa con el ORM. El mapper es el **único** lugar que sabe cómo traducir entre ORM y domain. Nunca mezclar estas dos responsabilidades.

@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}{% if product %}Editar producto{% else %}Nuevo producto{% endif %}{% endblock %}
+{% block heading %}{% if product %}Editar producto{% else %}Nuevo producto{% endif %}{% endblock %}
+{% block content %}
+<form method="post" action="{% if product %}{% url 'product_save' product.id %}{% else %}{% url 'product_create' %}{% endif %}" class="max-w-2xl space-y-5">
+  {% csrf_token %}
+
+  <section class="card p-6 space-y-5">
+    <div class="th">Información básica</div>
+    <div>
+      <label for="product-name" class="th block mb-2">Nombre</label>
+      <input id="product-name" class="field" name="name" value="{{ product.name }}" placeholder="Ej: Pizza muzzarella" required>
+    </div>
+    <div>
+      <label for="product-description" class="th block mb-2">Descripción</label>
+      <textarea id="product-description" class="field resize-none" name="description" rows="3" placeholder="Detalle del producto, ingredientes, tamaño…">{{ product.description }}</textarea>
+    </div>
+    <div>
+      <label for="product-image" class="th block mb-2">Imagen (URL) <span class="text-ink-faint font-normal">— opcional</span></label>
+      <input id="product-image" class="field" name="image_url" type="url" value="{{ product.imageUrl|default:'' }}" placeholder="https://…" x-data="{ img: '{{ product.imageUrl|default:'' }}' }" x-model="img">
+      <div class="mt-2 flex items-center gap-2.5">
+        <template x-if="img">
+          <img :src="img" @error="$el.style.display='none'" referrerpolicy="no-referrer" class="w-14 h-14 rounded-lg object-cover border border-line bg-muted" alt="Vista previa">
+        </template>
+        <p class="text-[12px] text-ink-faint">Se muestra en el listado y en la ficha del producto.</p>
+      </div>
+    </div>
+    <div>
+      <label for="product-category" class="th block mb-2">Categoría</label>
+      <select id="product-category" class="field" name="category_id" required>
+        {% for c in categories %}
+          <option value="{{ c.id }}" {% if product.categoryId == c.id %}selected{% endif %}>{{ c.description }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </section>
+
+  <section class="card p-6 space-y-4">
+    <div class="th">Precio</div>
+    {% if product %}
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <div class="text-[12px] text-ink-muted">Precio vigente</div>
+          <div class="mt-0.5 font-mono text-[20px] font-semibold tnum text-ink">{{ current_price|money }}</div>
+        </div>
+        <a href="{% url 'product_detail' product.id %}" class="btn btn-ghost shrink-0">Gestionar precios</a>
+      </div>
+      <p class="text-[12px] text-ink-faint">Los cambios de precio se registran desde la ficha del producto para conservar el historial.</p>
+    {% else %}
+      <div>
+        <label for="product-price" class="th block mb-2">Precio inicial</label>
+        <input id="product-price" class="field font-mono" type="number" min="0" step="0.01" name="price" placeholder="0.00" required>
+        <p class="mt-2 text-[12px] text-ink-faint">Queda registrado como el primer precio del producto.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card p-6 space-y-4">
+    <div class="th">Operación</div>
+    <label class="flex items-start gap-2.5 cursor-pointer">
+      <input type="checkbox" name="available" class="mt-0.5" {% if not product or product.available %}checked{% endif %}>
+      <span>
+        <span class="block text-[14px] font-semibold text-ink">Disponible para pedir</span>
+        <span class="block text-[12px] text-ink-muted">Si está marcado, los clientes pueden incluirlo en sus pedidos.</span>
+      </span>
+    </label>
+  </section>
+
+  <div class="flex items-center gap-2">
+    <a href="{% url 'products' %}" class="btn btn-ghost">Cancelar</a>
+    <button class="btn btn-primary">{% if product %}Guardar cambios{% else %}Crear producto{% endif %}</button>
+  </div>
+</form>
+{% endblock %}

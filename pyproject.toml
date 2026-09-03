@@ -46,21 +46,21 @@ containers = [
   "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon",
 ]
 layers = [
-  "adapters.inbound.http",       # DRF views/serializers (highest)
-  "adapters.outbound",           # Prisma repositories/gateways
-  "application.ports.inbound",   # inbound port interfaces
-  "application.use_cases",       # orchestration
-  "application.ports.outbound",  # outbound port interfaces
-  "domain",                      # pure domain (lowest)
+  "(infrastructure.adapters.driver)",   # DRF views/serializers (highest)
+  "(infrastructure.adapters.driven)",   # Prisma repositories/gateways
+  "(application.use_cases)",            # orchestration (implements driver ports)
+  "(application.ports.driver)",         # driver port interfaces
+  "(application.ports.driven)",         # driven port interfaces
+  "(domain)",                           # pure domain (lowest)
 ]
 # NOTE: composition/ is intentionally outside this contract — it is the wiring root.
 # If lint-imports flags composition imports, add "composition" as the top layer.
 
 [[tool.importlinter.contracts]]
-name = "No inbound HTTP adapter to outbound adapter (views never touch the DB)"
+name = "No driver adapter to driven adapter (views never touch the DB)"
 type = "forbidden"
-source_modules = ["modules.*.adapters.inbound.http"]
-forbidden_modules = ["modules.*.adapters.outbound"]
+source_modules = ["modules.*.adapters.driver"]
+forbidden_modules = ["modules.*.adapters.driven"]
 as_packages = true
 
 [[tool.importlinter.contracts]]
@@ -132,8 +132,8 @@ ancestors = ["modules"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-pythonpath = ["api", "."]              # makes `modules.*` and `config.*` importable
-testpaths = ["tests"]
+pythonpath = ["api"]              # makes `modules.*` and `config.*` importable
+testpaths = ["tests", "api/modules", "api/shared/infrastructure/prisma/tests"]
 addopts = "-ra --strict-markers"
 markers = [
   "db: test that requires the Prisma-managed test database",

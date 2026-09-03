@@ -8,6 +8,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .import_linter_cache/
+.atl/
 
 # Environment / secrets
 .env
@@ -22,3 +23,16 @@ node_modules/
 Thumbs.db
 .idea/
 .vscode/
+
+# Skills
+.claude
+.gemini
+.codex
+.github
+
+#UI
+**/vendor/**
+
+# AI
+opencode.json
+.atl/**

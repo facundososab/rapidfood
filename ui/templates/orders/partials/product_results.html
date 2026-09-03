@@ -1,0 +1,1 @@
+{% for p in products %}<div class="px-3 py-2 flex justify-between text-[13px] border-b border-line"><span>{{ p.name }}</span><span class="text-ink-muted">{{ p.category.description }}</span></div>{% empty %}<div class="p-3 text-[13px] text-ink-muted">Sin productos disponibles.</div>{% endfor %}

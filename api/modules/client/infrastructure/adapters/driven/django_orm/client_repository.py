@@ -5,6 +5,7 @@ from modules.client.domain.models.client import Client
 from modules.client.infrastructure.adapters.driven.django_orm.models import (
     ClientModel,
 )
+from django.db.models import Q
 
 
 class DjangoClientRepository(ClientRepositoryPort):
@@ -37,11 +38,28 @@ class DjangoClientRepository(ClientRepositoryPort):
             phone_number=client.phone_number,
         )
 
+    def list(self, search: str | None = None) -> list[Client]:
+        queryset = ClientModel.objects.all()
+        if search:
+            needle = search.strip()
+            queryset = queryset.filter(
+                Q(name__icontains=needle)
+                | Q(last_name__icontains=needle)
+                | Q(phone_number__icontains=needle)
+            )
+        return [self._to_domain(model) for model in queryset]
+
+    def delete(self, client_id: str) -> None:
+        ClientModel.objects.filter(id=client_id).delete()
+
+    def client_exists(self, client_id: str) -> bool:
+        return ClientModel.objects.filter(id=client_id).exists()
+
     @staticmethod
     def _to_domain(model: ClientModel) -> Client:
         return Client(
             id=model.id,
             name=model.name,
-            last_name=model.last_name,
-            phone_number=model.phone_number,
+            lastName=model.last_name,
+            phoneNumber=model.phone_number,
         )

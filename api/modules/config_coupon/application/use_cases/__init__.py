@@ -1,0 +1,1 @@
+"""Coupon use cases — orchestrate the domain via injected ports."""

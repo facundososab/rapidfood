@@ -1,0 +1,1 @@
+"""Domain tests — pure Python, no Django/DB/HTTP."""

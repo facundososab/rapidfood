@@ -5,10 +5,7 @@ license: MIT
 metadata:
 author: project-team
 version: '1.0'
-scope:
-  - api
-  - backend
-  - django
+scope: [api]
 auto_invoke:
   - 'Implementing a Django module'
   - 'Creating a use case'
@@ -74,6 +71,10 @@ module/
 │       │   └── rest/
 │       └── driven/
 │           └── django_orm/
+│               ├── models.py
+│               ├── order_repository.py
+│               └── mappers/
+│                   └── order_mapper.py
 ├── configuration/
 ├── migrations/
 └── tests/
@@ -155,6 +156,7 @@ Antes de finalizar una implementación, verificar:
 - Las views no contienen reglas de negocio.
 - Los serializers no reemplazan validaciones de dominio.
 - Los repositorios devuelven entidades y no modelos ORM.
+- La lógica de traducción ORM ↔ Domain está en `mappers/` dentro del adaptador driven, no en el repositorio ni en el caso de uso.
 - Las dependencias se reciben por constructor.
 - La configuración concreta está centralizada en `container.py`.
 - Las excepciones de dominio se traducen en el borde.
@@ -165,6 +167,7 @@ Antes de finalizar una implementación, verificar:
 - La IA no modifica directamente datos de negocio.
 - Existen pruebas para reglas y casos de uso.
 - No se agregó código a `shared` sin justificar que el concepto es realmente común.
+- Los Commands en las vistas REST se instancian preferentemente haciendo unpacking del serializer: `Command(**serializer.validated_data)`.
 
 ## Antipatrones prohibidos
 

@@ -1,0 +1,1 @@
+"""REST inbound adapter — DRF views, serializers and urls."""

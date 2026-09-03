@@ -1,13 +1,16 @@
 """URL routing — Rapidfood.
 
-Route layout: ``/health`` plus per-app inbound adapters added by later changes.
+Route layout: ``/health`` plus per-app inbound adapters.
 """
 
-from django.urls import path, include
+from django.urls import include, path
 
 from config import views
 
 urlpatterns = [
     path("health/", views.health, name="health"),
-    path("", include("modules.client.infrastructure.adapters.driver.rest.urls")),
+    path("api/conversation/", include("modules.conversation.infrastructure.adapters.driver.rest.urls")),
+    path("api/catalog/", include("modules.catalog.infrastructure.adapters.driver.rest.urls")),
+    path("api/clients/", include("modules.client.infrastructure.adapters.driver.rest.urls")),
+    path("api/orders/", include("modules.order.infrastructure.adapters.driver.rest.urls")),
 ]

@@ -1,13 +1,25 @@
 import uuid
-from modules.client.application.use_cases.create_client_use_case import CreateClientUseCase
-from modules.client.application.use_cases.update_client_use_case import UpdateClientUseCase
+
 from modules.client.application.use_cases.add_address_use_case import AddAddressUseCase
-from modules.client.application.use_cases.update_address_use_case import UpdateAddressUseCase
+from modules.client.application.use_cases.create_client_use_case import CreateClientUseCase
+from modules.client.application.use_cases.delete_client_use_case import DeleteClientUseCase
+from modules.client.application.use_cases.get_client_use_case import GetClientUseCase
+from modules.client.application.use_cases.list_clients_use_case import ListClientsUseCase
 from modules.client.application.use_cases.remove_address_use_case import RemoveAddressUseCase
-from modules.client.application.use_cases.set_default_address_use_case import SetDefaultAddressUseCase
-from modules.client.infrastructure.adapters.driven.django_orm.client_repository import DjangoClientRepository
-from modules.client.infrastructure.adapters.driven.django_orm.address_repository import DjangoAddressRepository
-from modules.client.infrastructure.adapters.driven.django_orm.client_query_adapter import DjangoClientQueryAdapter
+from modules.client.application.use_cases.set_default_address_use_case import (
+    SetDefaultAddressUseCase,
+)
+from modules.client.application.use_cases.update_address_use_case import UpdateAddressUseCase
+from modules.client.application.use_cases.update_client_use_case import UpdateClientUseCase
+from modules.client.infrastructure.adapters.driven.django_orm.address_repository import (
+    DjangoAddressRepository,
+)
+from modules.client.infrastructure.adapters.driven.django_orm.client_query_adapter import (
+    DjangoClientQueryAdapter,
+)
+from modules.client.infrastructure.adapters.driven.django_orm.client_repository import (
+    DjangoClientRepository,
+)
 
 
 class UuidIdGenerator:
@@ -16,35 +28,22 @@ class UuidIdGenerator:
 
 
 class ClientContainer:
-    _client_repository = DjangoClientRepository()
-    _address_repository = DjangoAddressRepository()
-    _id_generator = UuidIdGenerator()
-    _client_query_adapter = DjangoClientQueryAdapter()
+    def __init__(self) -> None:
+        client_repository = DjangoClientRepository()
+        address_repository = DjangoAddressRepository()
+        id_generator = UuidIdGenerator()
 
-    @classmethod
-    def create_client_use_case(cls) -> CreateClientUseCase:
-        return CreateClientUseCase(cls._client_repository, cls._id_generator)
+        self.create_client = CreateClientUseCase(client_repository, id_generator)
+        self.update_client = UpdateClientUseCase(client_repository)
+        self.add_address = AddAddressUseCase(client_repository, address_repository, id_generator)
+        self.update_address = UpdateAddressUseCase(address_repository)
+        self.remove_address = RemoveAddressUseCase(address_repository)
+        self.set_default_address = SetDefaultAddressUseCase(address_repository)
+        self.get_client = GetClientUseCase(client_repository)
+        self.list_clients = ListClientsUseCase(client_repository)
+        self.delete_client = DeleteClientUseCase(client_repository)
+        self.client_query_adapter = DjangoClientQueryAdapter()
 
-    @classmethod
-    def update_client_use_case(cls) -> UpdateClientUseCase:
-        return UpdateClientUseCase(cls._client_repository)
 
-    @classmethod
-    def add_address_use_case(cls) -> AddAddressUseCase:
-        return AddAddressUseCase(cls._client_repository, cls._address_repository, cls._id_generator)
-        
-    @classmethod
-    def update_address_use_case(cls) -> UpdateAddressUseCase:
-        return UpdateAddressUseCase(cls._address_repository)
-        
-    @classmethod
-    def remove_address_use_case(cls) -> RemoveAddressUseCase:
-        return RemoveAddressUseCase(cls._address_repository)
-        
-    @classmethod
-    def set_default_address_use_case(cls) -> SetDefaultAddressUseCase:
-        return SetDefaultAddressUseCase(cls._address_repository)
-        
-    @classmethod
-    def client_query_adapter(cls) -> DjangoClientQueryAdapter:
-        return cls._client_query_adapter
+def get_client_container() -> ClientContainer:
+    return ClientContainer()

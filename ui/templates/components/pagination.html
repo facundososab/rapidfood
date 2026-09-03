@@ -1,0 +1,22 @@
+{% comment %}page(Page) target(hx-target selector) url(optional url name){% endcomment %}
+{% if page.num_pages > 1 %}
+<div class="flex items-center justify-between px-4 py-3 border-t border-line text-[13px]">
+  <span class="text-ink-muted">
+    {{ page.total }} resultado{{ page.total|pluralize }} · página {{ page.page }} de {{ page.num_pages }}
+  </span>
+  <div class="flex items-center gap-1">
+    <button class="btn btn-ghost !px-2 !py-1.5 disabled:opacity-40"
+            {% if not page.has_prev %}disabled{% endif %}
+            hx-get="{% if url %}{% url url %}{% endif %}{% querystring request page=page.page|add:'-1' %}"
+            hx-target="{{ target }}" hx-swap="outerHTML" hx-push-url="false">
+      {% include 'components/icon.html' with name='chevron-left' cls='w-4 h-4' %}
+    </button>
+    <button class="btn btn-ghost !px-2 !py-1.5 disabled:opacity-40"
+            {% if not page.has_next %}disabled{% endif %}
+            hx-get="{% if url %}{% url url %}{% endif %}{% querystring request page=page.page|add:'1' %}"
+            hx-target="{{ target }}" hx-swap="outerHTML" hx-push-url="false">
+      {% include 'components/icon.html' with name='chevron-right' cls='w-4 h-4' %}
+    </button>
+  </div>
+</div>
+{% endif %}

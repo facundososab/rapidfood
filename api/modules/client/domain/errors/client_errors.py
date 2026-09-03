@@ -1,4 +1,8 @@
-class ClientDomainError(Exception):
+class ClientError(Exception):
+    """Error base para el dominio de clientes."""
+
+
+class ClientDomainError(ClientError):
     pass
 
 

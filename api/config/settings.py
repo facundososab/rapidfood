@@ -13,33 +13,33 @@ data layer (single source of truth: ``schema.prisma``). Therefore:
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 def _load_dotenv() -> None:
     """Minimal .env loader (no third-party deps).
 
     The Prisma CLI loads ``.env`` natively, but the Prisma Python client reads
-    ``os.environ`` at ``connect()`` time — so the project root ``.env`` is
-    loaded here, before any settings are read, in every Django context
-    (runserver, manage.py, pytest-django).
+    ``os.environ`` at ``connect()`` time — so the repo-root ``.env`` (and any
+    local ``api/.env`` override) is loaded here, before any settings are read,
+    in every Django context (runserver, manage.py, pytest-django).
     """
-    env_file = BASE_DIR / ".env"
-    if not env_file.exists():
-        return
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    for env_file in (BASE_DIR / ".env", BASE_DIR.parent / ".env"):
+        if not env_file.exists():
             continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip()
-        if (value.startswith('"') and value.endswith('"')) or (
-            value.startswith("'") and value.endswith("'")
-        ):
-            value = value[1:-1]
-        if key and key not in os.environ:
-            os.environ[key] = value
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            if (value.startswith('"') and value.endswith('"')) or (
+                value.startswith("'") and value.endswith("'")
+            ):
+                value = value[1:-1]
+            if key and key not in os.environ:
+                os.environ[key] = value
 
 
 _load_dotenv()
@@ -49,7 +49,6 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
-    # Only contrib app — Django never owns tables; Prisma does (ADR-8/ADR-9).
     "django.contrib.staticfiles",
     "rest_framework",
     "modules.client",
@@ -72,6 +71,7 @@ ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+STATIC_URL = "static/"
 
 # No sessions/auth/admin → nothing to process.
 MIDDLEWARE: list[str] = []
@@ -81,4 +81,5 @@ REST_FRAMEWORK = {
     # No sessions → CSRF not enforced; token auth later if needed (design).
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "EXCEPTION_HANDLER": "modules.client.infrastructure.adapters.driver.rest.exception_handlers.client_exception_handler",
+    "UNAUTHENTICATED_USER": None,
 }

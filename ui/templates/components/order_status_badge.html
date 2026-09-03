@@ -1,0 +1,11 @@
+{% comment %}Usage: {% include 'components/order_status_badge.html' with status=order.status %}{% endcomment %}
+{% if status == 'DRAFT' %}{% with c='neutral' %}<span class="badge" style="background:var(--color-{{c}}-soft);color:var(--color-{{c}})"><span class="badge-dot" style="background:var(--color-{{c}})"></span>Borrador</span>{% endwith %}
+{% elif status == 'PENDING' %}<span class="badge" style="background:var(--color-warning-soft);color:var(--color-warning)"><span class="badge-dot" style="background:var(--color-warning)"></span>Pendiente</span>
+{% elif status == 'PAID' %}<span class="badge" style="background:var(--color-info-soft);color:var(--color-info)"><span class="badge-dot" style="background:var(--color-info)"></span>Pagado</span>
+{% elif status == 'CONFIRMED' %}<span class="badge" style="background:var(--color-purple-soft);color:var(--color-purple)"><span class="badge-dot" style="background:var(--color-purple)"></span>Confirmado</span>
+{% elif status == 'IN_PREPARATION' %}<span class="badge" style="background:#fff3d6;color:#a15c00"><span class="badge-dot" style="background:#e08600"></span>En preparación</span>
+{% elif status == 'READY' %}<span class="badge" style="background:#e0f2fe;color:#0369a1"><span class="badge-dot" style="background:#0284c7"></span>Listo</span>
+{% elif status == 'DELIVERED' %}<span class="badge" style="background:var(--color-success-soft);color:var(--color-success)"><span class="badge-dot" style="background:var(--color-success)"></span>Entregado</span>
+{% elif status == 'PICKED_UP' %}<span class="badge" style="background:var(--color-success-soft);color:#0f8a53"><span class="badge-dot" style="background:#0f8a53"></span>Retirado</span>
+{% elif status == 'CANCELLED' %}<span class="badge" style="background:var(--color-danger-soft);color:var(--color-danger)"><span class="badge-dot" style="background:var(--color-danger)"></span>Cancelado</span>
+{% else %}<span class="badge" style="background:var(--color-neutral-soft);color:var(--color-neutral)">{{ status }}</span>{% endif %}

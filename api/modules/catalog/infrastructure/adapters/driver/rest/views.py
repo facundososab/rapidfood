@@ -1,0 +1,236 @@
+from datetime import date
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from modules.catalog.application.ports.driver.add_price_ports import AddPriceCommand
+from modules.catalog.application.ports.driver.create_category_ports import (
+    CreateCategoryCommand,
+)
+from modules.catalog.application.ports.driver.create_product_ports import (
+    CreateProductCommand,
+)
+from modules.catalog.application.ports.driver.delete_product_ports import (
+    DeleteProductCommand,
+)
+from modules.catalog.application.ports.driver.get_product_ports import ProductDetail
+from modules.catalog.application.ports.driver.list_prices_ports import ListPricesQuery
+from modules.catalog.application.ports.driver.list_products_ports import (
+    ListProductsQuery,
+)
+from modules.catalog.application.ports.driver.set_discount_ports import SetDiscountCommand
+from modules.catalog.application.ports.driver.set_product_state_ports import (
+    SetProductStateCommand,
+)
+from modules.catalog.application.ports.driver.update_product_ports import (
+    UpdateProductCommand,
+)
+from composition.container import get_app_catalog_container
+from modules.catalog.domain.errors.catalog_errors import (
+    CategoryNotFoundError,
+    ProductInUseError,
+    ProductNotFoundError,
+)
+from modules.catalog.domain.models.product import ProductState
+
+from .serializers import (
+    AddPriceSerializer,
+    CreateCategorySerializer,
+    CreateProductSerializer,
+    SetDiscountSerializer,
+    SetProductStateSerializer,
+    UpdateProductSerializer,
+)
+
+
+def _serialize_product(detail: ProductDetail) -> dict:
+    return {
+        "id": detail.id,
+        "name": detail.name,
+        "description": detail.description,
+        "image_url": detail.image_url,
+        "state": detail.state,
+        "category_id": detail.category_id,
+        "category": (
+            {"id": detail.category.id, "description": detail.category.description}
+            if detail.category is not None
+            else None
+        ),
+        "prices": [
+            {
+                "id": price.id,
+                "product_id": price.product_id,
+                "since_date": price.since_date,
+                "price": price.price,
+            }
+            for price in detail.prices
+        ],
+    }
+
+
+class ProductListCreateView(APIView):
+    def get(self, request):
+        category_id = request.query_params.get("category_id")
+        available_param = request.query_params.get("available")
+
+        state = None
+        if available_param is not None:
+            state = (
+                ProductState.AVAILABLE
+                if available_param.lower() == "true"
+                else ProductState.UNAVAILABLE
+            )
+
+        query = ListProductsQuery(category_id=category_id, state=state)
+        container = get_app_catalog_container()
+        results = container.list_products.execute(query)
+
+        return Response([r.__dict__ for r in results])
+
+    def post(self, request):
+        serializer = CreateProductSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        command = CreateProductCommand(**serializer.validated_data)
+
+        container = get_app_catalog_container()
+        try:
+            result = container.create_product.execute(command)
+        except CategoryNotFoundError:
+            return Response(
+                {"detail": "La categoria no existe"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+
+
+class SetProductStateView(APIView):
+    def patch(self, request, product_id: str):
+        serializer = SetProductStateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        state = ProductState(serializer.validated_data["state"])
+        command = SetProductStateCommand(product_id=product_id, state=state)
+
+        container = get_app_catalog_container()
+        try:
+            result = container.set_product_state.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(result.__dict__)
+
+
+class PriceListCreateView(APIView):
+    def get(self, request, product_id: str):
+        query = ListPricesQuery(product_id=product_id)
+        container = get_app_catalog_container()
+        results = container.list_prices.execute(query)
+
+        return Response([r.__dict__ for r in results])
+
+    def post(self, request, product_id: str):
+        serializer = AddPriceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        since_date = serializer.validated_data.get("since_date") or date.today()
+        command = AddPriceCommand(
+            product_id=product_id, since_date=since_date, price=serializer.validated_data["price"]
+        )
+
+        container = get_app_catalog_container()
+        try:
+            result = container.add_price.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+
+
+class ProductDetailView(APIView):
+    def get(self, request, product_id: str):
+        container = get_app_catalog_container()
+        try:
+            result = container.get_product.execute(product_id)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(_serialize_product(result))
+
+    def patch(self, request, product_id: str):
+        serializer = UpdateProductSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        command = UpdateProductCommand(product_id=product_id, **serializer.validated_data)
+
+        container = get_app_catalog_container()
+        try:
+            result = container.update_product.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except CategoryNotFoundError:
+            return Response(
+                {"detail": "La categoria no existe"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(_serialize_product(result))
+
+    def delete(self, request, product_id: str):
+        command = DeleteProductCommand(product_id=product_id)
+
+        container = get_app_catalog_container()
+        try:
+            container.delete_product.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except ProductInUseError as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_409_CONFLICT
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CategoryListCreateView(APIView):
+    def get(self, request):
+        container = get_app_catalog_container()
+        results = container.list_categories.execute()
+        return Response([r.__dict__ for r in results])
+
+    def post(self, request):
+        serializer = CreateCategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        command = CreateCategoryCommand(**serializer.validated_data)
+        container = get_app_catalog_container()
+        result = container.create_category.execute(command)
+
+        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+
+
+class SetDiscountView(APIView):
+    def post(self, request):
+        serializer = SetDiscountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        command = SetDiscountCommand(**serializer.validated_data)
+
+        container = get_app_catalog_container()
+        try:
+            result = container.set_discount.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(result.__dict__, status=status.HTTP_201_CREATED)

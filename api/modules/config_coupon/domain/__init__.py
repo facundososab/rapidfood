@@ -1,0 +1,1 @@
+"""Coupon domain package. Pure Python — no frameworks."""
