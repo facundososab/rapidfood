@@ -109,10 +109,10 @@ api/modules/config_coupon/
 
 | Método | Ruta | Descripción | Use case |
 |--------|------|-------------|----------|
-| `POST` | `/coupons/` | Crear cupón (admin) | `create_coupon` |
-| `GET` | `/coupons/list/` | Listar todos los cupones | `list_coupons` |
-| `GET` | `/coupons/by-code/<code>/` | Consultar por código | `get_coupon_by_code` |
-| `PATCH` | `/coupons/<id>/status/` | Activar/desactivar cupón | `toggle_coupon_status` |
+| `POST` | `/api/coupons/` | Crear cupón (admin) | `create_coupon` |
+| `GET` | `/api/coupons/list/` | Listar todos los cupones | `list_coupons` |
+| `GET` | `/api/coupons/by-code/<code>/` | Consultar por código | `get_coupon_by_code` |
+| `PATCH` | `/api/coupons/<id>/status/` | Activar/desactivar cupón | `toggle_coupon_status` |
 
 > `validate`/`consume` **NO se exponen por REST**: son operaciones internas (vía puertos) que consume `order` in-process.
 

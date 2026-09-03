@@ -1,7 +1,9 @@
 """URL routing for the config_coupon REST inbound adapter.
 
 Views receive their use cases from the module's container at wiring time.
-These routes must be included from the project root urlconf.
+These routes are included from the project root urlconf under the
+``api/coupons/`` prefix (see ``api/config/urls.py``), so the paths here are
+relative to that prefix.
 
 Only the ADMIN surface is routed. Validate/consume are internal (in-process via
 the application ports), not exposed over HTTP.
@@ -29,11 +31,11 @@ _toggle_status = views.ToggleCouponStatusView.as_view(
 )
 
 urlpatterns = [
-    path("coupons/", _create_coupon, name="coupon-create"),
-    path("coupons/list/", _list_coupons, name="coupon-list"),
-    path("coupons/by-code/<str:coupon_code>/", _get_coupon_by_code, name="coupon-by-code"),
+    path("", _create_coupon, name="coupon-create"),
+    path("list/", _list_coupons, name="coupon-list"),
+    path("by-code/<str:coupon_code>/", _get_coupon_by_code, name="coupon-by-code"),
     path(
-        "coupons/<str:coupon_id>/status/",
+        "<str:coupon_id>/status/",
         _toggle_status,
         name="coupon-toggle-status",
     ),
