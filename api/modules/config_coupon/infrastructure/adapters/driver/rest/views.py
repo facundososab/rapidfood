@@ -3,6 +3,10 @@
 Views parse HTTP, validate format via serializers, translate to commands, call
 the inbound port (use case) obtained from the composition root, and translate
 domain errors to HTTP codes. NO business rules here.
+
+Only the ADMIN surface is exposed over REST (create / list / get-by-code /
+toggle). The cross-module operations (validate / consume) are consumed
+in-process by the order module through the application ports — never over HTTP.
 """
 
 from __future__ import annotations
@@ -18,20 +22,23 @@ from modules.config_coupon.application.ports.driver.coupon_admin_ports import (
     ListCouponsQuery,
     ToggleCouponStatusCommand,
 )
-from modules.config_coupon.application.ports.driver.coupon_application_ports import (
-    ConsumeCouponCommand,
-    ValidateCouponCommand,
+from modules.config_coupon.domain.errors.coupon_errors import (
+    CouponAlreadyExistsError,
+    CouponNotFoundError,
+    DomainError,
 )
-from modules.config_coupon.domain.errors.coupon_errors import DomainError
 from modules.config_coupon.infrastructure.adapters.driver.rest.serializers import (
     CreateCouponSerializer,
     ToggleCouponStatusSerializer,
-    ValidateCouponSerializer,
 )
 
 
 def _error_response(error: DomainError) -> Response:
-    """Translate a domain error to an HTTP 400 (admin/client-facing)."""
+    """Translate a domain error to the appropriate HTTP status code."""
+    if isinstance(error, CouponNotFoundError):
+        return Response({"detail": str(error)}, status=status.HTTP_404_NOT_FOUND)
+    if isinstance(error, CouponAlreadyExistsError):
+        return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
     return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -146,55 +153,4 @@ class ToggleCouponStatusView(APIView):
             return _error_response(exc)
         return Response(
             {"coupon_id": result.coupon_id, "is_active": result.is_active}
-        )
-
-
-class ValidateCouponView(APIView):
-    """Validates a coupon against a subtotal (called while the order is BORRADOR)."""
-
-    validate_coupon = None  # injected by the container
-
-    def post(self, request: Request) -> Response:
-        serializer = ValidateCouponSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        try:
-            result = self.validate_coupon.execute(
-                ValidateCouponCommand(
-                    coupon_code=data["coupon_code"],
-                    subtotal=data["subtotal"],
-                )
-            )
-        except DomainError as exc:
-            return _error_response(exc)
-        return Response(
-            {
-                "coupon_id": result.coupon_id,
-                "coupon_code": result.coupon_code,
-                "coupon_type": result.coupon_type,
-                "amount": str(result.amount),
-                "discount_amount": str(result.discount_amount),
-                "available_uses": result.available_uses,
-                "date_of_expiration": result.date_of_expiration,
-            }
-        )
-
-
-class ConsumeCouponView(APIView):
-    """Consumes one use of a coupon (called when the order leaves BORRADOR)."""
-
-    consume_coupon = None  # injected by the container
-
-    def post(self, request: Request, coupon_code: str) -> Response:
-        try:
-            result = self.consume_coupon.execute(
-                ConsumeCouponCommand(coupon_code=coupon_code)
-            )
-        except DomainError as exc:
-            return _error_response(exc)
-        return Response(
-            {
-                "coupon_code": result.coupon_code,
-                "remaining_uses": result.remaining_uses,
-            }
         )

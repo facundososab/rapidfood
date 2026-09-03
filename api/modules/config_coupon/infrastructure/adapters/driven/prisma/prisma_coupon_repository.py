@@ -4,26 +4,35 @@ Data layer is owned by Prisma (single source of truth: schema.prisma). This
 adapter maps between the Prisma ``Coupon`` model and the domain ``Coupon``
 entity. All row<->entity mapping stays in this adapter.
 
-The Prisma client instance is injected via the constructor at the composition
-root (it is never a global here). It uses the shared ``db`` singleton from
-``shared.infrastructure.prisma.db`` passed in by the caller.
+It receives a ``Database`` (a lazy connection holder) — by default the shared
+singleton ``db`` — and reaches ``database.client`` lazily inside each operation.
+Importing/wiring this module therefore NEVER opens a connection; the connection
+opens on the first real repository operation. Tests inject a ``Database`` bound
+to the dedicated test database.
 """
 
 from __future__ import annotations
 
 from prisma import Prisma
+from prisma.errors import UniqueViolationError
 
 from modules.config_coupon.application.ports.driven.coupon_repository_port import (
     CouponRepositoryPort,
 )
+from modules.config_coupon.domain.errors.coupon_errors import CouponAlreadyExistsError
 from modules.config_coupon.domain.models.coupon import Coupon
 from modules.config_coupon.domain.models.coupon_code import CouponCode
 from modules.config_coupon.domain.models.coupon_type import CouponType
+from shared.infrastructure.prisma.db import Database, db
 
 
 class PrismaCouponRepository(CouponRepositoryPort):
-    def __init__(self, prisma_client: Prisma) -> None:
-        self._prisma = prisma_client
+    def __init__(self, database: Database = db) -> None:
+        self._database = database
+
+    @property
+    def _prisma(self) -> Prisma:
+        return self._database.client
 
     def save(self, coupon: Coupon) -> Coupon:
         if coupon.coupon_id is None:
@@ -31,13 +40,11 @@ class PrismaCouponRepository(CouponRepositoryPort):
         return self._update(coupon)
 
     def find_by_code(self, coupon_code: str) -> Coupon | None:
-        row = self._prisma.coupon.find_first(
-            where={"couponCode": coupon_code},
-        )
+        row = self._prisma.coupon.find_unique(where={"couponCode": coupon_code})
         return self._to_domain(row) if row is not None else None
 
     def find_by_id(self, coupon_id: str) -> Coupon | None:
-        row = self._prisma.coupon.find_first(where={"id": coupon_id})
+        row = self._prisma.coupon.find_unique(where={"id": coupon_id})
         return self._to_domain(row) if row is not None else None
 
     def list_all(self) -> list[Coupon]:
@@ -47,7 +54,10 @@ class PrismaCouponRepository(CouponRepositoryPort):
     # --- persistence helpers -------------------------------------------------
 
     def _insert(self, coupon: Coupon) -> Coupon:
-        row = self._prisma.coupon.create({**_data(coupon)})
+        try:
+            row = self._prisma.coupon.create({**_data(coupon)})
+        except UniqueViolationError as exc:
+            raise CouponAlreadyExistsError(coupon.coupon_code.value) from exc
         return self._to_domain(row)
 
     def _update(self, coupon: Coupon) -> Coupon:
@@ -64,13 +74,13 @@ class PrismaCouponRepository(CouponRepositoryPort):
     def _to_domain(row: object) -> Coupon:  # type: ignore[type-arg]
         return Coupon(
             coupon_id=str(row.id),
-            coupon_code=CouponCode(row.coupon_code),
+            coupon_code=CouponCode(row.couponCode),
             coupon_type=CouponType.from_value(row.type),
             amount=row.amount,
-            min_order_amount=row.min_order_amount,
-            available_uses=row.available_uses,
-            date_of_expiration=row.date_of_expiration,
-            is_active=row.is_active,
+            min_order_amount=row.minOrderAmount,
+            available_uses=row.availableUses,
+            date_of_expiration=row.dateOfExpiration,
+            is_active=row.isActive,
         )
 
 

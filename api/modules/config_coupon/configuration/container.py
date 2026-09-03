@@ -36,14 +36,13 @@ from modules.config_coupon.infrastructure.adapters.driven.prisma.prisma_coupon_r
 from modules.config_coupon.infrastructure.adapters.driven.prisma.system_clock import (
     SystemClock,
 )
-from shared.infrastructure.prisma.db import db
 
 
 class CouponContainer:
     """Wires concrete dependencies into the coupon use cases."""
 
     def __init__(self) -> None:
-        coupon_repository = PrismaCouponRepository(db.client)
+        coupon_repository = PrismaCouponRepository()
         clock = SystemClock()
 
         self.create_coupon = CreateCouponUseCase(coupon_repository)
