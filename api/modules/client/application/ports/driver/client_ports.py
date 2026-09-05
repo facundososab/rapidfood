@@ -1,33 +1,18 @@
-from dataclasses import dataclass
-from typing import Protocol
+# Re-exporting driver ports for client operations
+from .create_client_ports import (
+    ClientResponse,
+    CreateClientCommand,
+    CreateClientPort,
+)
+from .update_client_ports import (
+    UpdateClientCommand,
+    UpdateClientPort,
+)
 
-
-@dataclass(frozen=True)
-class CreateClientCommand:
-    name: str
-    last_name: str
-    phone_number: str
-
-
-@dataclass(frozen=True)
-class UpdateClientCommand:
-    client_id: str
-    name: str
-    last_name: str
-    phone_number: str
-
-
-@dataclass(frozen=True)
-class ClientResponse:
-    id: str
-    name: str
-    last_name: str
-    phone_number: str
-
-
-class CreateClientPort(Protocol):
-    def execute(self, command: CreateClientCommand) -> ClientResponse: ...
-
-
-class UpdateClientPort(Protocol):
-    def execute(self, command: UpdateClientCommand) -> ClientResponse: ...
+__all__ = [
+    "CreateClientCommand",
+    "UpdateClientCommand",
+    "ClientResponse",
+    "CreateClientPort",
+    "UpdateClientPort",
+]

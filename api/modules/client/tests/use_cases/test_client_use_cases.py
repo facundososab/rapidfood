@@ -15,7 +15,7 @@ from modules.client.domain.models.client import Client
 
 
 def _client(cid, name="Ana", last="Gómez"):
-    return Client(id=cid, name=name, lastName=last, phoneNumber="+5491100000000")
+    return Client(id=cid, name=name, last_name=last, phone_number="+5491100000000")
 
 
 class FakeClientRepo:
@@ -30,7 +30,7 @@ class FakeClientRepo:
         if search:
             needle = search.lower().strip()
             rows = [c for c in rows if needle in c.name.lower()
-                    or needle in c.lastName.lower() or needle in c.phoneNumber]
+                    or needle in c.last_name.lower() or needle in c.phone_number]
         return rows
 
     def delete(self, client_id):

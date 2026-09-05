@@ -1,7 +1,9 @@
-from modules.client.application.ports.driver.client_ports import (
+from modules.client.application.ports.driver.create_client_ports import (
+    ClientResponse,
+)
+from modules.client.application.ports.driver.update_client_ports import (
     UpdateClientCommand,
     UpdateClientPort,
-    ClientResponse,
 )
 from modules.client.application.ports.driven.client_repository_port import (
     ClientRepositoryPort,
