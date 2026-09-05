@@ -68,9 +68,11 @@ model BusinessConfiguration {
   businessName  String          @map("business_name")
   minOrder      Decimal         @map("min_order") @db.Decimal(10, 2)
   shippingCost  Decimal         @map("shipping_cost") @db.Decimal(10, 2)
-  availableZone String          @map("available_zone")
+  availableZone Json?           @map("available_zone")
   businessHours BusinessHours[]
   addresses     Address[]
+  orders        Order[]
+  deliveryPricingConfiguration DeliveryPricingConfiguration?
 
   @@map("business_configuration")
 }
@@ -95,9 +97,11 @@ model Address {
   city             String
   province         String
   postalCode       String?               @map("postal_code")
-  businessConfigId String                @map("business_config_id") @db.Uuid
+  businessConfigId String                @unique @map("business_config_id") @db.Uuid
   businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
   orders           Order[]
+  // inverse: address can be origin for at most one delivery pricing config
+  deliveryPricingOriginFor DeliveryPricingConfiguration? @relation("DeliveryPricingOriginAddress")
 
   @@map("address")
 }
@@ -180,16 +184,20 @@ model Order {
   address         Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
   conversationId  String?         @map("conversation_id") @db.Uuid // RN-030: order references its conversation; RN-031: 1 conv -> many orders
   conversation    Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  appliedCouponId String?         @map("applied_coupon_id") @db.Uuid // Optional coupon applied
-  confirmedAt     DateTime?       @map("confirmed_at")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  lines           OrderLine[]
-  appliedCoupons  AppliedCoupon[]
-  payments        Payment[]
+  appliedCouponId  String?               @map("applied_coupon_id") @db.Uuid // Optional coupon applied
+  confirmedAt      DateTime?             @map("confirmed_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  // nullable until all order creation paths are updated to supply businessConfigId
+  businessConfigId String?               @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration? @relation(fields: [businessConfigId], references: [id], onDelete: Restrict)
+  lines            OrderLine[]
+  appliedCoupons   AppliedCoupon[]
+  payments         Payment[]
 
   @@index([clientId])
   @@index([status])
   @@index([conversationId])
+  @@index([businessConfigId, deliveryType, status, createdAt])
   @@map("order")
 }
 
@@ -300,4 +308,45 @@ model Payment {
 
   @@index([orderId])
   @@map("payment")
+}
+
+// --- Delivery module models ---
+
+// Per-restaurant delivery pricing configuration (1:1 with BusinessConfiguration).
+// Stores all pricing rules; weekday multipliers are normalized in DeliveryWeekdayPricingRule.
+model DeliveryPricingConfiguration {
+  id                       String                @id @default(uuid()) @map("delivery_pricing_configuration_id") @db.Uuid
+
+  businessConfigId         String                @unique @map("business_config_id") @db.Uuid
+  businessConfig           BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+
+  // The restaurant address used as the route origin for delivery quotes
+  originAddressId          String                @unique @map("origin_address_id") @db.Uuid
+  originAddress            Address               @relation("DeliveryPricingOriginAddress", fields: [originAddressId], references: [id], onDelete: Restrict)
+
+  pricePerKm               Decimal               @map("price_per_km") @db.Decimal(10, 2)
+
+  highDemandThreshold      Int                   @map("high_demand_threshold")
+  veryHighDemandThreshold  Int                   @map("very_high_demand_threshold")
+
+  highDemandMultiplier     Decimal               @map("high_demand_multiplier") @db.Decimal(5, 2)
+  veryHighDemandMultiplier Decimal               @map("very_high_demand_multiplier") @db.Decimal(5, 2)
+
+  weekdayRules             DeliveryWeekdayPricingRule[]
+
+  @@map("delivery_pricing_configuration")
+}
+
+// Per-day pricing multiplier (normalized; one row per weekday per restaurant).
+model DeliveryWeekdayPricingRule {
+  id                      String                       @id @default(uuid()) @map("delivery_weekday_pricing_rule_id") @db.Uuid
+
+  deliveryPricingConfigId String                       @map("delivery_pricing_config_id") @db.Uuid
+  deliveryPricingConfig   DeliveryPricingConfiguration @relation(fields: [deliveryPricingConfigId], references: [id], onDelete: Cascade)
+
+  weekDay                 WeekDay                      @map("week_day")
+  multiplier              Decimal                      @db.Decimal(5, 2)
+
+  @@unique([deliveryPricingConfigId, weekDay])
+  @@map("delivery_weekday_pricing_rule")
 }

@@ -10,6 +10,8 @@ dependencies = [
     "prisma>=0.15",
     "psycopg[binary]>=3.2",
     "requests>=2.34.2",
+    "shapely>=2.0",
+    "openrouteservice>=2.3",
 ]
 
 [dependency-groups]
@@ -43,7 +45,7 @@ include_external_packages = true
 name = "Hexagonal layers inside each app"
 type = "layers"
 containers = [
-  "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon",
+  "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon", "modules.delivery",
 ]
 layers = [
   "(infrastructure.adapters.driver)",   # DRF views/serializers (highest)
@@ -126,6 +128,17 @@ forbidden_modules = ["modules.client", "modules.conversation", "modules.order", 
 as_packages = true
 
 [[tool.importlinter.contracts]]
+name = "delivery consumes siblings only via application.ports"
+type = "forbidden"
+source_modules = ["modules.delivery"]
+forbidden_modules = ["modules.client", "modules.catalog", "modules.config_coupon", "modules.order", "modules.conversation"]
+as_packages = true
+unmatched_ignore_imports_alerting = "warn"
+ignore_imports = [
+  "modules.delivery.** -> modules.order.application.ports.**",
+]
+
+[[tool.importlinter.contracts]]
 name = "No circular imports between apps"
 type = "acyclic_siblings"
 ancestors = ["modules"]
@@ -138,3 +151,6 @@ addopts = "-ra --strict-markers"
 markers = [
   "db: test that requires the Prisma-managed test database",
 ]
+
+[tool.pyright]
+extraPaths = ["api"]
