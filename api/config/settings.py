@@ -80,5 +80,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     # No sessions → CSRF not enforced; token auth later if needed (design).
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "EXCEPTION_HANDLER": "modules.client.infrastructure.adapters.driver.rest.exception_handlers.client_exception_handler",
     "UNAUTHENTICATED_USER": None,
 }

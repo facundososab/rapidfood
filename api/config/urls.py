@@ -1,4 +1,7 @@
-"""URL routing — Rapidfood."""
+"""URL routing — Rapidfood.
+
+Route layout: ``/health`` plus per-app inbound adapters.
+"""
 
 from django.urls import include, path
 
