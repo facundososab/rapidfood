@@ -5,16 +5,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from composition.container import get_app_client_container
-from modules.client.application.ports.driver.address_ports import (
-    AddAddressCommand,
-    RemoveAddressCommand,
+from modules.client.application.ports.driver.add_address_ports import AddAddressCommand
+from modules.client.application.ports.driver.create_client_ports import CreateClientCommand
+from modules.client.application.ports.driver.remove_address_ports import RemoveAddressCommand
+from modules.client.application.ports.driver.set_default_address_ports import (
     SetDefaultAddressCommand,
-    UpdateAddressCommand,
 )
-from modules.client.application.ports.driver.client_ports import (
-    CreateClientCommand,
-    UpdateClientCommand,
-)
+from modules.client.application.ports.driver.update_address_ports import UpdateAddressCommand
+from modules.client.application.ports.driver.update_client_ports import UpdateClientCommand
 from modules.client.application.ports.driver.delete_client_ports import DeleteClientCommand
 from modules.client.application.ports.driver.get_client_ports import GetClientQuery
 from modules.client.application.ports.driver.list_clients_ports import ListClientsQuery

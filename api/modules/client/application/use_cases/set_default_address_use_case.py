@@ -1,7 +1,9 @@
-from modules.client.application.ports.driver.address_ports import (
+from modules.client.application.ports.driver.add_address_ports import (
+    AddressResponse,
+)
+from modules.client.application.ports.driver.set_default_address_ports import (
     SetDefaultAddressCommand,
     SetDefaultAddressPort,
-    AddressResponse,
 )
 from modules.client.application.ports.driven.address_repository_port import (
     AddressRepositoryPort,

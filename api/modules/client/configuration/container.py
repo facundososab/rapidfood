@@ -11,14 +11,14 @@ from modules.client.application.use_cases.set_default_address_use_case import (
 )
 from modules.client.application.use_cases.update_address_use_case import UpdateAddressUseCase
 from modules.client.application.use_cases.update_client_use_case import UpdateClientUseCase
-from modules.client.infrastructure.adapters.driven.django_orm.address_repository import (
-    DjangoAddressRepository,
+from modules.client.infrastructure.adapters.driven.prisma.address_repository import (
+    PrismaAddressRepository,
 )
-from modules.client.infrastructure.adapters.driven.django_orm.client_query_adapter import (
-    DjangoClientQueryAdapter,
+from modules.client.infrastructure.adapters.driven.prisma.client_query_adapter import (
+    PrismaClientQueryAdapter,
 )
-from modules.client.infrastructure.adapters.driven.django_orm.client_repository import (
-    DjangoClientRepository,
+from modules.client.infrastructure.adapters.driven.prisma.client_repository import (
+    PrismaClientRepository,
 )
 
 
@@ -29,8 +29,8 @@ class UuidIdGenerator:
 
 class ClientContainer:
     def __init__(self) -> None:
-        client_repository = DjangoClientRepository()
-        address_repository = DjangoAddressRepository()
+        client_repository = PrismaClientRepository()
+        address_repository = PrismaAddressRepository()
         id_generator = UuidIdGenerator()
 
         self.create_client = CreateClientUseCase(client_repository, id_generator)
@@ -42,7 +42,7 @@ class ClientContainer:
         self.get_client = GetClientUseCase(client_repository)
         self.list_clients = ListClientsUseCase(client_repository)
         self.delete_client = DeleteClientUseCase(client_repository)
-        self.client_query_adapter = DjangoClientQueryAdapter()
+        self.client_query_adapter = PrismaClientQueryAdapter()
 
 
 def get_client_container() -> ClientContainer:
