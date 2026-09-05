@@ -67,8 +67,10 @@ urlpatterns = [
 
     # Configuration
     path("configuracion/", configuration.index, name="configuration"),
+    path("configuracion/direccion/", configuration.index, {"tab": "address"}, name="configuration_address_view"),
+    path("configuracion/envios/", configuration.index, {"tab": "delivery"}, name="configuration_delivery_view"),
     path("configuracion/general/", configuration.save_general, name="configuration_general"),
     path("configuracion/direccion/crear/", configuration.create_address, name="configuration_address_create"),
     path("configuracion/direccion/<str:address_id>/eliminar/", configuration.delete_address, name="configuration_address_delete"),
-    path("configuracion/envios/", configuration.save_delivery, name="configuration_delivery"),
+    path("configuracion/envios/guardar/", configuration.save_delivery, name="configuration_delivery"),
 ]

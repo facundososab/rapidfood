@@ -18,10 +18,8 @@ from modules.delivery.infrastructure.adapters.driver.rest import views
 
 _container = get_delivery_container()
 
-_configure_get = views.GetDeliveryConfigurationView.as_view(
+_configure = views.DeliveryConfigurationView.as_view(
     get_delivery_configuration=_container.get_delivery_configuration,
-)
-_configure_post = views.ConfigureDeliveryView.as_view(
     configure_delivery=_container.configure_delivery,
 )
 _quote = views.CalculateDeliveryQuoteView.as_view(
@@ -30,17 +28,12 @@ _quote = views.CalculateDeliveryQuoteView.as_view(
 
 urlpatterns = [
     path(
-        "<uuid:business_config_id>/configure/",
-        _configure_get,
-        name="delivery-configuration-get",
+        "<str:business_config_id>/configure/",
+        _configure,
+        name="delivery-configuration",
     ),
     path(
-        "<uuid:business_config_id>/configure/",
-        _configure_post,
-        name="delivery-configuration-post",
-    ),
-    path(
-        "<uuid:business_config_id>/quote/",
+        "<str:business_config_id>/quote/",
         _quote,
         name="delivery-quote",
     ),

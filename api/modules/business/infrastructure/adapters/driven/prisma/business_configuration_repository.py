@@ -122,6 +122,32 @@ class PrismaBusinessConfigurationRepository(BusinessConfigurationRepositoryPort)
         )
         return self._address_to_domain(record)
 
+    def update_address(
+        self,
+        address_id: str,
+        *,
+        street: str,
+        street_number: str,
+        city: str,
+        province: str,
+        floor: Optional[str],
+        apartment: Optional[str],
+        postal_code: Optional[str],
+    ) -> Address:
+        record = db.client.address.update(
+            where={"id": address_id},
+            data={
+                "street": street,
+                "streetNumber": street_number,
+                "city": city,
+                "province": province,
+                "floor": floor,
+                "apartment": apartment,
+                "postalCode": postal_code,
+            }
+        )
+        return self._address_to_domain(record)
+
     def delete_address(self, address_id: str) -> None:
         db.client.address.delete(where={"id": address_id})
 

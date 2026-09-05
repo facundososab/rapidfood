@@ -66,13 +66,58 @@ def _domain_error_to_response(error: DeliveryDomainError) -> Response:
     return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConfigureDeliveryView(APIView):
-    """Configure or update delivery settings for a restaurant.
+class DeliveryConfigurationView(APIView):
+    """Retrieve or configure delivery settings for a restaurant.
 
-    URL: POST /api/delivery/{business_config_id}/configure/
+    URL: GET/POST /api/delivery/{business_config_id}/configure/
+
+    A single view serves both methods so the route is registered once.
+    (Two separate views on the same path made the GET view shadow the
+    POST view, returning 405 on every save.)
     """
 
+    get_delivery_configuration = None  # injected by the container
     configure_delivery = None  # injected by the container
+
+    def get(self, request: Request, business_config_id: str) -> Response:
+        query = GetDeliveryConfigurationQuery(
+            business_config_id=str(business_config_id)
+        )
+        try:
+            result = self.get_delivery_configuration.execute(query)
+        except DeliveryDomainError as exc:
+            return _domain_error_to_response(exc)
+
+        return Response(
+            {
+                "business_config_id": result.business_config_id,
+                "base_shipping_cost": (
+                    str(result.base_shipping_cost)
+                    if result.base_shipping_cost else None
+                ),
+                "origin_address_id": result.origin_address_id,
+                "available_zone": result.available_zone,
+                "price_per_km": str(result.price_per_km) if result.price_per_km else None,
+                "high_demand_threshold": result.high_demand_threshold,
+                "very_high_demand_threshold": result.very_high_demand_threshold,
+                "high_demand_multiplier": (
+                    str(result.high_demand_multiplier)
+                    if result.high_demand_multiplier else None
+                ),
+                "very_high_demand_multiplier": (
+                    str(result.very_high_demand_multiplier)
+                    if result.very_high_demand_multiplier else None
+                ),
+                "weekday_multipliers": [
+                    {
+                        "week_day": wm.week_day,
+                        "multiplier": str(wm.multiplier),
+                    }
+                    for wm in result.weekday_multipliers
+                ],
+                "is_configured": result.is_configured,
+            }
+        )
 
     def post(self, request: Request, business_config_id: str) -> Response:
         serializer = ConfigureDeliverySerializer(data=request.data)
@@ -113,7 +158,6 @@ class ConfigureDeliveryView(APIView):
             very_high_demand_threshold=data["very_high_demand_threshold"],
             high_demand_multiplier=data["high_demand_multiplier"],
             very_high_demand_multiplier=data["very_high_demand_multiplier"],
-            demand_window_minutes=data["demand_window_minutes"],
             weekday_multipliers=weekday_multipliers,
         )
 
@@ -125,53 +169,6 @@ class ConfigureDeliveryView(APIView):
         return Response(
             {"business_config_id": result.business_config_id},
             status=status.HTTP_200_OK,
-        )
-
-
-class GetDeliveryConfigurationView(APIView):
-    """Retrieve the current delivery configuration for a restaurant.
-
-    URL: GET /api/delivery/{business_config_id}/configure/
-    """
-
-    get_delivery_configuration = None  # injected by the container
-
-    def get(self, request: Request, business_config_id: str) -> Response:
-        query = GetDeliveryConfigurationQuery(
-            business_config_id=str(business_config_id)
-        )
-        try:
-            result = self.get_delivery_configuration.execute(query)
-        except DeliveryDomainError as exc:
-            return _domain_error_to_response(exc)
-
-        return Response(
-            {
-                "business_config_id": result.business_config_id,
-                "base_shipping_cost": str(result.base_shipping_cost),
-                "origin_address_id": result.origin_address_id,
-                "available_zone": result.available_zone,
-                "price_per_km": str(result.price_per_km) if result.price_per_km else None,
-                "demand_window_minutes": result.demand_window_minutes,
-                "high_demand_threshold": result.high_demand_threshold,
-                "very_high_demand_threshold": result.very_high_demand_threshold,
-                "high_demand_multiplier": (
-                    str(result.high_demand_multiplier)
-                    if result.high_demand_multiplier else None
-                ),
-                "very_high_demand_multiplier": (
-                    str(result.very_high_demand_multiplier)
-                    if result.very_high_demand_multiplier else None
-                ),
-                "weekday_multipliers": [
-                    {
-                        "week_day": wm.week_day,
-                        "multiplier": str(wm.multiplier),
-                    }
-                    for wm in result.weekday_multipliers
-                ],
-                "is_configured": result.is_configured,
-            }
         )
 
 

@@ -96,7 +96,7 @@ model Address {
   city             String
   province         String
   postalCode       String?               @map("postal_code")
-  businessConfigId String                @map("business_config_id") @db.Uuid
+  businessConfigId String                @unique @map("business_config_id") @db.Uuid
   businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
   orders           Order[]
   // inverse: address can be origin for at most one delivery pricing config

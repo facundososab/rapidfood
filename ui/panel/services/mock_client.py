@@ -365,19 +365,28 @@ class MockRapidfoodClient(RapidfoodClient):
         ]
 
     def create_business_address(self, business_config_id: str, payload: dict) -> dtos.Address:
-        a = dtos.Address(
-            id=self.db.next_id("addr"),
-            street=payload["street"],
-            streetNumber=payload["streetNumber"],
-            city=payload["city"],
-            province=payload["province"],
-            floor=payload.get("floor"),
-            apartment=payload.get("apartment"),
-            postalCode=payload.get("postalCode"),
-            businessConfigId=business_config_id
+        new_id = str(uuid.uuid4())
+        address = dtos.Address(
+            id=new_id, street=payload["street"], streetNumber=payload["streetNumber"],
+            city=payload["city"], province=payload["province"],
+            floor=payload.get("floor"), apartment=payload.get("apartment"),
+            postalCode=payload.get("postalCode")
         )
-        self.db.business.addresses.append(a)
-        return a
+        self.mock_business.addresses.append(address)
+        return address
+
+    def update_business_address(self, business_config_id: str, address_id: str, payload: dict) -> dtos.Address:
+        for idx, addr in enumerate(self.mock_business.addresses):
+            if addr.id == address_id:
+                updated = dtos.Address(
+                    id=address_id, street=payload["street"], streetNumber=payload["streetNumber"],
+                    city=payload["city"], province=payload["province"],
+                    floor=payload.get("floor"), apartment=payload.get("apartment"),
+                    postalCode=payload.get("postalCode")
+                )
+                self.mock_business.addresses[idx] = updated
+                return updated
+        raise RuntimeError("Address not found")
 
     def delete_business_address(self, business_config_id: str, address_id: str) -> None:
         biz = self.db.business

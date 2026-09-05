@@ -75,6 +75,14 @@ class HttpRapidfoodClient(RapidfoodClient):
         self._raise_if_error(resp)
         return resp.json()
 
+    def _put(self, path: str, payload: list | dict) -> object:
+        resp = self.session.put(f"{self.base_url}{path}", json=payload, timeout=15)
+        self._raise_if_error(resp)
+        # 204 No Content won't have a JSON body
+        if resp.status_code == 204:
+            return None
+        return resp.json()
+
     def _delete(self, path: str) -> None:
         resp = self.session.delete(f"{self.base_url}{path}", timeout=15)
         self._raise_if_error(resp)
@@ -416,9 +424,9 @@ class HttpRapidfoodClient(RapidfoodClient):
     def save_business_hours(self, business_config_id: str, hours: list) -> None:
         payload = [
             {
-                "open_week_day": h["openWeekDay"],
-                "open_from_hour": h["openFromHour"],
-                "open_to_hour": h["openToHour"]
+                "open_week_day": h.get("open_week_day", h.get("openWeekDay")),
+                "open_from_hour": h.get("open_from_hour", h.get("openFromHour")),
+                "open_to_hour": h.get("open_to_hour", h.get("openToHour"))
             }
             for h in hours
         ]
@@ -435,6 +443,19 @@ class HttpRapidfoodClient(RapidfoodClient):
             "postal_code": payload.get("postalCode")
         }
         res = self._post(f"/api/business/{business_config_id}/addresses/", body)
+        return self._address(res)
+
+    def update_business_address(self, business_config_id: str, address_id: str, payload: dict) -> dtos.Address:
+        body = {
+            "street": payload["street"],
+            "street_number": payload["streetNumber"],
+            "city": payload["city"],
+            "province": payload["province"],
+            "floor": payload.get("floor"),
+            "apartment": payload.get("apartment"),
+            "postal_code": payload.get("postalCode")
+        }
+        res = self._patch(f"/api/business/{business_config_id}/addresses/{address_id}/", body)
         return self._address(res)
 
     def delete_business_address(self, business_config_id: str, address_id: str) -> None:

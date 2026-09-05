@@ -60,7 +60,6 @@ class GetDeliveryConfigurationUseCase(GetDeliveryConfigurationPort):
 
         weekday_multipliers: List[WeekdayMultiplierDto] = []
         price_per_km = None
-        demand_window_minutes = None
         high_demand_threshold = None
         very_high_demand_threshold = None
         high_demand_multiplier = None
@@ -69,7 +68,6 @@ class GetDeliveryConfigurationUseCase(GetDeliveryConfigurationPort):
         if config.pricing_config is not None:
             pc = config.pricing_config
             price_per_km = pc.price_per_km
-            demand_window_minutes = pc.demand_window_minutes
             high_demand_threshold = pc.high_demand_threshold
             very_high_demand_threshold = pc.very_high_demand_threshold
             high_demand_multiplier = pc.high_demand_multiplier
@@ -85,7 +83,6 @@ class GetDeliveryConfigurationUseCase(GetDeliveryConfigurationPort):
             origin_address_id=config.origin_address_id,
             available_zone=available_zone,
             price_per_km=price_per_km,
-            demand_window_minutes=demand_window_minutes,
             high_demand_threshold=high_demand_threshold,
             very_high_demand_threshold=very_high_demand_threshold,
             high_demand_multiplier=high_demand_multiplier,

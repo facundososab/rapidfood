@@ -144,8 +144,32 @@ class AddressListView(APIView):
         return Response(result, status=status.HTTP_201_CREATED)
 
 
+from modules.business.application.ports.driver.update_address_port import UpdateAddressCommand
+
 class AddressDetailView(APIView):
-    """DELETE /api/business/<business_config_id>/addresses/<address_id>/"""
+    """PATCH/DELETE /api/business/<business_config_id>/addresses/<address_id>/"""
+
+    def patch(self, request: Request, business_config_id: str, address_id: str) -> Response:
+        s = AddressSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        d = s.validated_data
+        try:
+            result = _get_container().update_address.execute(
+                UpdateAddressCommand(
+                    business_config_id=business_config_id,
+                    address_id=address_id,
+                    street=d["street"],
+                    street_number=d["street_number"],
+                    city=d["city"],
+                    province=d["province"],
+                    floor=d.get("floor"),
+                    apartment=d.get("apartment"),
+                    postal_code=d.get("postal_code"),
+                )
+            )
+        except (AddressNotFoundError, AddressDoesNotBelongToBusinessError) as e:
+            return _error(str(e), 404)
+        return Response(result, status=status.HTTP_200_OK)
 
     def delete(self, request: Request, business_config_id: str, address_id: str) -> Response:
         try:

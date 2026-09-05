@@ -35,7 +35,6 @@ class GetDeliveryConfigurationResponse:
     # None = zone not configured yet; dict = GeoJSON Polygon
     available_zone: Optional[Dict[str, Any]]
     price_per_km: Optional[Decimal]
-    demand_window_minutes: Optional[int]
     high_demand_threshold: Optional[int]
     very_high_demand_threshold: Optional[int]
     high_demand_multiplier: Optional[Decimal]

@@ -27,6 +27,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from prisma import Prisma
+from prisma.fields import Json
 
 from modules.delivery.application.ports.driven.delivery_configuration_repository_port import (
     DeliveryConfigurationRepositoryPort,
@@ -136,7 +137,7 @@ class DeliveryConfigurationRepository(DeliveryConfigurationRepositoryPort):
             origin_address_id = dpc.originAddressId
             origin_address = _prisma_address_to_postal(dpc.originAddress)
             weekday_multipliers = {
-                WeekDay(rule.weekDay.value): rule.multiplier
+                WeekDay(getattr(rule.weekDay, "value", rule.weekDay)): rule.multiplier
                 for rule in dpc.weekdayRules
             }
             try:
@@ -182,10 +183,13 @@ class DeliveryConfigurationRepository(DeliveryConfigurationRepositoryPort):
         pricing = config.pricing_config
 
         with self._db.tx() as tx:
-            # Update the delivery zone on BusinessConfiguration
+            # Update the delivery zone on BusinessConfiguration.
+            # `availableZone` is a Json? column: prisma-client-python only
+            # treats values wrapped in `Json(...)` as raw JSON (a raw dict is
+            # interpreted as a query "Data" node and raises DataError).
             tx.businessconfiguration.update(
                 where={"id": config.business_config_id},
-                data={"availableZone": geojson},
+                data={"availableZone": Json(geojson) if geojson is not None else None},
             )
 
             if pricing is not None:

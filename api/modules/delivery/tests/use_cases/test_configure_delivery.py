@@ -64,7 +64,6 @@ def _command(**overrides) -> ConfigureDeliveryCommand:
         very_high_demand_threshold=10,
         high_demand_multiplier=Decimal("1.50"),
         very_high_demand_multiplier=Decimal("2.00"),
-        demand_window_minutes=30,
         weekday_multipliers=_all_weekday_inputs(),
     )
     defaults.update(overrides)

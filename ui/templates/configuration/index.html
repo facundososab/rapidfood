@@ -8,63 +8,71 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<div x-data="configPage()" class="max-w-5xl">
+<div x-data="configPage()" class="max-w-6xl">
+  <div class="flex gap-10">
+    {# --- Settings sub-nav --- #}
+    <aside class="hidden lg:block w-56 shrink-0">
+      <nav class="sticky top-24 flex flex-col gap-0.5">
+        <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Negocio</p>
+        <a href="{% url 'configuration' %}" class="nav-item no-underline {% if active_tab == 'general' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='settings' %}</span>
+          <span>Datos generales</span>
+        </a>
+        <a href="{% url 'configuration_address_view' %}" class="nav-item no-underline {% if active_tab == 'address' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='map-pin' %}</span>
+          <span>Dirección</span>
+        </a>
 
-  {# --- Tab bar --- #}
-  <div class="flex gap-1 border-b border-line mb-6">
-    <button type="button"
-      @click="tab = 'general'"
-      :class="tab === 'general' ? 'border-b-2 border-primary text-primary' : 'text-ink-muted hover:text-ink'"
-      class="px-4 py-2.5 text-[13px] font-semibold transition-colors -mb-px">
-      General
-    </button>
-    <button type="button"
-      @click="tab = 'address'; $nextTick(() => initAddressMap())"
-      :class="tab === 'address' ? 'border-b-2 border-primary text-primary' : 'text-ink-muted hover:text-ink'"
-      class="px-4 py-2.5 text-[13px] font-semibold transition-colors -mb-px">
-      Dirección
-    </button>
-    <button type="button"
-      @click="tab = 'delivery'; $nextTick(() => initMap())"
-      :class="tab === 'delivery' ? 'border-b-2 border-primary text-primary' : 'text-ink-muted hover:text-ink'"
-      class="px-4 py-2.5 text-[13px] font-semibold transition-colors -mb-px">
-      Envíos
-    </button>
-  </div>
+        <p class="px-3 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Operación</p>
+        <a href="{% url 'configuration_delivery_view' %}" class="nav-item no-underline {% if active_tab == 'delivery' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='truck' %}</span>
+          <span>Envíos y demanda</span>
+        </a>
+        <button type="button" class="nav-item opacity-50 cursor-not-allowed" disabled>
+          <span class="shrink-0">{% include 'components/icon.html' with name='percent' %}</span>
+          <span>Impuestos</span>
+        </button>
+      </nav>
+    </aside>
 
-  {# =================== TAB: GENERAL =================== #}
-  <div x-show="tab === 'general'" x-cloak>
-    <form method="post" action="{% url 'configuration_general' %}" class="card overflow-hidden">
-      {% csrf_token %}
-      <div class="px-6 py-5 border-b border-line">
-        <h2 class="font-display font-bold text-[16px]">Configuración General</h2>
-        <p class="text-[13px] text-ink-muted mt-1">Datos básicos del negocio.</p>
+    <div class="flex-1 min-w-0">
+
+  {% if active_tab == 'general' %}
+  <div>
+      <form id="general-form" method="post" action="{% url 'configuration_general' %}" class="card overflow-hidden">
+        {% csrf_token %}
+        <input type="hidden" name="business_config_id" value="{{ business.id }}">
+      <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+        <span class="card-icon">{% include 'components/icon.html' with name='store' %}</span>
+        <div>
+          <h2 class="font-display font-bold text-[16px]">Datos del negocio</h2>
+          <p class="text-[13px] text-ink-muted mt-1">Datos básicos del negocio.</p>
+        </div>
       </div>
-      <div class="p-6 grid sm:grid-cols-2 gap-5">
-        <div class="sm:col-span-2">
+      <div class="p-6 grid gap-5">
+        <div>
           <label class="th block mb-2">Nombre del negocio</label>
           <input name="business_name" value="{{ business.businessName }}" class="field" required>
         </div>
-        <div>
-          <label class="th block mb-2">Pedido mínimo ($)</label>
-          <input name="min_order" value="{{ business.minOrder }}" type="number" min="0" step="0.01" class="field" required>
-        </div>
-        <div>
-          <label class="th block mb-2">Costo de envío base ($)</label>
-          <input name="shipping_cost" value="{{ business.shippingCost }}" type="number" min="0" step="0.01" class="field" required>
-        </div>
       </div>
 
-      <div class="px-6 py-5 border-t border-line">
-        <h2 class="font-display font-bold text-[16px] mb-4">Horarios de Atención</h2>
+      <div class="px-6 py-5 border-t border-line flex items-center gap-3">
+        <span class="card-icon">{% include 'components/icon.html' with name='clock' %}</span>
+        <h2 class="font-display font-bold text-[16px]">Horarios de Atención</h2>
+      </div>
+      <div class="pb-6 px-6">
         <input type="hidden" name="business_hours" x-ref="businessHoursInput">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+        <div class="grid grid-cols-1 gap-x-6 gap-y-4">
           <template x-for="(h, i) in businessHours" :key="h.openWeekDay">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3" :class="!h.isOpen && 'opacity-50'">
               <span class="w-24 text-[13px] font-semibold text-ink-muted" x-text="h.label"></span>
-              <input type="time" class="field !w-24 px-2" x-model="h.openFromHour" required>
+              <label class="relative inline-flex items-center cursor-pointer shrink-0" :title="h.isOpen ? 'Abierto' : 'Cerrado'">
+                <input type="checkbox" x-model="h.isOpen" class="sr-only peer" :aria-label="'Día ' + h.label + ' abierto'">
+                <div class="w-9 h-5 bg-line peer-checked:bg-primary rounded-full transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4"></div>
+              </label>
+              <input type="time" class="field !w-24 px-2" x-model="h.openFromHour" :disabled="!h.isOpen" :required="h.isOpen">
               <span class="text-ink-muted text-[13px]">-</span>
-              <input type="time" class="field !w-24 px-2" x-model="h.openToHour" required>
+              <input type="time" class="field !w-24 px-2" x-model="h.openToHour" :disabled="!h.isOpen" :required="h.isOpen">
             </div>
           </template>
         </div>
@@ -76,72 +84,118 @@
     </form>
   </div>
 
-  {# =================== TAB: DIRECCIÓN =================== #}
-  <div x-show="tab === 'address'" x-cloak>
+  {% endif %}
+  {% if active_tab == 'address' %}
+  <div>
     <div class="card overflow-hidden mb-6">
       <div class="px-6 py-5 border-b border-line flex items-center justify-between">
-        <div>
-          <h2 class="font-display font-bold text-[16px]">Buscar y Agregar Dirección</h2>
-          <p class="text-[13px] text-ink-muted mt-1">
-            Buscá la dirección para ubicarla en el mapa y guardarla.
-          </p>
+        <div class="flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='map-pin' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Dirección</h2>
+            <p class="text-[13px] text-ink-muted mt-1">Ubicación desde donde operás y entregás.</p>
+          </div>
         </div>
+        <button type="button" class="btn btn-ghost" @click="toggleEdit()" x-text="editing ? 'Cancelar' : 'Editar'"></button>
       </div>
-      
+
       <div class="p-6">
-        <div class="relative mb-4">
-          <input type="text" x-model.debounce.500ms="addressQuery" x-init="$watch('addressQuery', () => searchAddressLive())" placeholder="Ej: Av. Corrientes 1234, Buenos Aires" class="field w-full" required>
-          
-          <!-- Dropdown -->
-          <ul x-show="searchResults.length > 0" class="absolute z-50 w-full bg-surface border border-line rounded-lg mt-1 shadow-lg max-h-60 overflow-auto">
-            <template x-for="res in searchResults" :key="res.properties.osm_id">
-              <li @click="selectAddress(res)" class="px-4 py-2 hover:bg-muted cursor-pointer border-b border-line last:border-0">
-                <span class="text-[13px] text-ink block" x-text="formatPhotonAddress(res.properties)"></span>
-              </li>
-            </template>
-          </ul>
+        {# Current saved address (always visible, including edit mode) #}
+        <div class="mb-4">
+          <p class="text-[12px] font-semibold uppercase tracking-wide text-ink-faint mb-1.5">Dirección actual</p>
+          {% if business.addresses %}
+            {% with a=business.addresses.0 %}
+            <div class="rounded-xl bg-subtle px-4 py-3">
+              <p class="text-[16px] font-semibold text-ink">{{ a.street|default:'' }} {{ a.streetNumber|default:'' }}</p>
+              <p class="text-[14px] text-ink-muted">{{ a.city|default:'' }}{% if a.province %}, {{ a.province }}{% endif %}{% if a.postalCode %} ({{ a.postalCode }}){% endif %}</p>
+              {% if a.floor or a.apartment %}<p class="text-[13px] text-ink-faint">Piso {{ a.floor|default:'-' }} · Depto {{ a.apartment|default:'-' }}</p>{% endif %}
+            </div>
+            {% endwith %}
+          {% else %}
+            <div class="rounded-xl bg-subtle px-4 py-3">
+              <p class="text-[14px] text-ink-muted">Aún no hay una dirección guardada.</p>
+            </div>
+          {% endif %}
         </div>
 
         <div id="address-map" class="w-full rounded-xl border border-line mb-6" style="height:300px; z-index:0;"></div>
-        
-        <form x-show="selectedAddress" method="post" action="{% url 'configuration_address_create' %}" class="border-t border-line pt-6 grid sm:grid-cols-2 gap-5">
-          {% csrf_token %}
-          <input type="hidden" name="business_config_id" value="{{ business.id }}">
-          <div>
-            <label class="th block mb-2">Calle</label>
-            <input name="street" x-model="addressForm.street" class="field" required>
-          </div>
-          <div>
-            <label class="th block mb-2">Número</label>
-            <input name="street_number" x-model="addressForm.streetNumber" class="field" required>
-          </div>
-          <div>
-            <label class="th block mb-2">Ciudad</label>
-            <input name="city" x-model="addressForm.city" class="field" required>
-          </div>
-          <div>
-            <label class="th block mb-2">Provincia / Estado</label>
-            <input name="province" x-model="addressForm.province" class="field" required>
-          </div>
-          <div>
-            <label class="th block mb-2">Piso (opcional)</label>
-            <input name="floor" x-model="addressForm.floor" class="field">
-          </div>
-          <div>
-            <label class="th block mb-2">Departamento (opcional)</label>
-            <input name="apartment" x-model="addressForm.apartment" class="field">
-          </div>
-          <div class="sm:col-span-2 flex justify-end">
-            <button type="submit" class="btn btn-primary px-8">Guardar Dirección</button>
-          </div>
-        </form>
+
+        {# Edit mode: search + form #}
+        <div x-show="editing" x-cloak>
+          <template x-if="!selectedAddress">
+            <div class="relative mb-4" @click.away="showDropdown = false">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint">{% include 'components/icon.html' with name='search' cls='w-4 h-4' %}</span>
+              <input type="text" x-ref="searchInput" x-model.debounce.500ms="addressQuery" x-init="$watch('addressQuery', () => searchAddressLive())" @focus="if(addressQuery.length > 0) searchAddressLive(); showDropdown = true" placeholder="Ej: Av. Corrientes 1234, Buenos Aires" class="field w-full !pl-9" required>
+
+              <!-- Dropdown -->
+              <ul x-show="showDropdown && searchResults.length > 0" class="absolute z-50 w-full bg-surface border border-line rounded-lg mt-1 shadow-lg max-h-60 overflow-auto">
+                <template x-for="res in searchResults" :key="res.properties.osm_id">
+                  <li @click="selectAddress(res)" class="px-4 py-2 hover:bg-muted cursor-pointer border-b border-line last:border-0">
+                    <span class="text-[13px] text-ink block" x-text="formatAddressParts(res.properties)"></span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </template>
+
+          <template x-if="selectedAddress">
+            <div class="bg-muted border border-line rounded-lg p-3 mb-4 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-primary">{% include 'components/icon.html' with name='map-pin' cls='w-4 h-4' %}</span>
+                <span class="text-[13px] font-medium text-ink" x-text="addressQuery || 'Dirección seleccionada'"></span>
+              </div>
+              <button type="button" @click="selectedAddress = false; addressQuery = ''; addressForm = {street:'', streetNumber:'', city:'', province:'', floor:'', apartment:'', postalCode:''}; if(addressMarker) {addressMap.removeLayer(addressMarker); addressMarker=null;}" class="btn btn-ghost text-[12px] h-8 px-3">
+                Buscar otra
+              </button>
+            </div>
+          </template>
+
+          <button x-show="!selectedAddress" type="button" @click="useMyLocation()" class="btn btn-ghost text-[13px] inline-flex items-center gap-1.5 mb-4">
+            {% include 'components/icon.html' with name='locate' cls='w-4 h-4' %}
+            <span>Usar mi ubicación actual</span>
+          </button>
+
+          <form x-show="editing" method="post" action="{% url 'configuration_address_create' %}" class="border-t border-line pt-6 grid sm:grid-cols-2 gap-5">
+            {% csrf_token %}
+            <input type="hidden" name="business_config_id" value="{{ business.id }}">
+
+            <div>
+              <label class="th block mb-2">Calle</label>
+              <input name="street" x-model="addressForm.street" class="field" required>
+            </div>
+            <div>
+              <label class="th block mb-2">Número</label>
+              <input name="street_number" x-model="addressForm.streetNumber" class="field" required>
+            </div>
+            <div>
+              <label class="th block mb-2">Ciudad</label>
+              <input name="city" x-model="addressForm.city" class="field" required>
+            </div>
+            <div>
+              <label class="th block mb-2">Provincia / Estado</label>
+              <input name="province" x-model="addressForm.province" class="field" required>
+            </div>
+            <div>
+              <label class="th block mb-2">Piso (opcional)</label>
+              <input name="floor" x-model="addressForm.floor" class="field">
+            </div>
+            <div>
+              <label class="th block mb-2">Departamento (opcional)</label>
+              <input name="apartment" x-model="addressForm.apartment" class="field">
+            </div>
+            <div class="sm:col-span-2 flex justify-end">
+              <button type="submit" class="btn btn-primary px-8">Guardar Dirección</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
 
-  {# =================== TAB: ENVÍOS =================== #}
-  <div x-show="tab === 'delivery'" x-cloak>
-    <form method="post" action="{% url 'configuration_delivery' %}" @submit="prepareSubmit">
+  {% endif %}
+  {% if active_tab == 'delivery' %}
+  <div>
+    <form id="delivery-form" method="post" action="{% url 'configuration_delivery' %}" @submit="prepareSubmit">
       {% csrf_token %}
       <input type="hidden" name="business_config_id" value="{{ business.id }}">
       {# hidden fields que se rellenan por JS #}
@@ -151,30 +205,34 @@
       {# ---- Zona de entrega (mapa) ---- #}
       <div class="card overflow-hidden mb-6">
         <div class="px-6 py-5 border-b border-line flex items-center justify-between">
-          <div>
-            <h2 class="font-display font-bold text-[16px]">Zona de entrega</h2>
-            <p class="text-[13px] text-ink-muted mt-1">
-              Trazá el polígono que delimita la zona donde hacés delivery.
-              Hacé clic en el mapa para agregar puntos; cerrá el polígono haciendo clic sobre el primer punto.
-            </p>
+          <div class="flex items-center gap-3">
+            <span class="card-icon">{% include 'components/icon.html' with name='truck' %}</span>
+            <div>
+              <h2 class="font-display font-bold text-[16px]">Zona de entrega</h2>
+              <p class="text-[13px] text-ink-muted mt-1">
+                Área donde realizás delivery. Presioná Editar para trazar el polígono en el mapa.
+              </p>
+            </div>
           </div>
+          <button type="button" class="btn btn-ghost shrink-0" @click="toggleZoneEdit()" x-text="zoneEditing ? 'Cancelar' : 'Editar'"></button>
         </div>
 
-        {# toolbar #}
-        <div class="px-6 pt-4 pb-2 flex flex-wrap gap-2">
-          <button type="button" @click="startDrawing()"
-            :class="drawing ? 'btn btn-primary' : 'btn btn-ghost'"
-            class="text-[13px]">
-            <span x-text="drawing ? '🖊 Dibujando…' : '🖊 Dibujar zona'"></span>
+        {# toolbar (solo en modo edición) #}
+        <div x-show="zoneEditing" x-cloak class="px-6 pt-4 pb-2 flex flex-wrap gap-2">
+          <button type="button" @click="clearZone()" class="btn btn-ghost text-[13px] inline-flex items-center gap-1.5">
+            {% include 'components/icon.html' with name='trash' cls='w-4 h-4' %}
+            <span>Limpiar zona</span>
           </button>
-          <button type="button" @click="clearPolygon()" class="btn btn-ghost text-[13px]">
-            🗑 Limpiar zona
+          <button type="button" @click="saveZone()" class="btn btn-primary text-[13px] inline-flex items-center gap-1.5">
+            {% include 'components/icon.html' with name='check' cls='w-4 h-4' %}
+            <span>Guardar cambios</span>
           </button>
           <span x-show="polygonPoints.length > 0"
             class="ml-auto text-[12px] text-ink-muted self-center"
             x-text="polygonPoints.length + ' puntos'">
           </span>
         </div>
+        <p x-show="zoneEditing" x-cloak class="px-6 pb-2 text-[12px] text-ink-muted">Hacé clic en el mapa para agregar puntos; cerrá el polígono haciendo clic sobre el primer punto.</p>
 
         {# mapa #}
         <div id="delivery-map" class="w-full" style="height:420px; z-index:0;"></div>
@@ -187,10 +245,15 @@
 
       {# ---- Precios ---- #}
       <div class="card overflow-hidden mb-6">
-        <div class="px-6 py-5 border-b border-line">
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='dollar-sign' %}</span>
           <h2 class="font-display font-bold text-[16px]">Precios y distancia</h2>
         </div>
         <div class="p-6 grid sm:grid-cols-3 gap-5">
+          <div>
+            <label class="th block mb-2">Pedido mínimo ($)</label>
+            <input name="min_order" value="{{ business.minOrder }}" type="number" min="0" step="0.01" class="field" required>
+          </div>
           <div>
             <label class="th block mb-2">Costo base envío ($)</label>
             <input name="base_shipping_cost"
@@ -213,16 +276,19 @@
 
       {# ---- Demanda dinámica ---- #}
       <div class="card overflow-hidden mb-6">
-        <div class="px-6 py-5 border-b border-line">
-          <h2 class="font-display font-bold text-[16px]">Demanda dinámica</h2>
-          <p class="text-[13px] text-ink-muted mt-1">
-            El precio de envío se multiplica automáticamente cuando hay muchos pedidos en simultáneo.
-          </p>
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='trending-up' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Demanda dinámica</h2>
+            <p class="text-[13px] text-ink-muted mt-1">
+              El precio de envío se multiplica automáticamente cuando hay muchos pedidos en simultáneo.
+            </p>
+          </div>
         </div>
         <div class="p-6 grid sm:grid-cols-2 gap-5">
           <div class="border border-line rounded-xl p-4">
             <div class="flex items-center gap-2 mb-3">
-              <span class="inline-flex w-7 h-7 rounded-full bg-amber-100 text-amber-600 text-[13px] font-bold items-center justify-center">↑</span>
+              <span class="badge badge-amber">↑</span>
               <span class="font-semibold text-[14px]">Demanda alta</span>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -245,7 +311,7 @@
 
           <div class="border border-line rounded-xl p-4">
             <div class="flex items-center gap-2 mb-3">
-              <span class="inline-flex w-7 h-7 rounded-full bg-red-100 text-red-600 text-[13px] font-bold items-center justify-center">↑↑</span>
+              <span class="badge badge-red">↑↑</span>
               <span class="font-semibold text-[14px]">Demanda muy alta</span>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -270,9 +336,12 @@
 
       {# ---- Multiplicadores por día ---- #}
       <div class="card overflow-hidden mb-6">
-        <div class="px-6 py-5 border-b border-line">
-          <h2 class="font-display font-bold text-[16px]">Multiplicadores por día</h2>
-          <p class="text-[13px] text-ink-muted mt-1">Ajustá el precio de envío según el día de la semana.</p>
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='clock' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Multiplicadores por día</h2>
+            <p class="text-[13px] text-ink-muted mt-1">Ajustá el precio de envío según el día de la semana.</p>
+          </div>
         </div>
         <div class="p-6">
           <div class="grid grid-cols-7 gap-2">
@@ -299,6 +368,9 @@
       </div>
     </form>
   </div>
+  {% endif %}
+  </div>
+  </div>
 </div>
 
 <script>
@@ -306,39 +378,66 @@ function configPage() {
   // Initial delivery data from Django
   const initialDelivery = {{ delivery_json|default:'null'|safe }};
   
-  // JSON parse business hours string
-  const businessHoursJsonRaw = '{{ business.businessHours|default:"[]"|escapejs }}';
-  
+  {% if business.addresses %}
+  {% with a=business.addresses.0 %}
+  const savedAddressQuery = '{{ a.street|default:""|escapejs }} {{ a.streetNumber|default:""|escapejs }}, {{ a.city|default:""|escapejs }}, {{ a.province|default:""|escapejs }}';
+  const savedAddressId = '{{ a.id|escapejs }}';
+  const savedAddress = {
+    street: '{{ a.street|default:""|escapejs }}',
+    streetNumber: '{{ a.streetNumber|default:""|escapejs }}',
+    city: '{{ a.city|default:""|escapejs }}',
+    province: '{{ a.province|default:""|escapejs }}',
+    floor: '{{ a.floor|default:""|escapejs }}',
+    apartment: '{{ a.apartment|default:""|escapejs }}',
+    postalCode: '{{ a.postalCode|default:""|escapejs }}',
+  };
+  {% endwith %}
+  {% else %}
+  const savedAddressQuery = '';
+  const savedAddressId = null;
+  const savedAddress = null;
+  {% endif %}
+
+  // Business hours hydrated from Django, always showing all 7 weekdays.
+  const initialBusinessHours = {{ business_hours_json|default:'[]'|safe }};
+
   function parseBusinessHours() {
-    const defaultHours = [
-      { label: 'Lunes', openWeekDay: 'MONDAY', openFromHour: '09:00', openToHour: '18:00' },
-      { label: 'Martes', openWeekDay: 'TUESDAY', openFromHour: '09:00', openToHour: '18:00' },
-      { label: 'Miércoles', openWeekDay: 'WEDNESDAY', openFromHour: '09:00', openToHour: '18:00' },
-      { label: 'Jueves', openWeekDay: 'THURSDAY', openFromHour: '09:00', openToHour: '18:00' },
-      { label: 'Viernes', openWeekDay: 'FRIDAY', openFromHour: '09:00', openToHour: '18:00' },
-      { label: 'Sábado', openWeekDay: 'SATURDAY', openFromHour: '09:00', openToHour: '13:00' },
-      { label: 'Domingo', openWeekDay: 'SUNDAY', openFromHour: '00:00', openToHour: '00:00' }
+    const defaults = [
+      { openWeekDay: 'MONDAY',    label: 'Lunes',     openFromHour: '09:00', openToHour: '18:00' },
+      { openWeekDay: 'TUESDAY',   label: 'Martes',    openFromHour: '09:00', openToHour: '18:00' },
+      { openWeekDay: 'WEDNESDAY', label: 'Miércoles', openFromHour: '09:00', openToHour: '18:00' },
+      { openWeekDay: 'THURSDAY',  label: 'Jueves',    openFromHour: '09:00', openToHour: '18:00' },
+      { openWeekDay: 'FRIDAY',    label: 'Viernes',   openFromHour: '09:00', openToHour: '18:00' },
+      { openWeekDay: 'SATURDAY',  label: 'Sábado',    openFromHour: '09:00', openToHour: '13:00' },
+      { openWeekDay: 'SUNDAY',    label: 'Domingo',   openFromHour: '00:00', openToHour: '00:00' },
     ];
-    
-    try {
-      // The backend actually gives us objects if it's the real client, 
-      // but in template it renders as something we can't easily parse without a json filter.
-      // So we will just rely on the defaults if it's empty, and the backend handles parsing.
-      // We need a proper JSON dump from the view if we want to hydrate it accurately.
-      // For now, let's just use defaults for the UI.
-    } catch(e) {}
-    
-    return defaultHours;
+    const stored = {};
+    if (Array.isArray(initialBusinessHours)) {
+      for (const h of initialBusinessHours) stored[h.openWeekDay] = h;
+    }
+    return defaults.map(d => {
+      const s = stored[d.openWeekDay];
+      const from = (s && s.openFromHour) ? s.openFromHour : d.openFromHour;
+      const to = (s && s.openToHour) ? s.openToHour : d.openToHour;
+      return {
+        label: d.label,
+        openWeekDay: d.openWeekDay,
+        openFromHour: from,
+        openToHour: to,
+        isOpen: !(from === '00:00' && to === '00:00'),
+      };
+    });
   }
 
-  // Parse existing polygon from available_zone if present
+  // Parse existing polygon from available_zone (GeoJSON) if present
   function parseInitialPolygon() {
     if (!initialDelivery || !initialDelivery.available_zone) return [];
     try {
       const zone = initialDelivery.available_zone;
-      // available_zone is stored as { exterior_ring: [{longitude, latitude}, ...] }
-      if (zone.exterior_ring && Array.isArray(zone.exterior_ring)) {
-        return zone.exterior_ring.map(p => [p.latitude, p.longitude]);
+      // available_zone is stored as GeoJSON: {"type": "Polygon", "coordinates": [[[lon, lat], ...]]}
+      if (zone.type === 'Polygon' && Array.isArray(zone.coordinates) && zone.coordinates.length > 0) {
+        // GeoJSON coordinates are [lon, lat], Leaflet expects [lat, lon]
+        return zone.coordinates[0].map(p => [p[1], p[0]]);
       }
     } catch(e) {}
     return [];
@@ -363,7 +462,10 @@ function configPage() {
   }
 
   return {
-    tab: 'general',
+    tab: '{{ active_tab }}',
+    editing: false,
+    zoneEditing: false,
+    originMarker: null,
     drawing: false,
     map: null,
     polygon: null,
@@ -381,24 +483,50 @@ function configPage() {
     },
     addressQuery: '',
     searchResults: [],
+    showDropdown: false,
     isSearching: false,
     selectedAddress: false,
     addressForm: { street: '', streetNumber: '', city: '', province: '', floor: '', apartment: '', postalCode: '' },
+    savedAddressId: savedAddressId,
     addressMap: null,
     addressMarker: null,
     addressMapInited: false,
 
     businessHours: parseBusinessHours(),
-    
+
+    init() {
+      if (this.tab === 'address') {
+        this.$nextTick(() => this.initAddressMap());
+      } else if (this.tab === 'delivery') {
+        this.$nextTick(() => this.initMap());
+      }
+    },
+
     submitGeneral() {
-      // Map businessHours to JSON for hidden input
+      // Map businessHours to JSON for hidden input.
+      // A closed day (switch off) is persisted as 00:00-00:00 (sentinel the
+      // backend already understands); the UI re-derives isOpen from it on load.
       const payload = this.businessHours.map(h => ({
         openWeekDay: h.openWeekDay,
-        openFromHour: h.openFromHour,
-        openToHour: h.openToHour
+        openFromHour: h.isOpen ? h.openFromHour : '00:00',
+        openToHour: h.isOpen ? h.openToHour : '00:00',
       }));
       this.$refs.businessHoursInput.value = JSON.stringify(payload);
-      this.$el.closest('form').submit();
+      document.getElementById('general-form').submit();
+    },
+
+    toggleEdit() {
+      this.editing = !this.editing;
+      if (this.editing && savedAddress) {
+        this.addressForm = { ...savedAddress };
+        this.selectedAddress = true;
+        this.addressQuery = savedAddressQuery;
+        this.showDropdown = false;
+      } else if (!this.editing) {
+        this.selectedAddress = false;
+        this.searchResults = [];
+        this.showDropdown = false;
+      }
     },
 
     initAddressMap() {
@@ -408,34 +536,60 @@ function configPage() {
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
       }).addTo(this.addressMap);
+
+      const q = (savedAddressQuery || '').trim();
+      if (q && !this.skipSavedGeocode) {
+        fetch('https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=1&bbox=-73.56,-55.06,-53.64,-21.78')
+          .then(r => r.json())
+          .then(d => {
+            const f = d.features && d.features[0];
+            if (!f) return;
+            const [lng, lat] = f.geometry.coordinates;
+            this.addressMap.setView([lat, lng], 16);
+            if (this.addressMarker) this.addressMap.removeLayer(this.addressMarker);
+            this.addressMarker = L.marker([lat, lng]).addTo(this.addressMap);
+          })
+          .catch(() => {});
+      }
     },
 
     async searchAddressLive() {
       if (!this.addressQuery) {
         this.searchResults = [];
+        this.showDropdown = false;
         return;
       }
       try {
-        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(this.addressQuery)}&limit=5`);
+        // bbox restricts results to Argentina (minLon,minLat,maxLon,maxLat)
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(this.addressQuery)}&limit=5&bbox=-73.56,-55.06,-53.64,-21.78`);
         const data = await res.json();
         this.searchResults = data.features || [];
+        if (this.$refs.searchInput === document.activeElement) {
+          this.showDropdown = true;
+        }
       } catch (e) {
         console.error("Error al buscar direcciones", e);
       }
     },
 
-    formatPhotonAddress(p) {
+    formatAddressParts(p) {
+      const street = p.street || p.name || '';
+      const number = p.housenumber || '';
+      const city = p.city || p.town || p.village || p.county || '';
+      const province = p.state || '';
+      
       const parts = [];
-      if (p.name) parts.push(p.name);
-      if (p.housenumber) parts.push(p.housenumber);
-      if (p.street && p.street !== p.name) parts.push(p.street);
-      if (p.city || p.town) parts.push(p.city || p.town);
-      if (p.state) parts.push(p.state);
+      if (street || number) {
+        parts.push([street, number].filter(Boolean).join(' '));
+      }
+      if (city) parts.push(city);
+      if (province) parts.push(province);
       return parts.join(', ');
     },
 
     selectAddress(res) {
       this.searchResults = [];
+      this.showDropdown = false;
       // Photon uses [lon, lat]
       const lon = res.geometry.coordinates[0];
       const lat = res.geometry.coordinates[1];
@@ -449,35 +603,96 @@ function configPage() {
       }
       
       const p = res.properties;
+      // Prefer the number the user explicitly typed over what OSM returns,
+      // since OSM may snap to the nearest known housenumber.
+      const queryNumber = (this.addressQuery.match(/\b(\d+)\b/) || [])[1] || '';
       this.addressForm = {
         street: p.street || p.name || '',
-        streetNumber: p.housenumber || '',
+        streetNumber: queryNumber || p.housenumber || '',
         city: p.city || p.town || p.village || p.county || '',
         province: p.state || '',
         postalCode: p.postcode || '',
         floor: '',
         apartment: ''
       };
+      this.addressQuery = this.formatAddressParts(p);
       this.selectedAddress = true;
+    },
+
+    useMyLocation() {
+      if (!('geolocation' in navigator)) {
+        alert('Tu navegador no permite obtener la ubicación.');
+        return;
+      }
+      this.skipSavedGeocode = true;
+      if (!this.addressMap) this.initAddressMap();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          this.addressMap.setView([lat, lng], 16);
+          if (this.addressMarker) this.addressMap.removeLayer(this.addressMarker);
+          this.addressMarker = L.marker([lat, lng]).addTo(this.addressMap);
+          fetch('https://photon.komoot.io/reverse/?lat=' + lat + '&lon=' + lng)
+            .then(r => r.json())
+            .then(d => {
+              const f = d.features && d.features[0];
+              if (!f) return;
+              const p = f.properties;
+              this.addressForm = {
+                street: p.street || p.name || '',
+                streetNumber: p.housenumber || '',
+                city: p.city || p.town || p.village || p.county || '',
+                province: p.state || '',
+                postalCode: p.postcode || '',
+                floor: '',
+                apartment: ''
+              };
+              this.addressQuery = this.formatAddressParts(p);
+              this.selectedAddress = true;
+              this.showDropdown = false;
+            })
+            .catch(() => {});
+        },
+        (err) => {
+          console.error('Geolocation error', err);
+          alert('No se pudo obtener tu ubicación actual.');
+        }
+      );
     },
 
     initMap() {
       if (this.mapInited) return;
       this.mapInited = true;
 
-      // Default center: Buenos Aires
-      const center = this.polygonPoints.length > 0
-        ? this.polygonPoints[0]
-        : [-34.6037, -58.3816];
-
-      this.map = L.map('delivery-map').setView(center, 13);
+      this.map = L.map('delivery-map').setView([-34.6037, -58.3816], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(this.map);
 
-      // Draw existing polygon if any
-      if (this.polygonPoints.length >= 3) {
+      // Center on current address; draw existing polygon if any
+      const q = (savedAddressQuery || '').trim();
+      if (q) {
+        fetch('https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=1&bbox=-73.56,-55.06,-53.64,-21.78')
+          .then(r => r.json())
+          .then(d => {
+            const f = d.features && d.features[0];
+            if (!f) {
+              if (this.polygonPoints.length >= 3) this.renderPolygon();
+              return;
+            }
+            const [lng, lat] = f.geometry.coordinates;
+            if (this.polygonPoints.length >= 3) {
+              this.renderPolygon();
+            } else {
+              this.map.setView([lat, lng], 16);
+              if (this.originMarker) this.map.removeLayer(this.originMarker);
+              this.originMarker = L.marker([lat, lng]).addTo(this.map);
+            }
+          })
+          .catch(() => { if (this.polygonPoints.length >= 3) this.renderPolygon(); });
+      } else if (this.polygonPoints.length >= 3) {
         this.renderPolygon();
       }
 
@@ -494,6 +709,30 @@ function configPage() {
       } else {
         this.map.getContainer().style.cursor = '';
       }
+    },
+
+    toggleZoneEdit() {
+      this.zoneEditing = !this.zoneEditing;
+      if (this.zoneEditing) {
+        this.drawing = true;
+        if (this.map) this.map.getContainer().style.cursor = 'crosshair';
+      } else {
+        this.drawing = false;
+        if (this.map) this.map.getContainer().style.cursor = '';
+      }
+    },
+
+    clearZone() {
+      this.clearPolygon();
+      if (this.zoneEditing) {
+        this.drawing = true;
+        if (this.map) this.map.getContainer().style.cursor = 'crosshair';
+      }
+    },
+
+    saveZone() {
+      if (this.prepareSubmit() === false) return;
+      document.getElementById('delivery-form').submit();
     },
 
     addPoint(lat, lng) {
@@ -582,6 +821,12 @@ function configPage() {
     },
 
     prepareSubmit(e) {
+      if (this.polygonPoints.length < 3) {
+        if (e) e.preventDefault();
+        alert("Por favor, trazá una zona de entrega en el mapa antes de guardar.");
+        return false;
+      }
+
       // Build delivery_zone JSON
       const ring = this.polygonPoints.map(p => ({
         longitude: parseFloat(p[1].toFixed(6)),

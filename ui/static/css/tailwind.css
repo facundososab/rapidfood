@@ -95,6 +95,14 @@
     font-family: var(--font-sans);
   }
   .badge-dot { width: .375rem; height: .375rem; border-radius: 999px; }
+  .badge-amber { background: #fef3c7; color: #b45309; }
+  .badge-red { background: #fee2e2; color: #b91c1c; }
+
+  .card-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; flex-shrink: 0;
+    border-radius: 10px; background: var(--color-primary-soft); color: var(--color-primary);
+  }
 
   .badge-cat {
     display: inline-flex; align-items: center; gap: .375rem;

@@ -182,6 +182,9 @@ class RapidfoodClient(ABC):
     def create_business_address(self, business_config_id: str, payload: dict) -> dtos.Address: ...
 
     @abstractmethod
+    def update_business_address(self, business_config_id: str, address_id: str, payload: dict) -> dtos.Address: ...
+
+    @abstractmethod
     def delete_business_address(self, business_config_id: str, address_id: str) -> None: ...
 
     # ---- Delivery configuration ------------------------------------------

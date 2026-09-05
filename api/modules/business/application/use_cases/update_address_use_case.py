@@ -3,27 +3,34 @@ from __future__ import annotations
 from modules.business.application.ports.driven.business_repository_port import (
     BusinessConfigurationRepositoryPort,
 )
-from modules.business.application.ports.driver.create_address_port import (
-    CreateAddressCommand,
+from modules.business.application.ports.driver.update_address_port import (
+    UpdateAddressCommand,
 )
 from modules.business.domain.errors.business_errors import (
     BusinessConfigurationNotFoundError,
+    AddressNotFoundError,
+    AddressDoesNotBelongToBusinessError,
 )
 
-class CreateAddressUseCase:
+
+class UpdateAddressUseCase:
     def __init__(self, repo: BusinessConfigurationRepositoryPort) -> None:
         self._repo = repo
 
-    def execute(self, command: CreateAddressCommand) -> dict:
-        with open("/tmp/rapidfood_debug.log", "a") as f:
-            f.write(f"CREATE ADDRESS: business: {command.business_config_id} - street: {command.street} - streetNumber: {command.street_number}\n")
-
+    def execute(self, command: UpdateAddressCommand) -> dict:
         config = self._repo.get_by_id(command.business_config_id)
         if config is None:
             raise BusinessConfigurationNotFoundError(command.business_config_id)
+            
+        address = self._repo.get_address_by_id(command.address_id)
+        if address is None:
+            raise AddressNotFoundError(command.address_id)
+            
+        if address.businessConfigId != command.business_config_id:
+            raise AddressDoesNotBelongToBusinessError(command.address_id, command.business_config_id)
 
-        address = self._repo.create_address(
-            command.business_config_id,
+        address = self._repo.update_address(
+            command.address_id,
             street=command.street,
             street_number=command.street_number,
             city=command.city,

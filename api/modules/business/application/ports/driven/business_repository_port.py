@@ -50,6 +50,21 @@ class BusinessConfigurationRepositoryPort(Protocol):
         """Create a new address for this business."""
         ...
 
+    def update_address(
+        self,
+        address_id: str,
+        *,
+        street: str,
+        street_number: str,
+        city: str,
+        province: str,
+        floor: Optional[str],
+        apartment: Optional[str],
+        postal_code: Optional[str],
+    ) -> Address:
+        """Update an existing address."""
+        ...
+
     def delete_address(self, address_id: str) -> None:
         """Delete an address by id."""
         ...
