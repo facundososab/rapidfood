@@ -108,10 +108,6 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _category(self, d) -> Optional[dtos.Category]:
         return None if not d else dtos.Category(id=d["id"], description=d["description"])
 
-    def _price(self, d) -> dtos.Price:
-        return dtos.Price(id=d["id"], productId=d["product_id"],
-                          sinceDate=_parse_dt(d["since_date"]), price=_dec(d["price"]))
-
     def _product(self, d) -> Optional[dtos.Product]:
         if not d:
             return None
@@ -122,7 +118,8 @@ class HttpRapidfoodClient(RapidfoodClient):
         return dtos.Product(id=d["id"], name=d["name"], description=d["description"], available=bool(available),
                             categoryId=d["category_id"], category=self._category(d.get("category")),
                             prices=[self._price(p) for p in d.get("prices", [])],
-                            imageUrl=d.get("image_url") or None)
+                            imageUrl=d.get("image_url") or None,
+                            variants=[self._variant(v) for v in d.get("variants", []) if v])
 
     def _line(self, d) -> dtos.OrderLine:
         return dtos.OrderLine(id=d["id"], orderId=d["order_id"], productId=d["product_id"],
@@ -340,6 +337,41 @@ class HttpRapidfoodClient(RapidfoodClient):
             raise RuntimeError("Actualizar categorías aún no está soportado por el backend.")
         return self._category(self._post("/api/catalog/categories/",
                                          {"description": payload["description"]}))
+
+    def list_ingredients(self):
+        return [self._ingredient(x) for x in self._get("/api/catalog/ingredients/")]
+
+    def create_ingredient(self, payload):
+        return self._ingredient(self._post("/api/catalog/ingredients/", payload))
+
+    def update_ingredient(self, ingredient_id, payload):
+        return self._ingredient(self._patch(f"/api/catalog/ingredients/{ingredient_id}/", payload))
+
+    def create_variant(self, product_id, payload):
+        return self._variant(self._post(f"/api/catalog/products/{product_id}/variants/", payload))
+
+    def update_variant(self, variant_id, payload):
+        return self._variant(self._patch(f"/api/catalog/variants/{variant_id}/", payload))
+
+    def set_variant_price(self, variant_id, price):
+        self._post(f"/api/catalog/variants/{variant_id}/prices/", {
+            "price": str(price), "since_date": date.today().isoformat(),
+        })
+
+    def set_variant_ingredients(self, variant_id, payload):
+        return self._put(f"/api/catalog/variants/{variant_id}/ingredients/", payload)
+
+    def create_modifier_group(self, product_id, payload):
+        return self._modifier_group(self._post(f"/api/catalog/products/{product_id}/modifier-groups/", payload))
+
+    def update_modifier_group(self, group_id, payload):
+        return self._modifier_group(self._patch(f"/api/catalog/modifier-groups/{group_id}/", payload))
+
+    def create_modifier_option(self, group_id, payload):
+        return self._modifier_option(self._post(f"/api/catalog/modifier-groups/{group_id}/options/", payload))
+
+    def update_modifier_option(self, option_id, payload):
+        return self._modifier_option(self._patch(f"/api/catalog/modifier-options/{option_id}/", payload))
 
     # -- payments (not in scope yet) ---------------------------------------
     def list_payments(self, *, status=None, provider=None, date_from=None, date_to=None, page=1, page_size=15):

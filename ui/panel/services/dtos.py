@@ -116,6 +116,48 @@ class Product:
     category: Optional[Category] = None
     # optional; schema Product.imageUrl
     imageUrl: Optional[str] = None
+    variants: List[Variant] = field(default_factory=list)
+    modifierGroups: List[ModifierGroup] = field(default_factory=list)
+
+
+@dataclass
+class Variant:
+    id: str
+    name: str
+    available: bool
+    currentPrice: Decimal
+    ingredients: List[VariantIngredient] = field(default_factory=list)
+
+
+@dataclass
+class Ingredient:
+    id: str
+    name: str
+
+
+@dataclass
+class VariantIngredient:
+    id: str
+    ingredientId: str
+    name: str
+    removable: bool
+
+
+@dataclass
+class ModifierGroup:
+    id: str
+    name: str
+    minSelections: int
+    maxSelections: int
+    options: List[ModifierOption] = field(default_factory=list)
+
+
+@dataclass
+class ModifierOption:
+    id: str
+    name: str
+    priceDelta: Decimal
+    available: bool
 
 
 @dataclass

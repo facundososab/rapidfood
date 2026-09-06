@@ -23,9 +23,15 @@ def _paginate(items: list, page: int, page_size: int) -> Page:
     return Page(items=items[start:start + page_size], total=total, page=page, page_size=page_size)
 
 
+import uuid
+
 class MockRapidfoodClient(RapidfoodClient):
     def __init__(self) -> None:
         self.db = get_dataset()
+        self.ingredients: List[dtos.Ingredient] = []
+        self.variants: List[dtos.Variant] = []
+        self.modifier_groups: List[dtos.ModifierGroup] = []
+        self.modifier_options: List[dtos.ModifierOption] = []
 
     # ---- Orders -----------------------------------------------------------
     def all_orders(self) -> List[dtos.Order]:
@@ -215,6 +221,69 @@ class MockRapidfoodClient(RapidfoodClient):
         c = dtos.Category(id=db.next_id("cat"), description=payload["description"])
         db.categories.append(c)
         return c
+
+    # ---- Variants & Ingredients ------------------------------------------
+    def list_ingredients(self):
+        return list(self.ingredients)
+
+    def create_ingredient(self, payload):
+        ing = dtos.Ingredient(id=str(uuid.uuid4()), name=payload["name"])
+        self.ingredients.append(ing)
+        return ing
+
+    def update_ingredient(self, ingredient_id, payload):
+        ing = next((i for i in self.ingredients if i.id == ingredient_id), None)
+        if ing:
+            ing.name = payload.get("name", ing.name)
+        return ing
+
+    def create_variant(self, product_id, payload):
+        var = dtos.Variant(id=str(uuid.uuid4()), name=payload["name"], available=True, currentPrice=D(str(payload["initial_price"])))
+        self.variants.append(var)
+        p = self.get_product(product_id)
+        if p: p.variants.append(var)
+        return var
+
+    def update_variant(self, variant_id, payload):
+        var = next((v for v in self.variants if v.id == variant_id), None)
+        if var:
+            var.name = payload.get("name", var.name)
+            var.available = payload.get("available", var.available)
+        return var
+
+    def set_variant_price(self, variant_id, price):
+        var = next((v for v in self.variants if v.id == variant_id), None)
+        if var: var.currentPrice = D(str(price))
+
+    def set_variant_ingredients(self, variant_id, payload):
+        return []
+
+    def create_modifier_group(self, product_id, payload):
+        mg = dtos.ModifierGroup(id=str(uuid.uuid4()), name=payload["name"], minSelections=payload.get("min_selections", 0), maxSelections=payload.get("max_selections", 1))
+        self.modifier_groups.append(mg)
+        return mg
+
+    def update_modifier_group(self, group_id, payload):
+        mg = next((g for g in self.modifier_groups if g.id == group_id), None)
+        if mg:
+            mg.name = payload.get("name", mg.name)
+            mg.minSelections = payload.get("min_selections", mg.minSelections)
+            mg.maxSelections = payload.get("max_selections", mg.maxSelections)
+        return mg
+
+    def create_modifier_option(self, group_id, payload):
+        mo = dtos.ModifierOption(id=str(uuid.uuid4()), name=payload["name"], priceDelta=D(str(payload["price_delta"])), available=True)
+        self.modifier_options.append(mo)
+        return mo
+
+    def update_modifier_option(self, option_id, payload):
+        mo = next((o for o in self.modifier_options if o.id == option_id), None)
+        if mo:
+            mo.name = payload.get("name", mo.name)
+            if "price_delta" in payload:
+                mo.priceDelta = D(str(payload["price_delta"]))
+            mo.available = payload.get("available", mo.available)
+        return mo
 
     # ---- Payments ---------------------------------------------------------
     def all_payments(self) -> List[dtos.Payment]:

@@ -2,7 +2,7 @@
 name: design-taste-frontend
 description: Anti-slop frontend skill for landing pages, portfolios, and redesigns. The agent reads the brief, infers the right design direction, and ships interfaces that do not look templated. Real design systems when applicable, audit-first on redesigns, strict pre-flight check.
 metadata:
-  scope: [root, frontend]
+  scope: [root, ui]
   auto-invoke: 'When the user asks to build web components, pages, artifacts, posters, or applications'
 ---
 

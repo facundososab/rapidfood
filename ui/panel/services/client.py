@@ -110,6 +110,40 @@ class RapidfoodClient(ABC):
     @abstractmethod
     def save_category(self, payload: dict) -> dtos.Category: ...
 
+    # ---- Variants & Ingredients ------------------------------------------
+    @abstractmethod
+    def list_ingredients(self) -> List[dtos.Ingredient]: ...
+
+    @abstractmethod
+    def create_ingredient(self, payload: dict) -> dtos.Ingredient: ...
+
+    @abstractmethod
+    def update_ingredient(self, ingredient_id: str, payload: dict) -> dtos.Ingredient: ...
+
+    @abstractmethod
+    def create_variant(self, product_id: str, payload: dict) -> dtos.Variant: ...
+
+    @abstractmethod
+    def update_variant(self, variant_id: str, payload: dict) -> dtos.Variant: ...
+
+    @abstractmethod
+    def set_variant_price(self, variant_id: str, price: Decimal) -> None: ...
+
+    @abstractmethod
+    def set_variant_ingredients(self, variant_id: str, payload: dict) -> list: ...
+
+    @abstractmethod
+    def create_modifier_group(self, product_id: str, payload: dict) -> dtos.ModifierGroup: ...
+
+    @abstractmethod
+    def update_modifier_group(self, group_id: str, payload: dict) -> dtos.ModifierGroup: ...
+
+    @abstractmethod
+    def create_modifier_option(self, group_id: str, payload: dict) -> dtos.ModifierOption: ...
+
+    @abstractmethod
+    def update_modifier_option(self, option_id: str, payload: dict) -> dtos.ModifierOption: ...
+
     # ---- Payments ---------------------------------------------------------
     @abstractmethod
     def list_payments(

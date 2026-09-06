@@ -53,7 +53,7 @@ license: Apache-2.0
 metadata:
   author: test
   version: "1.0"
-  scope: [frontend]
+  scope: [ui]
   auto_invoke: "Testing frontend components"
 allowed-tools: Read
 ---
@@ -361,7 +361,7 @@ license: Apache-2.0
 metadata:
   author: test
   version: "1.0"
-  scope: [frontend]
+  scope: [ui]
   auto_invoke:
     - "Action B"
     - "Action A"
@@ -388,7 +388,7 @@ license: Apache-2.0
 metadata:
   author: test
   version: "1.0"
-  scope: [frontend]
+  scope: [ui]
   auto_invoke:
     - "Z action"
     - "A action"
@@ -405,7 +405,7 @@ license: Apache-2.0
 metadata:
   author: test
   version: "1.0"
-  scope: [frontend]
+  scope: [ui]
   auto_invoke: "A action"
 allowed-tools: Read
 ---
