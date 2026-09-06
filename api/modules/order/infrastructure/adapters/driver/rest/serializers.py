@@ -9,8 +9,14 @@ class StartDraftOrderSerializer(serializers.Serializer):
     )
 
 class AddLineSerializer(serializers.Serializer):
-    product_id = serializers.UUIDField(required=True)
+    product_variant_id = serializers.UUIDField(required=True)
     quantity = serializers.IntegerField(required=True, min_value=1)
+    modifier_option_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, default=list
+    )
+    removed_ingredient_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, default=list
+    )
 
 class UpdateLineQuantitySerializer(serializers.Serializer):
     quantity = serializers.IntegerField(required=True, min_value=1)

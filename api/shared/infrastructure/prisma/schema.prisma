@@ -201,46 +201,47 @@ model Order {
 }
 
 model OrderLine {
-  id         String    @id @default(uuid()) @map("order_line_id") @db.Uuid
-  orderId    String    @map("order_id") @db.Uuid
-  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String    @map("product_id") @db.Uuid
-  product    Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-  quantity   Int       @map("quantity") // quantity (was amount)
-  unitPrice  Decimal?  @map("unit_price") @db.Decimal(10, 2) // snapshot - NULL in DRAFT, frozen at confirm
-  subtotal   Decimal   @db.Decimal(10, 2) // recomputed on draft edits
-  discountId String?   @map("discount_id") @db.Uuid
-  discount   Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  id                 String                       @id @default(uuid()) @map("order_line_id") @db.Uuid
+  orderId            String                       @map("order_id") @db.Uuid
+  order              Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariantId   String                       @map("product_variant_id") @db.Uuid
+  productVariant     ProductVariant               @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  quantity           Int                          @map("quantity") // quantity (was amount)
+  unitPrice          Decimal?                     @map("unit_price") @db.Decimal(10, 2) // snapshot - NULL in DRAFT, frozen at confirm
+  subtotal           Decimal                      @db.Decimal(10, 2) // recomputed on draft edits
+  discountId         String?                      @map("discount_id") @db.Uuid
+  discount           Discount?                    @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  modifiers          OrderLineModifier[]
+  removedIngredients OrderLineRemovedIngredient[]
 
-  @@unique([orderId, productId]) // one line per product
-  @@index([productId])
+  @@index([productVariantId])
   @@map("order_line")
 }
 
 model Product {
-  id          String      @id @default(uuid()) @map("product_id") @db.Uuid
-  name        String
-  description String
-  imageUrl    String?     @map("image_url")
-  available   Boolean     @default(true)
-  categoryId  String      @map("category_id") @db.Uuid // diagram "1..1": product belongs to exactly 1 category
-  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  prices      Price[]
-  orderLines  OrderLine[]
-  discounts   Discount[]
+  id             String           @id @default(uuid()) @map("product_id") @db.Uuid
+  name           String
+  description    String
+  imageUrl       String?          @map("image_url")
+  available      Boolean          @default(true)
+  categoryId     String           @map("category_id") @db.Uuid // diagram "1..1": product belongs to exactly 1 category
+  category       Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  discounts      Discount[]
+  variants       ProductVariant[]
+  modifierGroups ModifierGroup[]
 
   @@index([categoryId])
   @@map("product")
 }
 
 model Price {
-  id        String   @id @default(uuid()) @map("price_id") @db.Uuid
-  productId String   @map("product_id") @db.Uuid
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sinceDate DateTime @map("since_date")
-  price     Decimal  @db.Decimal(10, 2)
+  id               String         @id @default(uuid()) @map("price_id") @db.Uuid
+  productVariantId String         @map("product_variant_id") @db.Uuid
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  sinceDate        DateTime       @map("since_date")
+  price            Decimal        @db.Decimal(10, 2)
 
-  @@index([productId, sinceDate]) // current price = max(since_date) <= now
+  @@index([productVariantId, sinceDate]) // current price = max(since_date) <= now
   @@map("price")
 }
 
@@ -253,12 +254,16 @@ model Category {
 }
 
 model Discount {
-  id         String      @id @default(uuid()) @map("discount_id") @db.Uuid
-  percentage Decimal     @db.Decimal(5, 2) // 0-100
-  productId  String?     @map("product_id") @db.Uuid
-  product    Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orderLines OrderLine[]
+  id               String          @id @default(uuid()) @map("discount_id") @db.Uuid
+  percentage       Decimal         @db.Decimal(5, 2) // 0-100
+  productId        String?         @map("product_id") @db.Uuid
+  product          Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productVariantId String?         @map("product_variant_id") @db.Uuid
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  orderLines       OrderLine[]
 
+  @@index([productId])
+  @@index([productVariantId])
   @@map("discount")
 }
 
@@ -307,6 +312,117 @@ model Payment {
 
   @@index([orderId])
   @@map("payment")
+}
+
+// --- Catalog: variant, ingredient, and modifier models ---
+
+model ProductVariant {
+  id        String  @id @default(uuid()) @map("product_variant_id") @db.Uuid
+
+  productId String  @map("product_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  name      String
+  available Boolean @default(true)
+
+  prices              Price[]
+  ingredients         ProductVariantIngredient[]
+  orderLines          OrderLine[]
+  discounts           Discount[]
+
+  @@index([productId])
+  @@map("product_variant")
+}
+
+model Ingredient {
+  id   String @id @default(uuid()) @map("ingredient_id") @db.Uuid
+  name String
+
+  variantIngredients    ProductVariantIngredient[]
+  removedFromOrderLines OrderLineRemovedIngredient[]
+
+  @@map("ingredient")
+}
+
+model ProductVariantIngredient {
+  id String @id @default(uuid()) @map("product_variant_ingredient_id") @db.Uuid
+
+  productVariantId String         @map("product_variant_id") @db.Uuid
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id") @db.Uuid
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  removable Boolean @default(true)
+
+  @@unique([productVariantId, ingredientId])
+  @@index([ingredientId])
+  @@map("product_variant_ingredient")
+}
+
+model ModifierGroup {
+  id String @id @default(uuid()) @map("modifier_group_id") @db.Uuid
+
+  productId String  @map("product_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  name          String
+  minSelections Int    @default(0) @map("min_selections")
+  maxSelections Int    @map("max_selections")
+
+  options ModifierOption[]
+
+  @@index([productId])
+  @@map("modifier_group")
+}
+
+model ModifierOption {
+  id String @id @default(uuid()) @map("modifier_option_id") @db.Uuid
+
+  modifierGroupId String        @map("modifier_group_id") @db.Uuid
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  name       String
+  priceDelta Decimal @default(0) @map("price_delta") @db.Decimal(10, 2)
+  available  Boolean @default(true)
+
+  orderLineModifiers OrderLineModifier[]
+
+  @@index([modifierGroupId])
+  @@map("modifier_option")
+}
+
+model OrderLineModifier {
+  id String @id @default(uuid()) @map("order_line_modifier_id") @db.Uuid
+
+  orderLineId String    @map("order_line_id") @db.Uuid
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  modifierOptionId String         @map("modifier_option_id") @db.Uuid
+  modifierOption   ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Restrict)
+
+  optionNameSnapshot String  @map("option_name_snapshot")
+  priceDelta         Decimal? @map("price_delta") @db.Decimal(10, 2)
+
+  @@unique([orderLineId, modifierOptionId])
+  @@index([modifierOptionId])
+  @@map("order_line_modifier")
+}
+
+model OrderLineRemovedIngredient {
+  id String @id @default(uuid()) @map("order_line_removed_ingredient_id") @db.Uuid
+
+  orderLineId String    @map("order_line_id") @db.Uuid
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id") @db.Uuid
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  ingredientNameSnapshot String @map("ingredient_name_snapshot")
+
+  @@unique([orderLineId, ingredientId])
+  @@index([ingredientId])
+  @@map("order_line_removed_ingredient")
 }
 
 // --- Delivery module models ---
