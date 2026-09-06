@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 
 from prisma import enums
@@ -10,9 +11,12 @@ from modules.order.application.ports.driven.order_repository import (
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
+from modules.order.domain.models.order_line_modifier import OrderLineModifier
+from modules.order.domain.models.order_line_removed_ingredient import OrderLineRemovedIngredient
 from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment_method import PaymentMethod
+from decimal import Decimal
 
 
 class PrismaOrderRepository(OrderRepository):
@@ -31,7 +35,14 @@ class PrismaOrderRepository(OrderRepository):
     def get_by_id(self, order_id: str) -> Optional[Order]:
         record = db.client.order.find_first(
             where={"id": order_id},
-            include={"lines": True},
+            include={
+                "lines": {
+                    "include": {
+                        "modifiers": True,
+                        "removedIngredients": True,
+                    }
+                }
+            },
         )
         if record is None:
             return None
@@ -57,7 +68,14 @@ class PrismaOrderRepository(OrderRepository):
         records = db.client.order.find_many(
             where=where,
             order={"createdAt": "desc"},
-            include={"lines": True},
+            include={
+                "lines": {
+                    "include": {
+                        "modifiers": True,
+                        "removedIngredients": True,
+                    }
+                }
+            },
         )
         return [_to_domain(record) for record in records]
 
@@ -88,10 +106,12 @@ def _to_prisma_enum(enum_cls, value) -> Optional[str]:
 
 
 def _sync_lines(tx, order: Order) -> None:
+    """Sync order lines and their children within an active transaction."""
     line_ids = [line.id for line in order.lines]
     where = {"orderId": order.id}
     if line_ids:
         where["id"] = {"notIn": line_ids}
+    # Delete lines that are no longer in the order (cascades to modifiers + removed_ingredients)
     tx.orderline.delete_many(where=where)
 
     for line in order.lines:
@@ -101,7 +121,7 @@ def _sync_lines(tx, order: Order) -> None:
                 "create": {
                     "id": line.id,
                     "orderId": order.id,
-                    "productId": line.product_id,
+                    "productVariantId": line.product_variant_id,
                     "quantity": line.quantity,
                     "unitPrice": line.unit_price,
                     "subtotal": line.subtotal,
@@ -116,20 +136,59 @@ def _sync_lines(tx, order: Order) -> None:
             },
         )
 
+        # Sync OrderLineModifier children
+        existing_modifier_ids = [m.id for m in line.modifiers]
+        tx.orderlinemodifier.delete_many(
+            where={
+                "orderLineId": line.id,
+                "id": {"notIn": existing_modifier_ids} if existing_modifier_ids else None,
+            }
+        )
+        for modifier in line.modifiers:
+            tx.orderlinemodifier.upsert(
+                where={"id": modifier.id},
+                data={
+                    "create": {
+                        "id": modifier.id,
+                        "orderLineId": line.id,
+                        "modifierOptionId": modifier.modifier_option_id,
+                        "optionNameSnapshot": modifier.option_name_snapshot,
+                        "priceDelta": modifier.price_delta,
+                    },
+                    "update": {
+                        "optionNameSnapshot": modifier.option_name_snapshot,
+                        "priceDelta": modifier.price_delta,
+                    },
+                },
+            )
+
+        # Sync OrderLineRemovedIngredient children
+        existing_removed_ids = [r.id for r in line.removed_ingredients]
+        tx.orderlineremovedingredient.delete_many(
+            where={
+                "orderLineId": line.id,
+                "id": {"notIn": existing_removed_ids} if existing_removed_ids else None,
+            }
+        )
+        for removed in line.removed_ingredients:
+            tx.orderlineremovedingredient.upsert(
+                where={"id": removed.id},
+                data={
+                    "create": {
+                        "id": removed.id,
+                        "orderLineId": line.id,
+                        "ingredientId": removed.ingredient_id,
+                        "ingredientNameSnapshot": removed.ingredient_name_snapshot,
+                    },
+                    "update": {
+                        "ingredientNameSnapshot": removed.ingredient_name_snapshot,
+                    },
+                },
+            )
+
 
 def _to_domain(record) -> Order:
-    lines = [
-        OrderLine(
-            id=line.id,
-            order_id=record.id,
-            product_id=line.productId,
-            quantity=line.quantity,
-            unit_price=line.unitPrice,
-            subtotal=line.subtotal,
-            discount_id=line.discountId,
-        )
-        for line in record.lines
-    ]
+    lines = [_line_to_domain(line) for line in record.lines]
     return Order(
         id=record.id,
         status=OrderState(_enum_value(record.status)),
@@ -149,6 +208,39 @@ def _to_domain(record) -> Order:
         confirmed_at=record.confirmedAt,
         created_at=record.createdAt,
         lines=lines,
+    )
+
+
+def _line_to_domain(line) -> OrderLine:
+    modifiers = [
+        OrderLineModifier(
+            id=m.id,
+            order_line_id=line.id,
+            modifier_option_id=m.modifierOptionId,
+            option_name_snapshot=m.optionNameSnapshot,
+            price_delta=Decimal(str(m.priceDelta)) if m.priceDelta is not None else None,
+        )
+        for m in (line.modifiers or [])
+    ]
+    removed_ingredients = [
+        OrderLineRemovedIngredient(
+            id=r.id,
+            order_line_id=line.id,
+            ingredient_id=r.ingredientId,
+            ingredient_name_snapshot=r.ingredientNameSnapshot,
+        )
+        for r in (line.removedIngredients or [])
+    ]
+    return OrderLine(
+        id=line.id,
+        order_id=line.orderId,
+        product_variant_id=line.productVariantId,
+        quantity=line.quantity,
+        unit_price=line.unitPrice,
+        subtotal=line.subtotal,
+        discount_id=line.discountId,
+        modifiers=modifiers,
+        removed_ingredients=removed_ingredients,
     )
 
 

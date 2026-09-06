@@ -49,6 +49,24 @@ from modules.catalog.infrastructure.adapters.driven.prisma.product_repository im
 from shared.infrastructure.uuid_generator import UuidGenerator
 
 
+
+from modules.catalog.infrastructure.adapters.driven.prisma.variant_repository import PrismaVariantRepository
+from modules.catalog.infrastructure.adapters.driven.prisma.ingredient_repository import PrismaIngredientRepository
+from modules.catalog.infrastructure.adapters.driven.prisma.variant_ingredient_repository import PrismaVariantIngredientRepository
+from modules.catalog.infrastructure.adapters.driven.prisma.modifier_repository import PrismaModifierRepository
+
+from modules.catalog.application.use_cases.create_variant_use_case import CreateVariantUseCase
+from modules.catalog.application.use_cases.update_variant_use_case import UpdateVariantUseCase
+from modules.catalog.application.use_cases.set_variant_price_use_case import SetVariantPriceUseCase
+from modules.catalog.application.use_cases.create_ingredient_use_case import CreateIngredientUseCase
+from modules.catalog.application.use_cases.update_ingredient_use_case import UpdateIngredientUseCase
+from modules.catalog.application.use_cases.list_ingredients_use_case import ListIngredientsUseCase
+from modules.catalog.application.use_cases.set_variant_ingredients_use_case import SetVariantIngredientsUseCase
+from modules.catalog.application.use_cases.create_modifier_group_use_case import CreateModifierGroupUseCase
+from modules.catalog.application.use_cases.update_modifier_group_use_case import UpdateModifierGroupUseCase
+from modules.catalog.application.use_cases.create_modifier_option_use_case import CreateModifierOptionUseCase
+from modules.catalog.application.use_cases.update_modifier_option_use_case import UpdateModifierOptionUseCase
+
 class CatalogContainer:
     def __init__(self) -> None:
         products = PrismaProductRepository()
@@ -56,8 +74,9 @@ class CatalogContainer:
         categories = PrismaCategoryRepository()
         discounts = PrismaDiscountRepository()
         id_generator = UuidGenerator()
+        variants = PrismaVariantRepository()
 
-        self.create_product = CreateProductUseCase(products, categories, id_generator)
+        self.create_product = CreateProductUseCase(product_repo=products, category_repo=categories, id_generator=id_generator, variant_repo=variants)
         self.delete_product = DeleteProductUseCase(products)
         self.set_product_state = SetProductStateUseCase(products)
         self.add_price = AddPriceUseCase(products, prices, id_generator)
