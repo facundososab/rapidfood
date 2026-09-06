@@ -99,6 +99,38 @@ class HttpRapidfoodClient(RapidfoodClient):
         raise RuntimeError(message)
 
     # -- mappers (JSON -> DTO) ---------------------------------------------
+
+    def _price(self, d) -> Optional[dtos.Price]:
+        if not d:
+            return None
+        return dtos.Price(id=d["id"], productId=d.get("product_id"),
+                          price=_dec(d["price"]), sinceDate=_parse_dt(d["since_date"]))
+
+    def _ingredient(self, d) -> Optional[dtos.Ingredient]:
+        if not d:
+            return None
+        return dtos.Ingredient(id=d["id"], name=d["name"])
+
+    def _variant(self, d) -> Optional[dtos.Variant]:
+        if not d:
+            return None
+        return dtos.Variant(id=d["id"], name=d["name"], available=d.get("available", True),
+                            currentPrice=_dec(d.get("current_price")),
+                            ingredients=[self._ingredient(i) for i in d.get("ingredients", []) if i])
+
+    def _modifier_option(self, d) -> Optional[dtos.ModifierOption]:
+        if not d:
+            return None
+        return dtos.ModifierOption(id=d["id"], name=d["name"], priceDelta=_dec(d.get("price_delta")),
+                                   available=d.get("available", True))
+
+    def _modifier_group(self, d) -> Optional[dtos.ModifierGroup]:
+        if not d:
+            return None
+        return dtos.ModifierGroup(id=d["id"], name=d["name"], minSelections=d.get("min_selections", 0),
+                                  maxSelections=d.get("max_selections", 1),
+                                  options=[self._modifier_option(o) for o in d.get("options", []) if o])
+
     def _client(self, d) -> Optional[dtos.Client]:
         if not d:
             return None

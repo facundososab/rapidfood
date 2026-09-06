@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from modules.catalog.configuration.container import get_app_catalog_container
+from modules.catalog.configuration.container import get_catalog_container
 from modules.catalog.application.ports.driver.create_variant_ports import CreateVariantCommand
 from modules.catalog.application.ports.driver.update_variant_ports import UpdateVariantCommand
 from modules.catalog.application.ports.driver.set_variant_price_ports import SetVariantPriceCommand

@@ -44,6 +44,15 @@ urlpatterns = [
     path("productos/<str:product_id>/disponibilidad/", products.toggle_availability, name="product_toggle"),
     path("productos/<str:product_id>/precio/", products.add_price, name="product_add_price"),
 
+    path("productos/<str:product_id>/variantes/guardar/", products.variant_save, name="product_variant_save"),
+    path("productos/<str:product_id>/opcionales/guardar/", products.modifier_group_save, name="product_modifier_group_save"),
+    path("ingredientes/guardar/", products.ingredient_save, name="ingredient_save"),
+
+    path("variantes/<str:variant_id>/ingredientes/guardar/", products.variant_ingredients_save, name="product_variant_ingredients_save"),
+
+    path("opcionales/<str:group_id>/opcion/guardar/", products.modifier_option_save, name="product_modifier_option_save"),
+
+
     # Payments
     path("pagos/", payments.index, name="payments"),
     path("pagos/tabla/", payments.table, name="payments_table"),

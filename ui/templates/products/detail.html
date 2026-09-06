@@ -7,135 +7,238 @@
 </a>
 {% endblock %}
 {% block content %}
-<div class="max-w-2xl space-y-4" x-data="{ priceModal: false, historyModal: false, options: false }" @keydown.escape.window="options = false">
+<div class="max-w-4xl mx-auto space-y-6" x-data="{ currentTab: 'general', variantModal: false, modifierModal: false, optionModal: false, selectedGroupId: '', ingredientModal: false, selectedVariantId: '', currentIngredients: [] }" @keydown.escape.window="variantModal = false; modifierModal = false; optionModal = false; ingredientModal = false">
 
-  <div class="card overflow-hidden">
-    {% if product.imageUrl %}
-      <img src="{{ product.imageUrl }}" referrerpolicy="no-referrer" onerror="this.style.display='none'"
-           class="h-48 w-full object-cover bg-muted" alt="Foto de {{ product.name }}">
-    {% endif %}
-    <div class="p-5">
-    <div class="relative flex items-center justify-between gap-3 mb-4 border-b border-line pb-3">
-      <span class="badge {% if product.available %}bg-success-soft text-success{% else %}bg-neutral-soft text-neutral{% endif %}">
-        <span class="badge-dot {% if product.available %}bg-success{% else %}bg-neutral{% endif %}"></span>
-        {{ product.available|yesno:'Disponible,No disponible' }}
-      </span>
-      <button type="button" class="btn btn-ghost shrink-0" @click="options = !options" aria-haspopup="true" :aria-expanded="options.toString()" :aria-label="'Ver opciones para ' + '{{ product.name|escapejs }}'">
-        {% include 'components/icon.html' with name='more-vertical' cls='w-4 h-4' %}
-        <span>Ver opciones</span>
-      </button>
-      <div x-show="options" x-transition.opacity @click.outside="options = false" style="display:none" role="menu" aria-label="Opciones del producto"
-           class="absolute right-0 top-full mt-1 w-56 card p-1 z-40 shadow-lg">
-        <form method="post" action="{% url 'product_toggle' product.id %}">
-          {% csrf_token %}
-          <button type="submit" role="menuitem" class="w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-ink hover:bg-subtle transition-colors cursor-pointer">
-            {{ product.available|yesno:'Marcar como no disponible,Marcar como disponible' }}
-          </button>
-        </form>
-        <a href="{% url 'product_edit' product.id %}" role="menuitem"
-           class="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-ink hover:bg-subtle transition-colors">
-          {% include 'components/icon.html' with name='settings' cls='w-4 h-4 text-ink-muted' %}
-          Editar producto
-        </a>
-        <form method="post" action="{% url 'product_delete' product.id %}" onsubmit="return confirm('¿Eliminar «{{ product.name|escapejs }}»? Esta acción no se puede deshacer.')">
-          {% csrf_token %}
-          <button type="submit" role="menuitem"
-                  class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-danger hover:bg-subtle transition-colors cursor-pointer">
-            {% include 'components/icon.html' with name='trash' cls='w-4 h-4' %}
-            Eliminar producto
-          </button>
-        </form>
-      </div>
+  <div class="flex items-end justify-between border-b border-line pb-4">
+    <div>
+      <h1 class="font-display font-bold text-2xl text-ink">{{ product.name }}</h1>
+      <p class="text-sm text-ink-muted mt-1">{{ product.category.description }}</p>
     </div>
-    <div class="grid sm:grid-cols-2 gap-4">
-      <div>
-        <label for="product-name" class="th block mb-1.5">Nombre</label>
-        <input id="product-name" class="field" value="{{ product.name }}" disabled>
-      </div>
-      <div>
-        <label for="product-category" class="th block mb-1.5">Categoría</label>
-        <input id="product-category" class="field" value="{{ product.category.description }}" disabled>
-      </div>
-    </div>
-    <div class="mt-4">
-      <label for="product-description" class="th block mb-1.5">Descripción</label>
-      <textarea id="product-description" class="field resize-none" rows="3" disabled>{{ product.description }}</textarea>
-    </div>
+    <div class="flex gap-2">
+      <form method="post" action="{% url 'product_toggle' product.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost text-[13px]">
+          {% if product.available %}Desactivar{% else %}Activar{% endif %}
+        </button>
+      </form>
+      <a href="{% url 'product_edit' product.id %}" class="btn btn-ghost text-[13px]">Editar</a>
     </div>
   </div>
 
-  <section class="card p-4 flex flex-col">
-    <div class="th">Precio vigente</div>
-    {% if current_price %}
-      <div class="mt-1.5 font-display font-bold text-[24px] leading-none tnum text-ink">{{ current_price|money }}</div>
-      {% if history %}
-        <div class="mt-1 text-[12px] text-ink-muted">Vigente desde el {{ history.0.sinceDate|date_fmt }}</div>
-      {% endif %}
-    {% else %}
-      <div class="mt-1.5 text-[13px] text-ink-muted">Este producto aún no tiene un precio cargado.</div>
-    {% endif %}
-    <div class="mt-3 border-t border-line pt-3 flex flex-wrap gap-2">
-      <button type="button" class="btn btn-primary" @click="priceModal = true">Agregar precio</button>
-      <button type="button" class="btn btn-ghost" @click="historyModal = true">
-        Ver historial
-        {% if history %}<span class="badge bg-subtle text-ink-soft">{{ history|length }}</span>{% endif %}
-      </button>
-    </div>
-  </section>
+  <!-- Tabs -->
+  <div class="flex border-b border-line gap-6">
+    <button type="button" @click="currentTab = 'general'"
+            :class="currentTab === 'general' ? 'border-primary text-ink' : 'border-transparent text-ink-muted'"
+            class="pb-2.5 border-b-2 text-[14px] font-medium transition-colors hover:text-ink">
+      General
+    </button>
+    <button type="button" @click="currentTab = 'variants'"
+            :class="currentTab === 'variants' ? 'border-primary text-ink' : 'border-transparent text-ink-muted'"
+            class="pb-2.5 border-b-2 text-[14px] font-medium transition-colors hover:text-ink">
+      Variantes y Precios
+    </button>
+    <button type="button" @click="currentTab = 'modifiers'"
+            :class="currentTab === 'modifiers' ? 'border-primary text-ink' : 'border-transparent text-ink-muted'"
+            class="pb-2.5 border-b-2 text-[14px] font-medium transition-colors hover:text-ink">
+      Ingredientes y Opcionales
+    </button>
+  </div>
 
-  <div x-show="priceModal" x-transition.opacity @keydown.escape.window="priceModal = false"
-       class="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm grid place-items-center p-4" @click.self="priceModal = false"
-       style="display:none" role="dialog" aria-modal="true" aria-label="Agregar precio">
-    <div class="card w-full max-w-sm p-4">
-      <div class="flex items-center justify-between gap-3">
-        <div class="th">Agregar precio</div>
-        <button type="button" class="btn btn-ghost !px-2" @click="priceModal = false" aria-label="Cerrar">
-          {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
-        </button>
+  <!-- Tab: General -->
+  <div x-show="currentTab === 'general'" x-transition.opacity class="space-y-4">
+    <div class="card p-5">
+      <h3 class="th mb-2">Descripción</h3>
+      <p class="text-[14px] text-ink-soft">{{ product.description|default:"Sin descripción" }}</p>
+    </div>
+  </div>
+
+  <!-- Tab: Variants -->
+  <div x-show="currentTab === 'variants'" x-transition.opacity class="space-y-4" style="display: none;">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-display font-medium text-lg">Variantes</h3>
+      <button type="button" class="btn btn-primary text-[13px]" @click="variantModal = true">Nueva Variante</button>
+    </div>
+
+    {% if product.variants %}
+      <div class="grid gap-3">
+        {% for variant in product.variants %}
+          <div class="card p-4 flex justify-between items-center transition-all hover:border-line-heavy">
+            <div>
+              <div class="font-medium text-[15px]">{{ variant.name }}</div>
+              <div class="text-[13px] text-ink-muted mt-0.5">Precio actual: <span class="font-mono">{{ variant.currentPrice|money }}</span></div>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost !px-3 text-[13px]" 
+                      @click="selectedVariantId = '{{ variant.id }}'; currentIngredients = [{% for i in variant.ingredients %}'{{ i.ingredientId }}'{% if not forloop.last %},{% endif %}{% endfor %}]; ingredientModal = true">
+                Ingredientes
+              </button>
+              <button class="btn btn-ghost !px-3" title="Administrar variante">
+                {% include 'components/icon.html' with name='settings' cls='w-4 h-4' %}
+              </button>
+            </div>
+          </div>
+        {% endfor %}
       </div>
-      <form method="post" action="{% url 'product_add_price' product.id %}" class="mt-3">
+    {% else %}
+      {% include 'components/empty_state.html' with title='Sin variantes' message='Este producto no tiene variantes configuradas. Se usará la Default.' %}
+    {% endif %}
+  </div>
+
+  <!-- Tab: Modifiers -->
+  <div x-show="currentTab === 'modifiers'" x-transition.opacity class="space-y-4" style="display: none;">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-display font-medium text-lg">Grupos de Opcionales</h3>
+      <button type="button" class="btn btn-primary text-[13px]" @click="modifierModal = true">Nuevo Grupo</button>
+    </div>
+
+    {% if product.modifierGroups %}
+      <div class="grid gap-4">
+        {% for group in product.modifierGroups %}
+          <div class="card p-4 border-l-4 border-l-primary/50">
+            <div class="flex justify-between items-start mb-3">
+              <div>
+                <div class="font-medium text-[15px]">{{ group.name }}</div>
+                <div class="text-[12px] text-ink-muted">Mín: {{ group.minSelections }} | Máx: {{ group.maxSelections }}</div>
+              </div>
+              <button class="btn btn-ghost !px-2 text-[12px]" @click="selectedGroupId = '{{ group.id }}'; optionModal = true">Agregar opción</button>
+            </div>
+            <div class="space-y-2 mt-3 pt-3 border-t border-line-soft">
+              {% for option in group.options %}
+                <div class="flex justify-between items-center bg-subtle px-3 py-2 rounded-md">
+                  <span class="text-[13px] font-medium">{{ option.name }}</span>
+                  <span class="text-[13px] font-mono text-ink-muted">+{{ option.priceDelta|money }}</span>
+                </div>
+              {% empty %}
+                <span class="text-[12px] text-ink-faint italic">No hay opciones cargadas</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% include 'components/empty_state.html' with title='Sin opcionales' message='Agregá grupos (ej: "Salsas", "Extras") para que el cliente pueda customizar el pedido.' %}
+    {% endif %}
+  </div>
+
+  <!-- Modals -->
+  <div x-show="ingredientModal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid place-items-center p-4"
+       x-transition.opacity style="display: none;">
+    <div class="card w-full max-w-sm p-5" @click.outside="ingredientModal = false">
+      <h3 class="font-display font-bold mb-4">Ingredientes de la Variante</h3>
+      <form method="post" :action="`{% url 'product_variant_ingredients_save' 'VARIANT_ID' %}`.replace('VARIANT_ID', selectedVariantId)">
         {% csrf_token %}
-        <label for="new-price" class="th block mb-1.5">Nuevo precio</label>
-        <input id="new-price" name="price" type="number" min="0" step="0.01" class="field font-mono" placeholder="0.00" required>
-        <p class="mt-2 text-[12px] text-ink-faint">Entra en vigencia desde hoy.</p>
-        <div class="mt-3 flex justify-end gap-2">
-          <button type="button" class="btn btn-ghost" @click="priceModal = false">Cancelar</button>
-          <button class="btn btn-primary">Agregar</button>
+        <div class="flex gap-2 mb-4">
+           <input type="text" id="new_ing_name" class="field flex-1 text-[13px]" placeholder="Crear nuevo (ej. Cebolla)">
+           <button type="button" class="btn btn-secondary text-[13px]" onclick="
+             const name = document.getElementById('new_ing_name').value;
+             if (!name) return;
+             const form = document.createElement('form');
+             form.method = 'post';
+             form.action = '{% url 'ingredient_save' %}';
+             
+             const input = document.createElement('input');
+             input.type = 'hidden';
+             input.name = 'name';
+             input.value = name;
+             form.appendChild(input);
+             
+             const csrf = document.createElement('input');
+             csrf.type = 'hidden';
+             csrf.name = 'csrfmiddlewaretoken';
+             csrf.value = '{{ csrf_token }}';
+             form.appendChild(csrf);
+             
+             document.body.appendChild(form);
+             form.submit();
+           ">Crear</button>
+        </div>
+        <div class="space-y-3 max-h-64 overflow-y-auto pr-2 border-t border-line-soft pt-3">
+          {% for ing in ingredients_list %}
+            <label class="flex items-center justify-between p-2 hover:bg-subtle rounded-md cursor-pointer border border-transparent hover:border-line">
+              <div class="flex items-center gap-2.5">
+                <input type="checkbox" name="ingredients" value="{{ ing.id }}" class="mt-0.5" 
+                       :checked="currentIngredients.includes('{{ ing.id }}')">
+                <span class="text-[14px] font-medium">{{ ing.name }}</span>
+              </div>
+              <label class="flex items-center gap-1 text-[12px] text-ink-muted cursor-pointer" @click.stop>
+                <input type="checkbox" name="removable" value="{{ ing.id }}" checked>
+                Removible
+              </label>
+            </label>
+          {% empty %}
+            <p class="text-[13px] text-ink-muted">No hay ingredientes cargados en el sistema.</p>
+          {% endfor %}
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button type="button" class="btn btn-ghost" @click="ingredientModal = false">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Ingredientes</button>
         </div>
       </form>
     </div>
   </div>
 
-  <div x-show="historyModal" x-transition.opacity @keydown.escape.window="historyModal = false"
-       class="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm grid place-items-center p-4" @click.self="historyModal = false"
-       style="display:none" role="dialog" aria-modal="true" aria-label="Historial de precios">
-    <div class="card w-full max-w-sm overflow-hidden">
-      <div class="px-4 py-3 border-b border-line flex items-center justify-between gap-3">
-        <div class="font-display font-bold">Historial de precios</div>
-        <button type="button" class="btn btn-ghost !px-2" @click="historyModal = false" aria-label="Cerrar">
-          {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
-        </button>
-      </div>
-      {% if history %}
-      <div class="max-h-72 overflow-y-auto">
-        <table class="w-full">
-          <tbody>
-            {% for price in history %}
-              <tr class="border-b border-line last:border-0">
-                <td class="px-4 py-2.5 text-[13px] text-ink-muted whitespace-nowrap">{{ price.sinceDate|date_fmt }}</td>
-                <td class="px-4 py-2.5 text-right font-mono tnum text-ink">{{ price.price|money }}</td>
-                {% if current_price and price.price == current_price %}
-                  <td class="px-4 py-2.5 text-right w-px"><span class="badge bg-primary-soft text-primary">Vigente</span></td>
-                {% endif %}
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-        {% include 'components/empty_state.html' with title='Sin precios registrados' message='Agregá un precio para que los clientes puedan pedir este producto.' %}
-      {% endif %}
+  <div x-show="optionModal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid place-items-center p-4"
+       x-transition.opacity style="display: none;">
+    <div class="card w-full max-w-sm p-5" @click.outside="optionModal = false">
+      <h3 class="font-display font-bold mb-4">Nueva Opción</h3>
+      <form method="post" :action="`{% url 'product_modifier_option_save' 'GROUP_ID' %}`.replace('GROUP_ID', selectedGroupId)">
+        {% csrf_token %}
+        <div class="space-y-3">
+          <input type="text" name="name" class="field w-full" placeholder="Nombre (ej. Queso extra)" required>
+          <input type="number" step="0.01" name="price_delta" class="field w-full font-mono" placeholder="Recargo (ej. 500.00)" required>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button type="button" class="btn btn-ghost" @click="optionModal = false">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
     </div>
   </div>
+
+  <div x-show="modifierModal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid place-items-center p-4"
+       x-transition.opacity style="display: none;">
+    <div class="card w-full max-w-sm p-5" @click.outside="modifierModal = false">
+      <h3 class="font-display font-bold mb-4">Nuevo Grupo Opcional</h3>
+      <form method="post" action="{% url 'product_modifier_group_save' product.id %}">
+        {% csrf_token %}
+        <div class="space-y-3">
+          <input type="text" name="name" class="field w-full" placeholder="Nombre (ej. Salsas)" required>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[12px] text-ink-muted mb-1 block">Mínimo</label>
+              <input type="number" name="min_selections" class="field w-full font-mono" value="0" required>
+            </div>
+            <div>
+              <label class="text-[12px] text-ink-muted mb-1 block">Máximo</label>
+              <input type="number" name="max_selections" class="field w-full font-mono" value="1" required>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button type="button" class="btn btn-ghost" @click="modifierModal = false">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div x-show="variantModal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid place-items-center p-4"
+       x-transition.opacity style="display: none;">
+    <div class="card w-full max-w-sm p-5" @click.outside="variantModal = false">
+      <h3 class="font-display font-bold mb-4">Nueva Variante</h3>
+      <form method="post" action="{% url 'product_variant_save' product.id %}">
+        {% csrf_token %}
+        <div class="space-y-3">
+          <input type="text" class="field w-full" name="name" placeholder="Nombre (ej. Simple, Doble)" required>
+          <input type="number" class="field w-full font-mono" name="initial_price" placeholder="Precio Base" required>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button type="button" class="btn btn-ghost" @click="variantModal = false">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

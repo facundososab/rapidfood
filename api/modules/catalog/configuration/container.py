@@ -75,6 +75,9 @@ class CatalogContainer:
         discounts = PrismaDiscountRepository()
         id_generator = UuidGenerator()
         variants = PrismaVariantRepository()
+        ingredients = PrismaIngredientRepository()
+        variant_ingredients = PrismaVariantIngredientRepository()
+        modifiers = PrismaModifierRepository()
 
         self.create_product = CreateProductUseCase(product_repo=products, category_repo=categories, id_generator=id_generator, variant_repo=variants)
         self.delete_product = DeleteProductUseCase(products)
@@ -82,12 +85,30 @@ class CatalogContainer:
         self.add_price = AddPriceUseCase(products, prices, id_generator)
         self.create_category = CreateCategoryUseCase(categories, id_generator)
         self.set_discount = SetDiscountUseCase(discounts, products, id_generator)
-        self.product_query = ProductQueryUseCase(products, prices)
+        self.product_query = ProductQueryUseCase(
+            product_repo=products,
+            variant_repo=variants,
+            price_repo=prices,
+            variant_ingredient_repo=variant_ingredients,
+            modifier_repo=modifiers
+        )
         self.list_products = ListProductsUseCase(products)
         self.list_prices = ListPricesUseCase(prices)
         self.list_categories = ListCategoriesUseCase(categories)
         self.get_product = GetProductUseCase(products, categories, prices)
         self.update_product = UpdateProductUseCase(products, categories, prices)
+
+        self.create_variant = CreateVariantUseCase(products, variants, prices, id_generator)
+        self.update_variant = UpdateVariantUseCase(variants)
+        self.set_variant_price = SetVariantPriceUseCase(variants, prices, id_generator)
+        self.create_ingredient = CreateIngredientUseCase(ingredients, id_generator)
+        self.update_ingredient = UpdateIngredientUseCase(ingredients)
+        self.list_ingredients = ListIngredientsUseCase(ingredients)
+        self.set_variant_ingredients = SetVariantIngredientsUseCase(variants, ingredients, variant_ingredients)
+        self.create_modifier_group = CreateModifierGroupUseCase(products, modifiers, id_generator)
+        self.update_modifier_group = UpdateModifierGroupUseCase(modifiers)
+        self.create_modifier_option = CreateModifierOptionUseCase(modifiers, id_generator)
+        self.update_modifier_option = UpdateModifierOptionUseCase(modifiers)
 
 @lru_cache(maxsize=1)
 def get_catalog_container() -> CatalogContainer:
