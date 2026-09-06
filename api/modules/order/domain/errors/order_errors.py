@@ -41,3 +41,13 @@ class BusinessClosedError(OrderDomainError):
 class MinimumOrderNotMetError(OrderDomainError):
     """Raised when the order subtotal is below the configured minimum."""
     pass
+
+
+class IngredientNotRemovableError(OrderDomainError):
+    """Raised when a client tries to remove a non-removable ingredient."""
+    pass
+
+
+class ModifierValidationError(OrderDomainError):
+    """Raised when modifier selection violates group rules."""
+    pass

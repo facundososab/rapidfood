@@ -16,8 +16,12 @@ from modules.client.application.ports.driver.update_client_ports import UpdateCl
 from modules.client.application.ports.driver.delete_client_ports import DeleteClientCommand
 from modules.client.application.ports.driver.get_client_ports import GetClientQuery
 from modules.client.application.ports.driver.list_clients_ports import ListClientsQuery
-from modules.client.domain.errors.client_errors import ClientNotFoundError
-
+from modules.client.domain.errors.client_errors import (
+    ClientNotFoundError,
+    ClientDomainError,
+    AddressNotFoundError,
+    AddressNotOwnedByClientError,
+)
 from .serializers import (
     AddressRequestSerializer,
     CreateClientRequestSerializer,
@@ -34,16 +38,20 @@ def _serialize_client(client) -> dict:
     }
 
 
-class ClientListView(APIView):
+class CreateClientView(APIView):
     def post(self, request):
         serializer = CreateClientRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        command = CreateClientCommand(**serializer.validated_data)
-        response = get_app_client_container().create_client.execute(command)
+        try:
+            command = CreateClientCommand(**serializer.validated_data)
+            response = get_app_client_container().create_client.execute(command)
+            return Response(asdict(response), status=status.HTTP_201_CREATED)
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(asdict(response), status=status.HTTP_201_CREATED)
 
+class ListClientsView(APIView):
     def get(self, request):
         search = request.query_params.get("search")
         query = ListClientsQuery(search=search)
@@ -51,49 +59,69 @@ class ClientListView(APIView):
         return Response([_serialize_client(c) for c in clients], status=status.HTTP_200_OK)
 
 
-class ClientDetailView(APIView):
+class GetClientView(APIView):
     def get(self, request, client_id: str):
         query = GetClientQuery(client_id=client_id)
         try:
             client = get_app_client_container().get_client.execute(query)
+            return Response(_serialize_client(client), status=status.HTTP_200_OK)
         except ClientNotFoundError:
             return Response(
-                {"detail": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(_serialize_client(client), status=status.HTTP_200_OK)
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class UpdateClientView(APIView):
     def patch(self, request, client_id: str):
         serializer = UpdateClientRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        command = UpdateClientCommand(client_id=client_id, **serializer.validated_data)
-        response = get_app_client_container().update_client.execute(command)
+        try:
+            command = UpdateClientCommand(client_id=client_id, **serializer.validated_data)
+            response = get_app_client_container().update_client.execute(command)
+            return Response(asdict(response), status=status.HTTP_200_OK)
+        except ClientNotFoundError:
+            return Response(
+                {"error": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(asdict(response), status=status.HTTP_200_OK)
 
+class DeleteClientView(APIView):
     def delete(self, request, client_id: str):
         command = DeleteClientCommand(client_id=client_id)
         try:
             get_app_client_container().delete_client.execute(command)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except ClientNotFoundError:
             return Response(
-                {"detail": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ClientAddressListView(APIView):
+class AddAddressView(APIView):
     def post(self, request, client_id: str):
         serializer = AddressRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        command = AddAddressCommand(client_id=client_id, **serializer.validated_data)
-        response = get_app_client_container().add_address.execute(command)
+        try:
+            command = AddAddressCommand(client_id=client_id, **serializer.validated_data)
+            response = get_app_client_container().add_address.execute(command)
+            return Response(asdict(response), status=status.HTTP_201_CREATED)
+        except ClientNotFoundError:
+            return Response(
+                {"error": "El cliente no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(asdict(response), status=status.HTTP_201_CREATED)
 
-
-class ClientAddressDetailView(APIView):
+class UpdateAddressView(APIView):
     def patch(self, request, client_id: str, address_id: str):
         serializer = AddressRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -101,21 +129,53 @@ class ClientAddressDetailView(APIView):
         data = serializer.validated_data
         data.pop("is_default", None)
 
-        command = UpdateAddressCommand(client_id=client_id, address_id=address_id, **data)
-        response = get_app_client_container().update_address.execute(command)
+        try:
+            command = UpdateAddressCommand(client_id=client_id, address_id=address_id, **data)
+            response = get_app_client_container().update_address.execute(command)
+            return Response(asdict(response), status=status.HTTP_200_OK)
+        except (ClientNotFoundError, AddressNotFoundError):
+            return Response(
+                {"error": "El cliente o la dirección no existen"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except AddressNotOwnedByClientError:
+            return Response(
+                {"error": "La dirección no pertenece a este cliente"}, status=status.HTTP_403_FORBIDDEN
+            )
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(asdict(response), status=status.HTTP_200_OK)
 
+class RemoveAddressView(APIView):
     def delete(self, request, client_id: str, address_id: str):
         command = RemoveAddressCommand(client_id=client_id, address_id=address_id)
-        get_app_client_container().remove_address.execute(command)
+        try:
+            get_app_client_container().remove_address.execute(command)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except (ClientNotFoundError, AddressNotFoundError):
+            return Response(
+                {"error": "El cliente o la dirección no existen"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except AddressNotOwnedByClientError:
+            return Response(
+                {"error": "La dirección no pertenece a este cliente"}, status=status.HTTP_403_FORBIDDEN
+            )
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-class ClientAddressSetDefaultView(APIView):
+class SetDefaultAddressView(APIView):
     def post(self, request, client_id: str, address_id: str):
         command = SetDefaultAddressCommand(client_id=client_id, address_id=address_id)
-        response = get_app_client_container().set_default_address.execute(command)
-
-        return Response(asdict(response), status=status.HTTP_200_OK)
+        try:
+            response = get_app_client_container().set_default_address.execute(command)
+            return Response(asdict(response), status=status.HTTP_200_OK)
+        except (ClientNotFoundError, AddressNotFoundError):
+            return Response(
+                {"error": "El cliente o la dirección no existen"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except AddressNotOwnedByClientError:
+            return Response(
+                {"error": "La dirección no pertenece a este cliente"}, status=status.HTTP_403_FORBIDDEN
+            )
+        except ClientDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

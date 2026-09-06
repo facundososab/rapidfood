@@ -1,29 +1,37 @@
 from django.urls import path
 
 from .views import (
-    ClientAddressDetailView,
-    ClientAddressListView,
-    ClientAddressSetDefaultView,
-    ClientDetailView,
-    ClientListView,
+    AddAddressView,
+    CreateClientView,
+    DeleteClientView,
+    GetClientView,
+    ListClientsView,
+    RemoveAddressView,
+    SetDefaultAddressView,
+    UpdateAddressView,
+    UpdateClientView,
 )
 
 urlpatterns = [
-    path("", ClientListView.as_view(), name="client-list-create"),
-    path("<str:client_id>/", ClientDetailView.as_view(), name="client-detail"),
+    path("", ListClientsView.as_view(), name="client-list"),
+    path("create/", CreateClientView.as_view(), name="client-create"),
+    path("<str:client_id>/", GetClientView.as_view(), name="client-detail"),
+    path("<str:client_id>/update/", UpdateClientView.as_view(), name="client-update"),
+    path("<str:client_id>/delete/", DeleteClientView.as_view(), name="client-delete"),
+    path("<str:client_id>/addresses/", AddAddressView.as_view(), name="client-address-create"),
     path(
-        "<str:client_id>/addresses/",
-        ClientAddressListView.as_view(),
-        name="client-address-list-create",
+        "<str:client_id>/addresses/<str:address_id>/update/",
+        UpdateAddressView.as_view(),
+        name="client-address-update",
     ),
     path(
-        "<str:client_id>/addresses/<str:address_id>/",
-        ClientAddressDetailView.as_view(),
-        name="client-address-detail",
+        "<str:client_id>/addresses/<str:address_id>/remove/",
+        RemoveAddressView.as_view(),
+        name="client-address-remove",
     ),
     path(
         "<str:client_id>/addresses/<str:address_id>/set-default/",
-        ClientAddressSetDefaultView.as_view(),
+        SetDefaultAddressView.as_view(),
         name="client-address-set-default",
     ),
 ]
