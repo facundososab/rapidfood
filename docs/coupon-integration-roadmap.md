@@ -12,23 +12,20 @@
 - `validate`/`consume` quedaron **internos** (no expuestos por HTTP), disponibles
   vía los puertos `ValidateCouponPort` / `ConsumeCouponPort` para consumo in-process.
 
-## 2. Decisiones pendientes
+## 2. Decisiones
 
-### 2.1 Modelo de usos (por persona vs global)
+### 2.1 Modelo de usos — RESUELTO
 
-- Hoy el dominio usa `available_uses` como contador **global** (RN-06).
-- El negocio se inclina a **usos por persona** (por cliente).
-- Implicancias si es por persona:
-  - Reemplazar el contador global por usos trackeados por cliente.
-  - Derivar los usos de `AppliedCoupon` + `Order.clientId`, o agregar una tabla
-    de usos por cliente.
-  - Cambiar dominio (`consume_use`), schema (`Coupon.availableUses`) y el contrato
-    `ConsumeCouponCommand` (que hoy solo recibe `coupon_code`).
+- `available_uses` es **opcional**: `None` = cupón ilimitado (cada cliente puede
+  usarlo sin límite), `N` = contador global que se descuenta y agota en 0.
+- **Sin** límite por cliente (cupón no nominal): se descartó la tabla de usos por
+  cliente por complejidad innecesaria.
 
-### 2.2 Consumo atómico
+### 2.2 Consumo atómico — pendiente
 
-- Recién cuando el modelo de usos esté cerrado. Hoy el consumo es read-modify-write
-  no atómico (race condition). Opciones: decremento condicional Prisma o transacción.
+- El consumo (`consume_use`) sigue siendo read-modify-write no atómico. Recién
+  aplica cuando `order` consuma cupones en BORRADOR→PENDIENTE. Opciones:
+  decremento condicional Prisma o transacción.
 
 ## 3. Contratos cross-module (order ↔ config_coupon)
 
@@ -51,8 +48,8 @@
 
 ## 6. Pasos sugeridos de continuación
 
-1. Cerrar la decisión del modelo de usos (2.1).
-2. Ajustar dominio + schema + contrato de consumo según esa decisión.
+1. ~~Cerrar la decisión del modelo de usos (2.1)~~ ✅ hecho.
+2. ~~Ajustar dominio + schema + contrato de consumo~~ ✅ hecho.
 3. Escribir el adapter `order → config_coupon` y reemplazar `FakeCouponQuery`.
 4. Definir y persistir el snapshot `AppliedCoupon`.
 5. Implementar consumo atómico.

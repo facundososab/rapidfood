@@ -29,7 +29,7 @@ Fuente: entrevista con el cliente + `docs/reglas-negocio.md` + `docs/req-funcion
 | RN-03 | `FIXED_AMOUNT` **requiere** `min_order_amount`. | `domain/models/coupon.py` — validación en constructor |
 | RN-04 | El descuento se aplica sobre el **subtotal** (el envío se suma después). | `validate_coupon_use_case.py` |
 | RN-05 | Un cupón por pedido (regla de `order`, no de cupones — no implementada aquí). | Fuera de scope; la consume el módulo `order` |
-| RN-06 | `available_uses` es un contador **global** de usos del cupón. | `domain/models/coupon.py` — `consume_use` |
+| RN-06 | `available_uses` es un contador **global opcional** (`None` = ilimitado). | `domain/models/coupon.py` — `consume_use` |
 | RN-07 | El consumo se produce en la transición `BORRADOR -> PENDIENTE` del pedido. | `consume_coupon_use_case.py` (lo invoca `order`) |
 | RN-08 | Vencimiento al **fin del día** 23:59:59. | `domain/models/coupon.py` — `validate_applicable` |
 | RN-09 | Flag administrativo `is_active` (activar/pausar cupón). | `toggle_coupon_status_use_case.py` |

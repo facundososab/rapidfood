@@ -133,3 +133,16 @@ class TestValidateCoupon:
         uc.execute(ValidateCouponCommand("OFERTA10", Decimal("1000")))
 
         assert repo.find_by_code("OFERTA10").available_uses == 100
+
+    def test_unlimited_coupon_validates_and_returns_none_uses(self) -> None:
+        coupon = Coupon(
+            coupon_code=CouponCode("ABIERTO"),
+            coupon_type=CouponType.PERCENTAGE,
+            amount=Decimal("10"),
+        )
+        uc, _ = self._setup(coupon)
+
+        result = uc.execute(ValidateCouponCommand("ABIERTO", Decimal("1000")))
+
+        assert result.discount_amount == Decimal("100.00")
+        assert result.available_uses is None

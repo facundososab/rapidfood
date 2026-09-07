@@ -5,9 +5,10 @@ Encapsulates all coupon business rules agreed with the business owner:
 - ``FIXED_AMOUNT`` coupons require a minimum order amount (RN interview Q1)
   and can never discount more than the subtotal (total never goes negative).
 - ``PERCENTAGE`` coupons have NO discount cap (Q1).
-- ``available_uses`` is a GLOBAL counter (Q2); per-client limits are a future
-  refinement. Uses are consumed when the order leaves BORRADOR -> PENDIENTE,
-  NOT when the coupon is merely applied to a draft (Q2).
+- ``available_uses`` is an OPTIONAL global counter: ``None`` means the coupon is
+  unlimited (every client can use it, nothing is decremented); an integer is a
+  global use budget consumed when the order leaves BORRADOR -> PENDIENTE (Q2).
+  Coupons are NEVER bound to a single client (no per-client limit).
 - Coupons expire at the END of the day (23:59:59) of ``date_of_expiration`` (Q4).
 - ``is_active`` is an explicit pause/activate flag (Q4).
 - One coupon per order and "discount applies to subtotal, shipping added
@@ -46,8 +47,8 @@ class Coupon:
         coupon_code: normalized unique code.
         coupon_type: FIXED_AMOUNT or PERCENTAGE.
         amount: fixed amount or percentage value.
+        available_uses: remaining global uses (counter). ``None`` = unlimited.
         min_order_amount: required subtotal minimum for FIXED_AMOUNT coupons.
-        available_uses: remaining GLOBAL uses (counter).
         date_of_expiration: last day the coupon is valid (end of that day).
         is_active: administrative pause flag.
     """
@@ -55,7 +56,7 @@ class Coupon:
     coupon_code: CouponCode
     coupon_type: CouponType
     amount: Decimal
-    available_uses: int
+    available_uses: int | None = None
     min_order_amount: Decimal | None = None
     date_of_expiration: datetime | None = None
     is_active: bool = True
@@ -75,7 +76,7 @@ class Coupon:
                 raise InvalidCouponAmountError(
                     "Minimum order amount cannot be negative"
                 )
-        if self.available_uses < 0:
+        if self.available_uses is not None and self.available_uses < 0:
             raise InvalidCouponUsesError("Available uses cannot be negative")
 
     @property
@@ -85,6 +86,11 @@ class Coupon:
     @property
     def is_percentage(self) -> bool:
         return self.coupon_type is CouponType.PERCENTAGE
+
+    @property
+    def is_unlimited(self) -> bool:
+        """True when there is no global use counter (available_uses is None)."""
+        return self.available_uses is None
 
     def is_expired(self, current_datetime: datetime) -> bool:
         """True if ``current_datetime`` is past the coupon's last valid day.
@@ -105,13 +111,13 @@ class Coupon:
 
         Raises the FIRST violated rule:
         1. inactive (paused)
-        2. depleted (no global uses left)
+        2. depleted (no global uses left; skipped when unlimited)
         3. expired (past end of expiration day)
         4. fixed-amount minimum order not reached
         """
         if not self.is_active:
             raise CouponInactiveError(self.coupon_code.value)
-        if self.available_uses <= 0:
+        if self.available_uses is not None and self.available_uses <= 0:
             raise CouponDepletedError(self.coupon_code.value)
         if self.is_expired(current_datetime):
             raise CouponExpiredError(self.coupon_code.value)
@@ -139,20 +145,22 @@ class Coupon:
     def validate_consumable(self, current_datetime: datetime) -> None:
         """Validate the coupon can still be CONSUMED at confirmation time.
 
-        Checks active, not expired, and remaining uses. The min-order check is
-        NOT repeated here: it was validated against the real subtotal at draft
-        time (ValidateCouponUseCase) and the discount is frozen in the order's
-        applied_coupon snapshot (RN-033/034).
+        Checks active, not expired, and remaining uses (skipped when unlimited).
+        The min-order check is NOT repeated here: it was validated against the
+        real subtotal at draft time (ValidateCouponUseCase) and the discount is
+        frozen in the order's applied_coupon snapshot (RN-033/034).
         """
         if not self.is_active:
             raise CouponInactiveError(self.coupon_code.value)
-        if self.available_uses <= 0:
+        if self.available_uses is not None and self.available_uses <= 0:
             raise CouponDepletedError(self.coupon_code.value)
         if self.is_expired(current_datetime):
             raise CouponExpiredError(self.coupon_code.value)
 
     def consume_use(self) -> None:
-        """Decrement the global use counter (called on BORRADOR -> PENDIENTE)."""
+        """Decrement the global use counter (no-op for unlimited coupons)."""
+        if self.available_uses is None:
+            return
         if self.available_uses <= 0:
             raise CouponDepletedError(self.coupon_code.value)
         self.available_uses -= 1

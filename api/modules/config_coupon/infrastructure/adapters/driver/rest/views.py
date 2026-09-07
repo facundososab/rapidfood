@@ -55,7 +55,7 @@ class CreateCouponView(APIView):
                     coupon_code=data["coupon_code"],
                     coupon_type=data["coupon_type"],
                     amount=data["amount"],
-                    available_uses=data["available_uses"],
+                    available_uses=data.get("available_uses"),
                     min_order_amount=data.get("min_order_amount"),
                     date_of_expiration=data.get("date_of_expiration"),
                     is_active=data.get("is_active", True),

@@ -46,7 +46,7 @@ class ValidateCouponResponse:
     coupon_type: str
     amount: Decimal
     discount_amount: Decimal
-    available_uses: int
+    available_uses: int | None
     date_of_expiration: datetime | None
 
 
@@ -68,7 +68,7 @@ class ConsumeCouponCommand:
 @dataclass(frozen=True, slots=True)
 class ConsumeCouponResponse:
     coupon_code: str
-    remaining_uses: int
+    remaining_uses: int | None
 
 
 class ConsumeCouponPort(Protocol):

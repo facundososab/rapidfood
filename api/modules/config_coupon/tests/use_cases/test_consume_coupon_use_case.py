@@ -92,3 +92,11 @@ class TestConsumeCoupon:
         result = uc.execute(ConsumeCouponCommand("OFERTA10"))
 
         assert result.remaining_uses == 2
+
+    def test_unlimited_coupon_consume_is_noop(self) -> None:
+        uc, repo = self._setup(_coupon(available_uses=None))
+
+        result = uc.execute(ConsumeCouponCommand("OFERTA10"))
+
+        assert result.remaining_uses is None
+        assert repo.find_by_code("OFERTA10").available_uses is None
