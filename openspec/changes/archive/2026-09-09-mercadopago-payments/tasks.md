@@ -22,24 +22,24 @@ Strict TDD: each RED task adds/records a failing focused `uv run pytest ...`; ea
 
 ## Phase 4: Mercado Pago Adapter
 
-- [ ] 4.1 RED: add adapter tests for status mapping, settings/env defaults, SDK create/get calls, SDK error translation, and signature validation boundary.
-- [ ] 4.2 GREEN: add `mercadopago` via `uv`; implement `infrastructure/adapters/driven/mercadopago/{mercadopago_settings.py,mercadopago_status_mapper.py,mercadopago_payment_provider.py,errors.py}`.
+- [x] 4.1 RED: add adapter tests for status mapping, settings/env defaults, SDK create/get calls, SDK error translation, and signature validation boundary.
+- [x] 4.2 GREEN: add `mercadopago` via `uv`; implement `infrastructure/adapters/driven/mercadopago/{mercadopago_settings.py,mercadopago_status_mapper.py,mercadopago_payment_provider.py,errors.py}`.
 
 ## Phase 5: Webhook Use Case and Idempotency
 
-- [ ] 5.1 RED: add `test_process_payment_notification_use_case.py` for provider-authoritative lookup before mutation, approved pays order, non-approved stays pending, duplicates no-op.
-- [ ] 5.2 GREEN: implement `application/use_cases/process_payment_notification_use_case.py` using payment lookup by external id, preference id, or external reference.
+- [x] 5.1 RED: add `test_process_payment_notification_use_case.py` for provider-authoritative lookup before mutation, approved pays order, non-approved stays pending, duplicates no-op.
+- [x] 5.2 GREEN: implement `application/use_cases/process_payment_notification_use_case.py` using payment lookup by external id, preference id, or external reference.
 
 ## Phase 6: DRF Driver and Routes
 
-- [ ] 6.1 RED: add REST tests for `POST /api/orders/{order_id}/payment-link/`, webhook success, invalid signature rejection, and views delegating only.
-- [ ] 6.2 GREEN: update `rest/{serializers.py,views.py,urls.py}` with payment-link serializer/view and Mercado Pago webhook serializer/view/signature validator.
+- [x] 6.1 RED: add REST tests for `POST /api/orders/{order_id}/payment-link/`, webhook success, invalid signature rejection, and views delegating only.
+- [x] 6.2 GREEN: update `rest/{serializers.py,views.py,urls.py}` with payment-link serializer/view and Mercado Pago webhook serializer/view/signature validator.
 
 ## Phase 7: Composition and Architecture Gate
 
-- [ ] 7.1 RED: test `api/modules/order/configuration/container.py` exposes payment use cases wired explicitly.
-- [ ] 7.2 GREEN: wire `PaymentRepository`, Mercado Pago provider, and use cases in order container and `api/composition/container.py`; no service locator.
-- [ ] 7.3 Update `[tool.importlinter]` in `pyproject.toml`: fix actual driver/driven paths and forbid `mercadopago` in domain/application.
+- [x] 7.1 RED: test `api/modules/order/configuration/container.py` exposes payment use cases wired explicitly.
+- [x] 7.2 GREEN: wire `PaymentRepository`, Mercado Pago provider, and use cases in order container and `api/composition/container.py`; no service locator.
+- [x] 7.3 Update `[tool.importlinter]` in `pyproject.toml`: fix actual driver/driven paths and forbid `mercadopago` in domain/application.
 
 ## Phase 8: Deferred Conversation Integration (later phase)
 

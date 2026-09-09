@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from modules.order.application.use_cases.start_draft_order_use_case import StartDraftOrderUseCase
 from modules.order.application.use_cases.add_line_use_case import AddLineUseCase
@@ -14,13 +14,29 @@ from modules.order.application.use_cases.list_orders_use_case import ListOrdersU
 from modules.order.application.use_cases.update_order_status_use_case import (
     UpdateOrderStatusUseCase,
 )
+from modules.order.application.use_cases.create_payment_link_use_case import (
+    CreatePaymentLinkUseCase,
+)
+from modules.order.application.use_cases.process_payment_notification_use_case import (
+    ProcessPaymentNotificationUseCase,
+)
 from modules.order.application.ports.driven.catalog_query import CatalogQuery
+from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_payment_provider import (
+    MercadoPagoPaymentProvider,
+)
+from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_settings import (
+    MercadoPagoSettings,
+)
 from modules.order.infrastructure.adapters.driven.prisma.order_repository import (
     PrismaOrderRepository,
+)
+from modules.order.infrastructure.adapters.driven.prisma.payment_repository import (
+    PrismaPaymentRepository,
 )
 from modules.order.infrastructure.adapters.driven.fakes.fakes import (
     FakeClientQuery, FakeCatalogQuery, FakeBusinessConfigQuery, FakeCouponQuery
 )
+from shared.infrastructure.prisma.db import db
 
 class OrderContainer:
     """
@@ -32,9 +48,16 @@ class OrderContainer:
     via the constructor.
     """
 
-    def __init__(self, catalog_query: Optional[CatalogQuery] = None):
+    def __init__(
+        self,
+        catalog_query: Optional[CatalogQuery] = None,
+        prisma_client: Optional[Any] = None,
+    ):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
+        self.payment_repository = PrismaPaymentRepository(prisma_client or db.client)
+        self.mercadopago_settings = MercadoPagoSettings.from_env()
+        self.payment_provider = MercadoPagoPaymentProvider(self.mercadopago_settings)
         self.client_query = FakeClientQuery()
         self.config_query = FakeBusinessConfigQuery()
         self.coupon_query = FakeCouponQuery()
@@ -80,9 +103,22 @@ class OrderContainer:
         self.update_order_status = UpdateOrderStatusUseCase(
             order_repo=self.order_repository
         )
+        self.create_payment_link_use_case = CreatePaymentLinkUseCase(
+            order_repo=self.order_repository,
+            payment_repo=self.payment_repository,
+            payment_provider=self.payment_provider,
+            currency=self.mercadopago_settings.currency,
+        )
+        self.process_payment_notification_use_case = ProcessPaymentNotificationUseCase(
+            order_repo=self.order_repository,
+            payment_repo=self.payment_repository,
+            payment_provider=self.payment_provider,
+        )
 
-# Singleton instance
-_container = OrderContainer()
+_container: OrderContainer | None = None
 
 def get_container() -> OrderContainer:
+    global _container
+    if _container is None:
+        _container = OrderContainer()
     return _container

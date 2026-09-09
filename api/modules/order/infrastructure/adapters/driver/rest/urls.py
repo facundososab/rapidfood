@@ -13,13 +13,17 @@ from .views import (
     AllOrdersView,
     OrderDetailView,
     UpdateOrderStatusView,
+    PaymentLinkView,
+    MercadoPagoWebhookView,
 )
 
 urlpatterns = [
     path('', OrderListView.as_view(), name='order-list'),
     path('all/', AllOrdersView.as_view(), name='order-all'),
     path('draft/', StartDraftOrderView.as_view(), name='start-draft-order'),
+    path('payments/mercadopago/webhook/', MercadoPagoWebhookView.as_view(), name='mercadopago-webhook'),
     path('<uuid:order_id>/', OrderDetailView.as_view(), name='order-detail'),
+    path('<uuid:order_id>/payment-link/', PaymentLinkView.as_view(), name='create-payment-link'),
     path('<uuid:order_id>/status/', UpdateOrderStatusView.as_view(), name='order-status'),
     path('<uuid:order_id>/lines/', AddLineView.as_view(), name='add-line'),
     path('<uuid:order_id>/lines/<uuid:line_id>/', UpdateLineQuantityView.as_view(), name='update-line-quantity'),

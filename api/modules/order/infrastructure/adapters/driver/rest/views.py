@@ -18,12 +18,18 @@ from modules.order.application.ports.driver.list_orders_ports import ListOrdersQ
 from modules.order.application.ports.driver.update_order_status_ports import (
     UpdateOrderStatusCommand,
 )
+from modules.order.application.ports.driver.payment_ports import (
+    CreatePaymentLinkCommand,
+    ProcessPaymentNotificationCommand,
+)
 from modules.order.domain.errors.order_errors import OrderDomainError
 from modules.order.domain.models.order import Order
+from .mercadopago_signature import validate_mercadopago_signature
 from .serializers import (
     StartDraftOrderSerializer, AddLineSerializer, UpdateLineQuantitySerializer,
     SetDeliveryDetailsSerializer, ConfirmOrderSerializer, ApplyCouponSerializer,
-    CancelOrderSerializer, AdvanceStateSerializer, UpdateOrderStatusSerializer
+    CancelOrderSerializer, AdvanceStateSerializer, UpdateOrderStatusSerializer,
+    CreatePaymentLinkSerializer, MercadoPagoWebhookSerializer
 )
 
 
@@ -136,6 +142,62 @@ class UpdateOrderStatusView(APIView):
         except OrderDomainError as e:
             return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
         return Response({"order_id": response.order_id, "status": response.status})
+
+
+class PaymentLinkView(APIView):
+    def post(self, request, order_id):
+        serializer = CreatePaymentLinkSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        container = get_app_container()
+        try:
+            result = container.create_payment_link_use_case.execute(
+                CreatePaymentLinkCommand(order_id=str(order_id))
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "order_id": result.order_id,
+                "payment_id": result.payment_id,
+                "provider": result.provider,
+                "checkout_url": result.checkout_url,
+                "status": result.status,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MercadoPagoWebhookView(APIView):
+    def post(self, request):
+        serializer = MercadoPagoWebhookSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data_id = str(serializer.validated_data["data"]["id"])
+        container = get_app_container()
+        settings = getattr(container, "mercadopago_settings", None)
+        secret = getattr(settings, "webhook_secret", None)
+        if not validate_mercadopago_signature(
+            data_id=data_id,
+            x_request_id=request.headers.get("x-request-id", ""),
+            x_signature=request.headers.get("x-signature", ""),
+            secret=secret,
+        ):
+            return Response({"error": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
+
+        result = container.process_payment_notification_use_case.execute(
+            ProcessPaymentNotificationCommand(
+                provider="MERCADOPAGO",
+                data_id=data_id,
+                topic=serializer.validated_data.get("topic")
+                or serializer.validated_data.get("type", "payment"),
+                raw_payload=dict(request.data),
+                headers=dict(request.headers),
+            )
+        )
+        return Response({"processed": result.processed, "status": result.status})
 
 
 class StartDraftOrderView(APIView):
