@@ -227,3 +227,22 @@ class TestCouponStatus:
         coupon = _make_coupon(is_active=False)
         coupon.activate()
         assert coupon.is_active is True
+
+
+class TestCouponUnlimited:
+    def test_none_available_uses_is_unlimited(self) -> None:
+        coupon = _make_coupon(available_uses=None)
+        assert coupon.is_unlimited is True
+
+    def test_unlimited_validates_without_depletion(self) -> None:
+        coupon = _make_coupon(available_uses=None)
+        coupon.validate_applicable(Decimal("1000"), _utc(2026, 8, 1))  # no raise
+
+    def test_unlimited_consume_is_noop(self) -> None:
+        coupon = _make_coupon(available_uses=None)
+        coupon.consume_use()
+        assert coupon.available_uses is None
+
+    def test_unlimited_is_consumable(self) -> None:
+        coupon = _make_coupon(available_uses=None)
+        coupon.validate_consumable(_utc(2026, 8, 1))  # no raise

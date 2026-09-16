@@ -29,7 +29,7 @@ class CreateCouponCommand:
     coupon_code: str
     coupon_type: str
     amount: Decimal
-    available_uses: int
+    available_uses: int | None = None
     min_order_amount: Decimal | None = None
     date_of_expiration: datetime | None = None
     is_active: bool = True
@@ -41,7 +41,7 @@ class CreateCouponResponse:
     coupon_code: str
     coupon_type: str
     amount: Decimal
-    available_uses: int
+    available_uses: int | None
     min_order_amount: Decimal | None
     date_of_expiration: datetime | None
     is_active: bool
@@ -78,7 +78,7 @@ class CouponSummary:
     coupon_code: str
     coupon_type: str
     amount: Decimal
-    available_uses: int
+    available_uses: int | None
     min_order_amount: Decimal | None
     date_of_expiration: datetime | None
     is_active: bool

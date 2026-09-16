@@ -14,9 +14,9 @@
 | Adapter de entrada (REST/DRF) | ✅ Implementado |
 | Tests unitarios (domain + use cases) | ✅ **65 passing** (ver §6) |
 | Tests de integración (Prisma real) | 🔲 Requiere base del proyecto resincronizada |
-| Enrutado en la app / arranque Django | 🔲 Pendiente (ver §8) |
+| Enrutado en la app / arranque Django | ✅ Hecho — `api/coupons/` (solo admin) |
 
-**El módulo `api/modules/config_coupon/` está terminado y es autocontenido.** Lo que **falta** no es código del módulo, sino la integración con el shell Django de la aplicación, que actualmente está desincronizada del repositorio (ver §8).
+**El módulo `api/modules/config_coupon/` está implementado y autocontenido como panel de administración.** La conexión con el módulo `order` y el modelo definitivo de usos de cupones quedan pendientes (ver `docs/coupon-integration-roadmap.md`).
 
 ## 2. Reglas de negocio modeladas
 
@@ -29,7 +29,7 @@ Fuente: entrevista con el cliente + `docs/reglas-negocio.md` + `docs/req-funcion
 | RN-03 | `FIXED_AMOUNT` **requiere** `min_order_amount`. | `domain/models/coupon.py` — validación en constructor |
 | RN-04 | El descuento se aplica sobre el **subtotal** (el envío se suma después). | `validate_coupon_use_case.py` |
 | RN-05 | Un cupón por pedido (regla de `order`, no de cupones — no implementada aquí). | Fuera de scope; la consume el módulo `order` |
-| RN-06 | `available_uses` es un contador **global** de usos del cupón. | `domain/models/coupon.py` — `consume_use` |
+| RN-06 | `available_uses` es un contador **global opcional** (`None` = ilimitado). | `domain/models/coupon.py` — `consume_use` |
 | RN-07 | El consumo se produce en la transición `BORRADOR -> PENDIENTE` del pedido. | `consume_coupon_use_case.py` (lo invoca `order`) |
 | RN-08 | Vencimiento al **fin del día** 23:59:59. | `domain/models/coupon.py` — `validate_applicable` |
 | RN-09 | Flag administrativo `is_active` (activar/pausar cupón). | `toggle_coupon_status_use_case.py` |
@@ -109,12 +109,12 @@ api/modules/config_coupon/
 
 | Método | Ruta | Descripción | Use case |
 |--------|------|-------------|----------|
-| `POST` | `/coupons/` | Crear cupón (admin) | `create_coupon` |
-| `GET` | `/coupons/list/` | Listar todos los cupones | `list_coupons` |
-| `GET` | `/coupons/by-code/<code>/` | Consultar por código | `get_coupon_by_code` |
-| `PATCH` | `/coupons/<id>/status/` | Activar/desactivar cupón | `toggle_coupon_status` |
-| `POST` | `/coupons/validate/` | Validar contra subtotal (usa `order` en BORRADOR) | `validate_coupon` |
-| `POST` | `/coupons/consume/<code>/` | Consumir un uso (usa `order` BORRADOR→PENDIENTE) | `consume_coupon` |
+| `POST` | `/api/coupons/` | Crear cupón (admin) | `create_coupon` |
+| `GET` | `/api/coupons/list/` | Listar todos los cupones | `list_coupons` |
+| `GET` | `/api/coupons/by-code/<code>/` | Consultar por código | `get_coupon_by_code` |
+| `PATCH` | `/api/coupons/<id>/status/` | Activar/desactivar cupón | `toggle_coupon_status` |
+
+> `validate`/`consume` **NO se exponen por REST**: son operaciones internas (vía puertos) que consume `order` in-process.
 
 Las rutas (`urls.py`) inyectan los use cases desde el container vía `as_view(create_coupon=...)`; las views declaran atributos `create_coupon = None` que el container puebla. **Esto mantiene las views sin dependencias directas de implementación.**
 
@@ -144,24 +144,25 @@ Cubren: invariantes de la entidad, cálculo de descuento, vencimiento 23:59:59, 
 
 ```prisma
 model Coupon {
-  id               String    @id @default(uuid())
-  code             String    @unique
-  type             CouponType
-  amount           Decimal
-  minOrderAmount   Decimal?    // RN-03: requerido para FIXED_AMOUNT
-  availableUses    Int
-  dateOfExpiration DateTime?   // RN-08: vence a las 23:59:59 de ese día
-  isActive         Boolean   @default(true)  // RN-09: flag administrativo
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id               String          @id @default(uuid()) @map("coupon_id") @db.Uuid
+  couponCode       String          @unique @map("coupon_code")
+  type             String          // FIXED_AMOUNT | PERCENTAGE (open vocab)
+  amount           Decimal         @db.Decimal(10, 2)
+  minOrderAmount   Decimal?        @map("min_order_amount") @db.Decimal(10, 2)
+  availableUses    Int             @map("available_uses")
+  dateOfExpiration DateTime?       @map("date_of_expiration")
+  isActive         Boolean         @default(true) @map("is_active")
+  appliedCoupons   AppliedCoupon[]
+
+  @@map("coupon")
 }
 ```
 
 > **IMPORTANTE**: para que el adapter Prisma funcione, hace falta ejecutar `prisma generate` (y `prisma migrate dev`) para regenerar el cliente con los campos `minOrderAmount` e `isActive`. Eso depende del arreglo de la base (ver §8).
 
-## 8. Integración pendiente con la aplicación — PASO A PASO
+## 8. Integración — estado real
 
-> ⚠️ **No se toca código del módulo para esto.** El módulo está terminado. Lo que sigue es trabajo de configuración del repositorio (fuera del alcance de la implementación del módulo), documentado aquí para quien retome el proyecto.
+> ✅ **El enrutado ya está resuelto**: el repo está resincronizado (`manage.py`, `settings.py` → `modules.*`, `pyproject.toml` → `root_package = "modules"`) y los endpoints admin están enrutados en `api/coupons/`. Lo que queda pendiente (conexión con `order`, modelo de usos por persona, consumo atómico, snapshot `AppliedCoupon`) está documentado en `docs/coupon-integration-roadmap.md`. El contenido que sigue (§8.1/§8.2) describe el repo ANTES de la resincronización y queda como histórico.
 
 ### 8.1 Diagnóstico del estado actual
 

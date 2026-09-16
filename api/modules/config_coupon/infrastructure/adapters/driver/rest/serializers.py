@@ -13,7 +13,7 @@ class CreateCouponSerializer(serializers.Serializer):
     coupon_code = serializers.CharField()
     coupon_type = serializers.CharField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    available_uses = serializers.IntegerField(min_value=0)
+    available_uses = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     min_order_amount = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, allow_null=True
     )
@@ -25,8 +25,3 @@ class CreateCouponSerializer(serializers.Serializer):
 
 class ToggleCouponStatusSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
-
-
-class ValidateCouponSerializer(serializers.Serializer):
-    coupon_code = serializers.CharField()
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
