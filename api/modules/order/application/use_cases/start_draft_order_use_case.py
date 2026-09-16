@@ -28,6 +28,7 @@ class StartDraftOrderUseCase(StartDraftOrderPort):
             subtotal=Decimal("0.0"),
             discount=Decimal("0.0"),
             client_id=command.client_id,
+            business_config_id=command.business_config_id,
             conversation_id=command.conversation_id,
             origin=OrderOrigin(command.origin) if command.origin else OrderOrigin.IN_PLACE,
             created_at=datetime.utcnow()

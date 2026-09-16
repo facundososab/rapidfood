@@ -12,23 +12,23 @@ class PrismaPriceRepository(PriceRepositoryPort):
         db.client.price.create(
             data={
                 "id": price.id,
-                "productId": price.product_id,
+                "productVariantId": price.product_variant_id,
                 "sinceDate": datetime.combine(price.since_date, datetime.min.time()),
                 "price": price.price,
             }
         )
 
-    def list_for_product(self, product_id: str) -> list[Price]:
+    def list_for_product(self, product_variant_id: str) -> list[Price]:
         records = db.client.price.find_many(
-            where={"productId": product_id},
+            where={"productVariantId": product_variant_id},
             order={"sinceDate": "desc"},
         )
         return [self._to_domain(record) for record in records]
 
-    def find_current(self, product_id: str, on_date: date) -> Price | None:
+    def find_current(self, product_variant_id: str, on_date: date) -> Price | None:
         records = db.client.price.find_many(
             where={
-                "productId": product_id,
+                "productVariantId": product_variant_id,
                 "sinceDate": {"lte": datetime.combine(on_date, datetime.min.time())},
             },
             order={"sinceDate": "desc"},
@@ -41,7 +41,7 @@ class PrismaPriceRepository(PriceRepositoryPort):
     def _to_domain(record) -> Price:
         return Price(
             id=record.id,
-            product_id=record.productId,
+            product_variant_id=record.productVariantId,
             since_date=record.sinceDate.date(),
             price=record.price,
         )

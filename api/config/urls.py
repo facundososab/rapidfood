@@ -1,4 +1,7 @@
-"""URL routing — Rapidfood."""
+"""URL routing — Rapidfood.
+
+Route layout: ``/health`` plus per-app inbound adapters.
+"""
 
 from django.urls import include, path
 
@@ -11,4 +14,6 @@ urlpatterns = [
     path("api/clients/", include("modules.client.infrastructure.adapters.driver.rest.urls")),
     path("api/orders/", include("modules.order.infrastructure.adapters.driver.rest.urls")),
     path("api/coupons/", include("modules.config_coupon.infrastructure.adapters.driver.rest.urls")),
+    path("api/delivery/", include("modules.delivery.infrastructure.adapters.driver.rest.urls")),
+    path("api/business/", include("modules.business.infrastructure.adapters.driver.rest.urls")),
 ]

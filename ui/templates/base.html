@@ -17,7 +17,7 @@
     {# ---- Sidebar ---- #}
     <aside
       class="fixed inset-y-0 left-0 z-40 w-[260px] bg-surface border-r border-line flex flex-col
-             transition-transform lg:static lg:translate-x-0"
+             transition-transform lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:translate-x-0"
       :class="sidebar ? 'translate-x-0' : '-translate-x-full'">
       <div class="h-16 flex items-center gap-2.5 px-5 border-b border-line">
         <span class="inline-flex items-center justify-center w-8 h-8 rounded-[10px] bg-primary text-white text-sm font-bold">R</span>

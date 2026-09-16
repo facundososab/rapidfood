@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class RemoveLineCommand:
     order_id: str
-    product_id: str
+    line_id: str
 
 
 @dataclass

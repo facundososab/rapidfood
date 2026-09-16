@@ -350,3 +350,46 @@ class MockRapidfoodClient(RapidfoodClient):
             biz.shippingCost = D(str(payload["shippingCost"]))
         biz.availableZone = payload.get("availableZone", biz.availableZone)
         return biz
+
+    def save_business_hours(self, business_config_id: str, hours: list) -> None:
+        biz = self.db.business
+        biz.businessHours = [
+            dtos.BusinessHours(
+                id=self.db.next_id("bh"),
+                openWeekDay=h["openWeekDay"],
+                openFromHour=h["openFromHour"],
+                openToHour=h["openToHour"],
+                businessConfigId=business_config_id
+            )
+            for h in hours
+        ]
+
+    def create_business_address(self, business_config_id: str, payload: dict) -> dtos.Address:
+        new_id = str(uuid.uuid4())
+        address = dtos.Address(
+            id=new_id, street=payload["street"], streetNumber=payload["streetNumber"],
+            city=payload["city"], province=payload["province"],
+            floor=payload.get("floor"), apartment=payload.get("apartment"),
+            postalCode=payload.get("postalCode")
+        )
+        self.mock_business.addresses.append(address)
+        return address
+
+    def update_business_address(self, business_config_id: str, address_id: str, payload: dict) -> dtos.Address:
+        for idx, addr in enumerate(self.mock_business.addresses):
+            if addr.id == address_id:
+                updated = dtos.Address(
+                    id=address_id, street=payload["street"], streetNumber=payload["streetNumber"],
+                    city=payload["city"], province=payload["province"],
+                    floor=payload.get("floor"), apartment=payload.get("apartment"),
+                    postalCode=payload.get("postalCode")
+                )
+                self.mock_business.addresses[idx] = updated
+                return updated
+        raise RuntimeError("Address not found")
+
+    def delete_business_address(self, business_config_id: str, address_id: str) -> None:
+        biz = self.db.business
+        biz.addresses = [a for a in biz.addresses if a.id != address_id]
+
+    # ---- Delivery configuration ------------------------------------------

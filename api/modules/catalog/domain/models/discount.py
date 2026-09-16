@@ -8,6 +8,7 @@ class Discount:
     id: str
     percentage: Decimal
     product_id: Optional[str] = None
+    product_variant_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not (Decimal("0") <= self.percentage <= Decimal("100")):

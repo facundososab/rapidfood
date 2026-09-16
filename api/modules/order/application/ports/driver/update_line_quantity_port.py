@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class UpdateLineQuantityCommand:
     order_id: str
-    product_id: str
+    line_id: str
     quantity: int
 
 

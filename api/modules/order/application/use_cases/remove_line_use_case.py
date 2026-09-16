@@ -1,12 +1,14 @@
 from modules.order.application.ports.driver.remove_line_port import (
-    RemoveLinePort, RemoveLineCommand, RemoveLineResponse
+    RemoveLinePort,
+    RemoveLineCommand,
+    RemoveLineResponse,
 )
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.domain.errors.order_errors import OrderNotFound
 
 
 class RemoveLineUseCase(RemoveLinePort):
-    def __init__(self, order_repo: OrderRepository):
+    def __init__(self, order_repo: OrderRepository) -> None:
         self.order_repo = order_repo
 
     def remove_line(self, command: RemoveLineCommand) -> RemoveLineResponse:
@@ -14,11 +16,11 @@ class RemoveLineUseCase(RemoveLinePort):
         if not order:
             raise OrderNotFound("Order not found")
 
-        order.remove_line(command.product_id)
+        order.remove_line(command.line_id)
         self.order_repo.save(order)
-        
+
         return RemoveLineResponse(
             order_id=order.id,
             total_amount=str(order.total_amount),
-            line_count=len(order.lines)
+            line_count=len(order.lines),
         )

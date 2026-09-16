@@ -58,11 +58,28 @@ def _order_to_dict(order: Order) -> dict:
             {
                 "id": line.id,
                 "order_id": line.order_id,
-                "product_id": line.product_id,
+                "product_variant_id": line.product_variant_id,
                 "quantity": line.quantity,
                 "unit_price": line.unit_price,
                 "subtotal": line.subtotal,
                 "discount_id": line.discount_id,
+                "modifiers": [
+                    {
+                        "id": m.id,
+                        "modifier_option_id": m.modifier_option_id,
+                        "option_name_snapshot": m.option_name_snapshot,
+                        "price_delta": str(m.price_delta) if m.price_delta is not None else None,
+                    }
+                    for m in line.modifiers
+                ],
+                "removed_ingredients": [
+                    {
+                        "id": r.id,
+                        "ingredient_id": r.ingredient_id,
+                        "ingredient_name_snapshot": r.ingredient_name_snapshot,
+                    }
+                    for r in line.removed_ingredients
+                ],
             }
             for line in order.lines
         ],
@@ -146,9 +163,10 @@ class AddLineView(APIView):
         serializer = AddLineSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # We ensure product_id is cast to string correctly if needed, or rely on UUID
         validated = serializer.validated_data.copy()
-        validated['product_id'] = str(validated['product_id'])
+        validated['product_variant_id'] = str(validated['product_variant_id'])
+        validated['modifier_option_ids'] = [str(x) for x in validated.get('modifier_option_ids', [])]
+        validated['removed_ingredient_ids'] = [str(x) for x in validated.get('removed_ingredient_ids', [])]
         
         command = AddLineCommand(
             order_id=str(order_id),
@@ -161,6 +179,7 @@ class AddLineView(APIView):
             return Response(
                 {
                     "order_id": response.order_id,
+                    "line_id": response.line_id,
                     "total_amount": response.total_amount,
                     "line_count": response.line_count
                 },
@@ -171,13 +190,13 @@ class AddLineView(APIView):
 
 
 class UpdateLineQuantityView(APIView):
-    def patch(self, request, order_id, product_id):
+    def patch(self, request, order_id, line_id):
         serializer = UpdateLineQuantitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         command = UpdateLineQuantityCommand(
             order_id=str(order_id),
-            product_id=str(product_id),
+            line_id=str(line_id),
             **serializer.validated_data
         )
         
@@ -249,10 +268,10 @@ class ConfirmOrderView(APIView):
 
 
 class RemoveLineView(APIView):
-    def delete(self, request, order_id, product_id):
+    def delete(self, request, order_id, line_id):
         command = RemoveLineCommand(
             order_id=str(order_id),
-            product_id=str(product_id)
+            line_id=str(line_id)
         )
         container = get_app_container()
         try:

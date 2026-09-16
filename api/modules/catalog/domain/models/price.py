@@ -5,7 +5,7 @@ from decimal import Decimal
 @dataclass(frozen=True)
 class Price:
     id: str
-    product_id: str
+    product_variant_id: str
     since_date: date
     price: Decimal
 

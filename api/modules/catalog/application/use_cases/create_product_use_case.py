@@ -11,20 +11,24 @@ from modules.catalog.application.ports.driven.id_generator_port import IdGenerat
 from modules.catalog.application.ports.driven.product_repository_port import(
     ProductRepositoryPort,
 )
+from modules.catalog.application.ports.driven.variant_repository_port import VariantRepositoryPort
 from modules.catalog.domain.errors.catalog_errors import CategoryNotFoundError
 from modules.catalog.domain.models.product import Product, ProductState
+from modules.catalog.domain.models.product_variant import ProductVariant
 
 
 class CreateProductUseCase(CreateProductPort):
     def __init__(
             self,
-            products: ProductRepositoryPort,
-            categories: CategoryRepositoryPort,
+            product_repo: ProductRepositoryPort,
+            category_repo: CategoryRepositoryPort,
             id_generator: IdGeneratorPort,
+            variant_repo: VariantRepositoryPort,
     ) -> None:
-        self._products = products
-        self._categories = categories
+        self._products = product_repo
+        self._categories = category_repo
         self._id_generator = id_generator
+        self._variants = variant_repo
 
     def execute(self, command: CreateProductCommand) -> CreateProductResponse:
         if self._categories.find_by_id(command.category_id) is None:
@@ -39,6 +43,13 @@ class CreateProductUseCase(CreateProductPort):
             category_id=command.category_id,
         )
         self._products.save(product)
+        
+        variant = ProductVariant(
+            id=self._id_generator.generate(),
+            product_id=product.id,
+            name="Default"
+        )
+        self._variants.save(variant)
 
         return CreateProductResponse(
             id=product.id,

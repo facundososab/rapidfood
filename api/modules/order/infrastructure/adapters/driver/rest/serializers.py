@@ -2,14 +2,21 @@ from rest_framework import serializers
 
 class StartDraftOrderSerializer(serializers.Serializer):
     client_id = serializers.UUIDField(required=False, allow_null=True)
+    business_config_id = serializers.CharField(required=False, allow_null=True)
     conversation_id = serializers.UUIDField(required=False, allow_null=True)
     origin = serializers.ChoiceField(
         choices=["IN_PLACE", "AGENT"], required=False, allow_null=True
     )
 
 class AddLineSerializer(serializers.Serializer):
-    product_id = serializers.UUIDField(required=True)
+    product_variant_id = serializers.UUIDField(required=True)
     quantity = serializers.IntegerField(required=True, min_value=1)
+    modifier_option_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, default=list
+    )
+    removed_ingredient_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, default=list
+    )
 
 class UpdateLineQuantitySerializer(serializers.Serializer):
     quantity = serializers.IntegerField(required=True, min_value=1)
