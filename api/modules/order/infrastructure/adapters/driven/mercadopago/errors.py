@@ -1,0 +1,2 @@
+class PaymentProviderError(Exception):
+    pass

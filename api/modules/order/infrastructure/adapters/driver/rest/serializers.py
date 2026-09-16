@@ -44,3 +44,19 @@ class AdvanceStateSerializer(serializers.Serializer):
 
 class UpdateOrderStatusSerializer(serializers.Serializer):
     status = serializers.CharField()
+
+
+class CreatePaymentLinkSerializer(serializers.Serializer):
+    pass
+
+
+class MercadoPagoWebhookSerializer(serializers.Serializer):
+    type = serializers.CharField(required=False, allow_blank=True, default="payment")
+    topic = serializers.CharField(required=False, allow_blank=True)
+    data = serializers.DictField(required=True)
+
+    def validate(self, attrs):
+        data_id = attrs.get("data", {}).get("id")
+        if not data_id:
+            raise serializers.ValidationError({"data": "data.id is required"})
+        return attrs

@@ -300,17 +300,23 @@ model AppliedCoupon {
 }
 
 model Payment {
-  id         String        @id @default(uuid()) @map("payment_id") @db.Uuid
-  orderId    String        @map("order_id") @db.Uuid
-  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider   String
-  externalId String?       @map("external_id")
-  status     PaymentStatus @default(PENDING)
-  amount     Decimal       @db.Decimal(10, 2)
-  createdAt  DateTime      @default(now()) @map("created_at")
-  updatedAt  DateTime      @updatedAt @map("updated_at")
+  id                String        @id @default(uuid()) @map("payment_id") @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String
+  externalId        String?       @unique @map("external_id")
+  preferenceId      String?       @unique @map("preference_id")
+  checkoutUrl       String?       @map("checkout_url")
+  externalReference String?       @map("external_reference")
+  providerPayload   Json?         @map("provider_payload")
+  expiresAt         DateTime?     @map("expires_at")
+  status            PaymentStatus @default(PENDING)
+  amount            Decimal       @db.Decimal(10, 2)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
 
   @@index([orderId])
+  @@index([externalReference])
   @@map("payment")
 }
 

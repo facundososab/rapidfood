@@ -80,12 +80,25 @@ def _ensure_test_database_exists(test_url: str) -> None:
             )
 
 
+def _reset_test_schema(test_url: str) -> None:
+    """Reset only the dedicated test database before applying migrations."""
+    parsed = urlparse(test_url)
+    dbname = parsed.path.lstrip("/")
+    if not dbname.startswith("test_"):
+        raise RuntimeError(f"Refusing to reset non-test database: {dbname}")
+
+    with psycopg.connect(test_url, autocommit=True, connect_timeout=5) as conn:
+        conn.execute("DROP SCHEMA IF EXISTS public CASCADE")
+        conn.execute("CREATE SCHEMA public")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def prisma_test_db(django_db_setup, django_db_blocker):
     """Create/migrate the Prisma test database once per pytest session."""
     test_url = _test_database_url()
 
     _ensure_test_database_exists(test_url)
+    _reset_test_schema(test_url)
 
     with django_db_blocker.unblock():
         subprocess.run(
