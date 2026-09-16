@@ -44,6 +44,7 @@ def _order_to_dict(order: Order) -> dict:
         "subtotal": order.subtotal,
         "discount": order.discount,
         "client_id": order.client_id,
+        "client_name": order.client_name,
         "address_id": order.address_id,
         "conversation_id": order.conversation_id,
         "estimated_time": order.estimated_time,

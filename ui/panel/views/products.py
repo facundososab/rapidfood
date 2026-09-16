@@ -1,4 +1,6 @@
-from decimal import Decimal
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from django.contrib import messages
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect
 from .common import page,required,int_param
@@ -23,19 +25,22 @@ def save(request, product_id=None):
         'description': request.POST['description'],
         'image_url': request.POST.get('image_url') or None,
         'category_id': request.POST['category_id'],
-        'available': request.POST.get('available') == 'on'
     }
-    
+    # Availability has its own control; only touch it when the form provides it.
+    if 'available' in request.POST:
+        payload['available'] = request.POST.get('available') == 'on'
+
     client = get_client()
-    
+
     if product_id:
         p = client.save_product(payload)
+        messages.success(request, 'Producto actualizado.')
         return redirect('product_detail', product_id=p.id)
     
     # New product creation
     p = client.save_product(payload)
-    product = client.get_product(p.id)
-    default_variant = product.variants[0] if product.variants else None
+    product = required(client.get_product(p.id))
+    default_variant = product.variants[0] if product and getattr(product, 'variants', None) else None
     
     has_variants = request.POST.get('has_variants') == 'true'
     
@@ -63,13 +68,15 @@ def save(request, product_id=None):
     return redirect('product_detail', product_id=p.id)
 
 def toggle_availability(request,product_id):
- p=get_client().get_product(product_id); get_client().set_product_availability(product_id,not p.available); return redirect('product_detail',product_id=product_id)
+ p=required(get_client().get_product(product_id)); get_client().set_product_availability(product_id,not p.available); return redirect('product_detail',product_id=product_id)
 def delete(request,product_id):
  if request.method!='POST': return HttpResponseBadRequest()
  try:
   get_client().delete_product(product_id)
  except Exception as e:
-  return page(request,'products/index.html',{**_list(request),'error':f'No se pudo eliminar el producto: {e}'})
+  messages.error(request, f'No se pudo eliminar el producto: {e}')
+  return redirect('products')
+ messages.success(request, 'Producto eliminado.')
  return redirect('products')
 def add_price(request,product_id):
  if request.method!='POST': return HttpResponseBadRequest()
@@ -78,6 +85,27 @@ def categories(request): return page(request,'products/categories.html',_ctx(req
 def save_category(request):
  if request.method!='POST': return HttpResponseBadRequest()
  get_client().save_category({'description':request.POST['description']}); return redirect('categories')
+
+
+def variant_price_save(request, variant_id):
+    if request.method != 'POST': return HttpResponseBadRequest()
+    back = request.META.get('HTTP_REFERER', 'products')
+    try:
+        price = Decimal(request.POST['price'])
+    except (KeyError, InvalidOperation):
+        messages.error(request, 'Ingresá un precio válido.')
+        return redirect(back)
+    since_date = None
+    raw_date = (request.POST.get('since_date') or '').strip()
+    if raw_date:
+        try:
+            since_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, 'La fecha ingresada no es válida.')
+            return redirect(back)
+    get_client().set_variant_price(variant_id, price, since_date)
+    messages.success(request, 'Precio actualizado.')
+    return redirect(back)
 
 
 def variant_save(request, product_id):
@@ -97,12 +125,36 @@ def modifier_group_save(request, product_id):
     })
     return redirect('product_detail', product_id=product_id)
 
+def modifier_group_update(request, group_id):
+    if request.method != 'POST': return HttpResponseBadRequest()
+    payload = {"min_selections": 1 if request.POST.get("min_selections") else 0}
+    if request.POST.get("name"):
+        payload["name"] = request.POST["name"]
+    if request.POST.get("max_selections"):
+        payload["max_selections"] = int(request.POST["max_selections"])
+    get_client().update_modifier_group(group_id, payload)
+    messages.success(request, 'Grupo actualizado.')
+    return redirect(request.META.get('HTTP_REFERER', 'products'))
+
+def modifier_group_delete(request, group_id):
+    if request.method != 'POST': return HttpResponseBadRequest()
+    get_client().delete_modifier_group(group_id)
+    messages.success(request, 'Grupo eliminado.')
+    return redirect(request.META.get('HTTP_REFERER', 'products'))
+
 def modifier_option_save(request, group_id):
     if request.method != 'POST': return HttpResponseBadRequest()
     get_client().create_modifier_option(group_id, {
         "name": request.POST["name"],
         "price_delta": request.POST["price_delta"]
     })
+    messages.success(request, 'Opción agregada.')
+    return redirect(request.META.get('HTTP_REFERER', 'products'))
+
+def modifier_option_delete(request, option_id):
+    if request.method != 'POST': return HttpResponseBadRequest()
+    get_client().delete_modifier_option(option_id)
+    messages.success(request, 'Opción eliminada.')
     return redirect(request.META.get('HTTP_REFERER', 'products'))
 
 
@@ -120,7 +172,7 @@ def variant_ingredients_save(request, variant_id):
             "removable": ing_id in removable_ids
         })
         
-    get_client().set_variant_ingredients(variant_id, payload)
+    get_client().set_variant_ingredients(variant_id, {"entries": payload})
     return redirect(request.META.get('HTTP_REFERER', 'products'))
 
 

@@ -66,6 +66,8 @@ from modules.catalog.application.use_cases.create_modifier_group_use_case import
 from modules.catalog.application.use_cases.update_modifier_group_use_case import UpdateModifierGroupUseCase
 from modules.catalog.application.use_cases.create_modifier_option_use_case import CreateModifierOptionUseCase
 from modules.catalog.application.use_cases.update_modifier_option_use_case import UpdateModifierOptionUseCase
+from modules.catalog.application.use_cases.delete_modifier_group_use_case import DeleteModifierGroupUseCase
+from modules.catalog.application.use_cases.delete_modifier_option_use_case import DeleteModifierOptionUseCase
 
 class CatalogContainer:
     def __init__(self) -> None:
@@ -109,6 +111,8 @@ class CatalogContainer:
         self.update_modifier_group = UpdateModifierGroupUseCase(modifiers)
         self.create_modifier_option = CreateModifierOptionUseCase(modifiers, id_generator)
         self.update_modifier_option = UpdateModifierOptionUseCase(modifiers)
+        self.delete_modifier_group = DeleteModifierGroupUseCase(modifiers)
+        self.delete_modifier_option = DeleteModifierOptionUseCase(modifiers)
 
 @lru_cache(maxsize=1)
 def get_catalog_container() -> CatalogContainer:

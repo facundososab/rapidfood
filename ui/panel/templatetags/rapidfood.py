@@ -170,3 +170,26 @@ def querystring(request, **kwargs):
             params[key] = value
     encoded = params.urlencode()
     return mark_safe(("?" + encoded) if encoded else "")
+
+
+@register.inclusion_tag("components/icon.html")
+def icon(name, cls=None):
+    """Render an inline icon: {% icon 'package' 'w-5 h-5' %}."""
+    return {"name": name, "cls": cls}
+
+
+@register.inclusion_tag("components/order_status_badge.html")
+def status_badge(status):
+    """Render an order status badge: {% status_badge order.status %}."""
+    return {"status": status}
+
+
+@register.filter
+def sin_label(name) -> str:
+    """Turn a group name into its "none" choice: "Elegí tu dip" -> "Sin dip"."""
+    n = (name or "").strip()
+    for prefix in ("Elegí tu ", "Elegí ", "Elige tu ", "Elige "):
+        if n.lower().startswith(prefix.lower()):
+            n = n[len(prefix):]
+            break
+    return "Sin " + n if n else "Sin"

@@ -88,6 +88,7 @@ def _to_prisma_data(order: Order) -> dict:
         "subtotal": order.subtotal,
         "discount": order.discount,
         "clientId": order.client_id,
+        "clientName": order.client_name,
         "businessConfigId": order.business_config_id,
         "addressId": order.address_id,
         "conversationId": order.conversation_id,
@@ -138,12 +139,10 @@ def _sync_lines(tx, order: Order) -> None:
 
         # Sync OrderLineModifier children
         existing_modifier_ids = [m.id for m in line.modifiers]
-        tx.orderlinemodifier.delete_many(
-            where={
-                "orderLineId": line.id,
-                "id": {"notIn": existing_modifier_ids} if existing_modifier_ids else None,
-            }
-        )
+        modifier_where = {"orderLineId": line.id}
+        if existing_modifier_ids:
+            modifier_where["id"] = {"notIn": existing_modifier_ids}
+        tx.orderlinemodifier.delete_many(where=modifier_where)
         for modifier in line.modifiers:
             tx.orderlinemodifier.upsert(
                 where={"id": modifier.id},
@@ -164,12 +163,10 @@ def _sync_lines(tx, order: Order) -> None:
 
         # Sync OrderLineRemovedIngredient children
         existing_removed_ids = [r.id for r in line.removed_ingredients]
-        tx.orderlineremovedingredient.delete_many(
-            where={
-                "orderLineId": line.id,
-                "id": {"notIn": existing_removed_ids} if existing_removed_ids else None,
-            }
-        )
+        removed_where = {"orderLineId": line.id}
+        if existing_removed_ids:
+            removed_where["id"] = {"notIn": existing_removed_ids}
+        tx.orderlineremovedingredient.delete_many(where=removed_where)
         for removed in line.removed_ingredients:
             tx.orderlineremovedingredient.upsert(
                 where={"id": removed.id},
@@ -195,6 +192,7 @@ def _to_domain(record) -> Order:
         subtotal=record.subtotal,
         discount=record.discount,
         client_id=record.clientId,
+        client_name=record.clientName,
         business_config_id=record.businessConfigId,
         address_id=record.addressId,
         conversation_id=record.conversationId,

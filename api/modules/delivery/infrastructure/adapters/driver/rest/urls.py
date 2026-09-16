@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from modules.delivery.configuration.container import get_delivery_container
+from composition.container import get_app_delivery_container as get_delivery_container
 from modules.delivery.infrastructure.adapters.driver.rest import views
 
 _container = get_delivery_container()

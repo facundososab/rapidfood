@@ -5,8 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Rapidfood{% endblock %} · Rapidfood</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260819b" />
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260916e" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  {% block head_scripts %}{% endblock %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
@@ -109,6 +110,38 @@
   </div>
 
   {# global toast area #}
-  <div id="toast" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+  <div id="toast" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 w-[min(360px,calc(100vw-2.5rem))]">
+    {% for message in messages %}
+    <div data-toast role="status"
+         class="toast {% if 'error' in message.tags %}toast-error{% elif 'success' in message.tags %}toast-success{% elif 'warning' in message.tags %}toast-warning{% endif %}">
+      <span class="toast-icon mt-0.5">
+        {% if 'success' in message.tags %}{% include 'components/icon.html' with name='check' cls='w-4 h-4' %}
+        {% elif 'error' in message.tags or 'warning' in message.tags %}{% include 'components/icon.html' with name='alert-triangle' cls='w-4 h-4' %}
+        {% else %}{% include 'components/icon.html' with name='clock' cls='w-4 h-4' %}{% endif %}
+      </span>
+      <span class="min-w-0 flex-1 text-[13px] font-medium leading-snug text-ink">{{ message }}</span>
+      <button type="button" data-toast-close class="shrink-0 text-ink-faint hover:text-ink transition-colors" aria-label="Cerrar">
+        {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  <script>
+    (function () {
+      var area = document.getElementById('toast');
+      if (!area) return;
+      function dismiss(el) {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(6px)';
+        window.setTimeout(function () { el.remove(); }, 200);
+      }
+      area.querySelectorAll('[data-toast]').forEach(function (el) {
+        el.querySelector('[data-toast-close]').addEventListener('click', function () { dismiss(el); });
+        window.setTimeout(function () { dismiss(el); }, 6000);
+      });
+    })();
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

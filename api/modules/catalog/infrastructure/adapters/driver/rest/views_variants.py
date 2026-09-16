@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from modules.catalog.configuration.container import get_catalog_container
+from composition.container import get_app_catalog_container
 from modules.catalog.application.ports.driver.create_variant_ports import CreateVariantCommand
 from modules.catalog.application.ports.driver.update_variant_ports import UpdateVariantCommand
 from modules.catalog.application.ports.driver.set_variant_price_ports import SetVariantPriceCommand
@@ -15,6 +15,8 @@ from modules.catalog.application.ports.driver.create_modifier_group_ports import
 from modules.catalog.application.ports.driver.update_modifier_group_ports import UpdateModifierGroupCommand
 from modules.catalog.application.ports.driver.create_modifier_option_ports import CreateModifierOptionCommand
 from modules.catalog.application.ports.driver.update_modifier_option_ports import UpdateModifierOptionCommand
+from modules.catalog.application.ports.driver.delete_modifier_group_ports import DeleteModifierGroupCommand
+from modules.catalog.application.ports.driver.delete_modifier_option_ports import DeleteModifierOptionCommand
 from modules.catalog.domain.errors.catalog_errors import (
     DomainError, VariantNotFoundError, IngredientNotFoundError,
     ModifierGroupNotFoundError, ModifierOptionNotFoundError,
@@ -156,7 +158,7 @@ class ModifierGroupListView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ModifierGroupDetailView(APIView):
-    """PATCH /api/catalog/modifier-groups/<group_id>/"""
+    """PATCH | DELETE /api/catalog/modifier-groups/<group_id>/"""
     def patch(self, request, group_id):
         serializer = UpdateModifierGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -167,6 +169,16 @@ class ModifierGroupDetailView(APIView):
             )
             return Response({"id": response.id, "name": response.name,
                              "min_selections": response.min_selections, "max_selections": response.max_selections})
+        except ModifierGroupNotFoundError as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, group_id):
+        container = get_app_catalog_container()
+        try:
+            response = container.delete_modifier_group.execute(
+                DeleteModifierGroupCommand(group_id=str(group_id))
+            )
+            return Response({"id": response.id}, status=status.HTTP_200_OK)
         except ModifierGroupNotFoundError as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
@@ -192,7 +204,7 @@ class ModifierOptionListView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
 class ModifierOptionDetailView(APIView):
-    """PATCH /api/catalog/modifier-options/<option_id>/"""
+    """PATCH | DELETE /api/catalog/modifier-options/<option_id>/"""
     def patch(self, request, option_id):
         serializer = UpdateModifierOptionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -203,5 +215,15 @@ class ModifierOptionDetailView(APIView):
             )
             return Response({"id": response.id, "name": response.name,
                              "price_delta": str(response.price_delta), "available": response.available})
+        except ModifierOptionNotFoundError as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, option_id):
+        container = get_app_catalog_container()
+        try:
+            response = container.delete_modifier_option.execute(
+                DeleteModifierOptionCommand(option_id=str(option_id))
+            )
+            return Response({"id": response.id}, status=status.HTTP_200_OK)
         except ModifierOptionNotFoundError as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)

@@ -5,6 +5,7 @@ from modules.catalog.application.ports.driver.product_query_ports import (
     ProductQueryPort,
     ProductSnapshot,
     VariantSnapshot,
+    VariantPriceSnapshot,
     IngredientSnapshot,
     ModifierGroupSnapshot,
     ModifierOptionSnapshot,
@@ -44,13 +45,14 @@ class ProductQueryUseCase(ProductQueryPort):
         variant_snapshots = []
         for variant in variants:
             price = self._price_repo.find_current(variant.id, today)
+            price_history = self._price_repo.list_for_variant(variant.id)
             ingredients = self._variant_ingredient_repo.list_for_variant(variant.id)
             variant_snapshots.append(
                 VariantSnapshot(
                     variant_id=variant.id,
                     variant_name=variant.name,
                     price=price.price if price else None,
-                    is_available=product.available and variant.available,
+                    is_available=product.state.value == 'available' and variant.available,
                     ingredients=tuple(
                         IngredientSnapshot(
                             ingredient_id=vi.ingredient_id,
@@ -58,6 +60,14 @@ class ProductQueryUseCase(ProductQueryPort):
                             removable=vi.removable,
                         )
                         for vi in ingredients
+                    ),
+                    prices=tuple(
+                        VariantPriceSnapshot(
+                            id=pr.id,
+                            since_date=pr.since_date,
+                            price=pr.price,
+                        )
+                        for pr in price_history
                     ),
                 )
             )
@@ -86,7 +96,7 @@ class ProductQueryUseCase(ProductQueryPort):
         return ProductSnapshot(
             product_id=product.id,
             name=product.name,
-            is_available=product.available,
+            is_available=product.state.value == 'available',
             variants=tuple(variant_snapshots),
             modifier_groups=tuple(group_snapshots),
         )
@@ -134,7 +144,7 @@ class ProductQueryUseCase(ProductQueryPort):
         return VariantContext(
             product_id=product.id,
             product_name=product.name,
-            product_available=product.available,
+            product_available=product.state.value == 'available',
             variant_id=variant.id,
             variant_name=variant.name,
             variant_available=variant.available,

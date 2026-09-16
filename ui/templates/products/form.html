@@ -35,18 +35,9 @@
     </div>
   </section>
 
+    {% if not product %}
     <section class="card p-6 space-y-4">
     <div class="th">Precio</div>
-    {% if product %}
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <div class="text-[12px] text-ink-muted">Precio vigente</div>
-          <div class="mt-0.5 font-mono text-[20px] font-semibold tnum text-ink">{{ current_price|money }}</div>
-        </div>
-        <a href="{% url 'product_detail' product.id %}" class="btn btn-ghost shrink-0">Gestionar precios</a>
-      </div>
-      <p class="text-[12px] text-ink-faint">Los cambios de precio se registran desde la ficha del producto para conservar el historial.</p>
-    {% else %}
       <div>
         <label class="flex items-start gap-2.5 cursor-pointer mb-4">
           <input type="checkbox" class="mt-0.5" x-model="hasVariants" @change="if(hasVariants) document.getElementById('has_variants_hidden').value = 'true'; else document.getElementById('has_variants_hidden').value = 'false';">
@@ -76,8 +67,8 @@
           <button type="button" class="btn btn-ghost text-[13px] mt-2" @click="variants.push({name: '', price: ''})">+ Agregar variante</button>
         </div>
       </div>
+    </section>
     {% endif %}
-  </section>
 
   <section class="card p-6 space-y-4">
     <div class="th">Operación</div>

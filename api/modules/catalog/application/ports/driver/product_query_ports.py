@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from typing import Optional, Protocol, Tuple
 
@@ -7,6 +8,12 @@ class IngredientSnapshot:
     ingredient_id: str
     name: str
     removable: bool
+
+@dataclass(frozen=True)
+class VariantPriceSnapshot:
+    id: str
+    since_date: date
+    price: Decimal
 
 @dataclass(frozen=True)
 class ModifierOptionSnapshot:
@@ -30,6 +37,7 @@ class VariantSnapshot:
     price: Decimal
     is_available: bool  # product.available AND variant.available
     ingredients: Tuple[IngredientSnapshot, ...] = field(default_factory=tuple)
+    prices: Tuple[VariantPriceSnapshot, ...] = field(default_factory=tuple)
 
 @dataclass(frozen=True)
 class ProductSnapshot:

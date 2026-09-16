@@ -127,6 +127,7 @@ class Variant:
     available: bool
     currentPrice: Decimal
     ingredients: List[VariantIngredient] = field(default_factory=list)
+    prices: List[Price] = field(default_factory=list)
 
 
 @dataclass
@@ -191,11 +192,12 @@ class Address:
 class OrderLine:
     id: str
     orderId: str
-    productId: str
+    productId: Optional[str]
     quantity: int
     subtotal: Decimal
     unitPrice: Optional[Decimal] = None  # NULL in DRAFT, frozen at confirm
     discountId: Optional[str] = None
+    productVariantId: Optional[str] = None
     # resolved conveniences
     product: Optional[Product] = None
     discount: Optional[Discount] = None
@@ -241,6 +243,7 @@ class Order:
     shippingCost: Optional[Decimal] = None
     totalAmount: Optional[Decimal] = None
     clientId: Optional[str] = None
+    clientName: Optional[str] = None  # free-text name when no client is linked
     addressId: Optional[str] = None
     conversationId: Optional[str] = None
     appliedCouponId: Optional[str] = None

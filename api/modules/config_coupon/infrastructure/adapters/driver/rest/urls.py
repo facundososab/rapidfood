@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from modules.config_coupon.configuration import get_coupon_container
+from composition.container import get_app_coupon_container as get_coupon_container
 from modules.config_coupon.infrastructure.adapters.driver.rest import views
 
 _container = get_coupon_container()

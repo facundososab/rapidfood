@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import date
 
 from rest_framework import status
@@ -86,7 +87,19 @@ class ProductListCreateView(APIView):
         container = get_app_catalog_container()
         results = container.list_products.execute(query)
 
-        return Response([r.__dict__ for r in results])
+        response_data = []
+        for r in results:
+            snapshot = container.product_query.find_product(r.id)
+            d = dataclasses.asdict(r)
+            if snapshot:
+                d['variants'] = [dataclasses.asdict(v) for v in snapshot.variants]
+                d['modifierGroups'] = [dataclasses.asdict(g) for g in snapshot.modifier_groups]
+            else:
+                d['variants'] = []
+                d['modifierGroups'] = []
+            response_data.append(d)
+
+        return Response(response_data)
 
     def post(self, request):
         serializer = CreateProductSerializer(data=request.data)
@@ -102,7 +115,7 @@ class ProductListCreateView(APIView):
                 {"detail": "La categoria no existe"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+        return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
 
 
 class SetProductStateView(APIView):
@@ -121,7 +134,7 @@ class SetProductStateView(APIView):
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(result.__dict__)
+        return Response(dataclasses.asdict(result))
 
 
 class PriceListCreateView(APIView):
@@ -130,7 +143,7 @@ class PriceListCreateView(APIView):
         container = get_app_catalog_container()
         results = container.list_prices.execute(query)
 
-        return Response([r.__dict__ for r in results])
+        return Response([dataclasses.asdict(r) for r in results])
 
     def post(self, request, product_id: str):
         serializer = AddPriceSerializer(data=request.data)
@@ -149,7 +162,7 @@ class PriceListCreateView(APIView):
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+        return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
 
 
 class ProductDetailView(APIView):
@@ -161,7 +174,15 @@ class ProductDetailView(APIView):
             return Response(
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(_serialize_product(result))
+        data = _serialize_product(result)
+        snapshot = container.product_query.find_product(product_id)
+        if snapshot:
+            data['variants'] = [dataclasses.asdict(v) for v in snapshot.variants]
+            data['modifierGroups'] = [dataclasses.asdict(g) for g in snapshot.modifier_groups]
+        else:
+            data['variants'] = []
+            data['modifierGroups'] = []
+        return Response(data)
 
     def patch(self, request, product_id: str):
         serializer = UpdateProductSerializer(data=request.data)
@@ -181,7 +202,15 @@ class ProductDetailView(APIView):
                 {"detail": "La categoria no existe"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        return Response(_serialize_product(result))
+        data = _serialize_product(result)
+        snapshot = container.product_query.find_product(product_id)
+        if snapshot:
+            data['variants'] = [dataclasses.asdict(v) for v in snapshot.variants]
+            data['modifierGroups'] = [dataclasses.asdict(g) for g in snapshot.modifier_groups]
+        else:
+            data['variants'] = []
+            data['modifierGroups'] = []
+        return Response(data)
 
     def delete(self, request, product_id: str):
         command = DeleteProductCommand(product_id=product_id)
@@ -205,7 +234,7 @@ class CategoryListCreateView(APIView):
     def get(self, request):
         container = get_app_catalog_container()
         results = container.list_categories.execute()
-        return Response([r.__dict__ for r in results])
+        return Response([dataclasses.asdict(r) for r in results])
 
     def post(self, request):
         serializer = CreateCategorySerializer(data=request.data)
@@ -215,7 +244,7 @@ class CategoryListCreateView(APIView):
         container = get_app_catalog_container()
         result = container.create_category.execute(command)
 
-        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+        return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
 
 
 class SetDiscountView(APIView):
@@ -233,4 +262,4 @@ class SetDiscountView(APIView):
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(result.__dict__, status=status.HTTP_201_CREATED)
+        return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
