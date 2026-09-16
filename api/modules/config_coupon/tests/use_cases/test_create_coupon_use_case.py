@@ -95,3 +95,11 @@ class TestCreateCoupon:
         uc.execute(_cmd(coupon_code="  oferta10 "))
 
         assert repo.find_by_code("OFERTA10") is not None
+
+    def test_creates_unlimited_coupon(self) -> None:
+        repo = InMemoryCouponRepository()
+        uc = CreateCouponUseCase(repo)
+
+        result = uc.execute(_cmd(available_uses=None))
+
+        assert result.available_uses is None

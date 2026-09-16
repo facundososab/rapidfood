@@ -18,12 +18,22 @@ from modules.config_coupon.domain.models.coupon_type import CouponType
 from modules.config_coupon.infrastructure.adapters.driven.prisma.prisma_coupon_repository import (
     PrismaCouponRepository,
 )
+from shared.infrastructure.prisma.db import Database
 
 pytestmark = pytest.mark.db
 
 
 def _utc(y: int, m: int, d: int) -> datetime:
     return datetime(y, m, d, tzinfo=timezone.utc)
+
+
+class _TestDatabase(Database):
+    """Wraps the pytest ``db`` fixture client so the repository targets the
+    dedicated test database instead of the shared dev singleton."""
+
+    def __init__(self, client: object) -> None:
+        super().__init__()
+        self._client = client  # type: ignore[assignment]
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +45,7 @@ def _clean_coupons(db):
 
 class TestPrismaCouponRepository:
     def test_save_and_find_by_code(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         coupon = Coupon(
             coupon_code=CouponCode("OFERTA10"),
             coupon_type=CouponType.PERCENTAGE,
@@ -54,7 +64,7 @@ class TestPrismaCouponRepository:
         assert found.is_active is True
 
     def test_saves_fixed_amount_with_min_order_and_expiration(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         coupon = Coupon(
             coupon_code=CouponCode("FIJOS"),
             coupon_type=CouponType.FIXED_AMOUNT,
@@ -73,7 +83,7 @@ class TestPrismaCouponRepository:
         assert found.date_of_expiration.date() == _utc(2026, 12, 31).date()
 
     def test_update_persists_changes(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         coupon = Coupon(
             coupon_code=CouponCode("OFERTA10"),
             coupon_type=CouponType.PERCENTAGE,
@@ -90,7 +100,7 @@ class TestPrismaCouponRepository:
         assert found.available_uses == 4
 
     def test_find_by_id(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         saved = repo.save(
             Coupon(
                 coupon_code=CouponCode("OFERTA10"),
@@ -106,7 +116,7 @@ class TestPrismaCouponRepository:
         assert found.coupon_code.value == "OFERTA10"
 
     def test_list_all_orders_by_code(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         repo.save(
             Coupon(
                 coupon_code=CouponCode("BETA"),
@@ -129,6 +139,6 @@ class TestPrismaCouponRepository:
         assert [c.coupon_code.value for c in coupons] == ["ALFA", "BETA"]
 
     def test_returns_none_when_not_found(self, db) -> None:
-        repo = PrismaCouponRepository(db)
+        repo = PrismaCouponRepository(_TestDatabase(db))
         assert repo.find_by_code("NOEXISTE") is None
         assert repo.find_by_id("00000000-0000-0000-0000-000000000000") is None
