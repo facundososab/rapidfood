@@ -78,7 +78,7 @@ Given this skill metadata:
 metadata:
   author: easybook
   version: '1.0'
-  scope: [frontend]
+  scope: [ui]
   auto_invoke: 'Creating/modifying React components'
 ```
 

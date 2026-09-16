@@ -22,6 +22,7 @@ class Order:
     subtotal: Decimal
     discount: Decimal
     client_id: Optional[str] = None
+    client_name: Optional[str] = None
     business_config_id: Optional[str] = None
     address_id: Optional[str] = None
     conversation_id: Optional[str] = None

@@ -4,6 +4,7 @@ from decimal import Decimal
 from modules.catalog.application.use_cases.product_query_use_case import (
     ProductQueryUseCase,
 )
+from modules.catalog.domain.models.product import ProductState
 from modules.catalog.domain.models.product_variant import ProductVariant
 from modules.catalog.domain.models.price import Price
 
@@ -14,6 +15,7 @@ class FakeProduct:
         self.id = id
         self.name = name
         self.available = available
+        self.state = ProductState.AVAILABLE if available else ProductState.UNAVAILABLE
 
 
 class FakeProductRepo:
@@ -56,6 +58,13 @@ class FakePriceRepo:
 
     def find_current(self, variant_id, on_date):
         return self._prices.get(variant_id)
+
+    def list_for_variant(self, variant_id):
+        price = self._prices.get(variant_id)
+        return [price] if price else []
+
+    def list_for_product(self, variant_id):
+        return self.list_for_variant(variant_id)
 
 
 class FakeVariantIngredientRepo:

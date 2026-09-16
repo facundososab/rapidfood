@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from .common import page, required, int_param
 from ..services.factory import get_client
 from ..services import dtos
@@ -31,11 +32,22 @@ def index(request):
     products=[]
     for p in c.list_products(only_available=False, page_size=200).items:
         price=pricing.current_price(p)
+        is_variable = False
         if price is None:
             full=c.get_product(p.id)
             price=pricing.current_price(full) if full else None
-        products.append({'id':p.id,'name':p.name,'description':p.description,'available':p.available,'imageUrl':p.imageUrl,'categoryId':p.categoryId,'category':p.category.description if p.category else '','price':price})
-    return page(request,'orders/index.html',{**_ctx(request),'recent_orders':c.list_orders(page_size=16).items,'categories':c.list_categories(),'products':products,'client_options':[{'id':x.id,'name':x.name,'lastName':x.lastName,'phoneNumber':x.phoneNumber} for x in c.search_clients('')],'shipping_cost':c.get_business_config().shippingCost})
+            if price is None and full and full.variants:
+                v_prices = [v.currentPrice for v in full.variants if v.available and v.currentPrice is not None]
+                if v_prices:
+                    price = min(v_prices)
+                    is_variable = True
+        products.append({'id':p.id,'name':p.name,'description':p.description,'available':p.available,'imageUrl':p.imageUrl,'categoryId':p.categoryId,'category':p.category.description if p.category else '','price':price,'is_variable':is_variable})
+    shipping = c.get_business_config().shippingCost or 0
+    pos_config = {
+        'shipping': float(shipping),
+        'productConfigUrl': reverse('orders_new_product_config', args=['0000']),
+    }
+    return page(request,'orders/index.html',{**_ctx(request),'recent_orders':c.list_orders(page_size=16).items,'categories':c.list_categories(),'products':products,'client_options':[{'id':x.id,'name':x.name,'lastName':x.lastName,'phoneNumber':x.phoneNumber} for x in c.search_clients('')],'pos_config':pos_config})
 def _list_ctx(request):
     c=get_client(); return {**_ctx(request),'orders':c.list_orders(status=request.GET.get('status') or None,delivery_type=request.GET.get('delivery') or None,payment_type=request.GET.get('payment') or None,search=request.GET.get('q') or None,page=int_param(request,'page'))}
 def table(request): return page(request,'orders/partials/table.html',_list_ctx(request))
@@ -132,11 +144,16 @@ def wizard_coupon(request):
     v=get_client().validate_coupon(request.POST.get('code',''),Decimal(request.POST.get('subtotal','0'))); return HttpResponse(f'<span class="text-[12px] {"text-success" if v.valid else "text-danger"}">{("Descuento: $ "+str(v.discount_amount)) if v.valid else v.reason}</span>')
 def wizard_confirm(request):
     if request.method!='POST': return HttpResponseBadRequest()
-    lines=[]
-    for pid,qty in request.POST.items():
-        if pid.startswith('qty_') and qty and int(qty)>0: lines.append({'product_id':pid[4:],'quantity':int(qty)})
+    import json
+    lines = []
+    cart_payload = request.POST.get('cart_payload')
+    if cart_payload:
+        lines = json.loads(cart_payload)
     if not lines: return HttpResponseBadRequest('Agregá al menos un producto.')
-    payload={'client_id':request.POST.get('client_id') or None,'origin':'IN_PLACE','delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':request.POST.get('coupon_code') or None,'lines':lines}
+    client_id=request.POST.get('client_id') or None
+    client_name=(request.POST.get('client_name') or '').strip() or None
+    if client_id: client_name=None  # a linked client already identifies the order
+    payload={'client_id':client_id,'client_name':client_name,'origin':'IN_PLACE','delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':request.POST.get('coupon_code') or None,'lines':lines}
     if payload['delivery_type']=='DELIVERY' and request.POST.get('street'):
         c=get_client()
         try:
@@ -146,3 +163,43 @@ def wizard_confirm(request):
             pass
     o=get_client().create_order(payload)
     return redirect('order_detail',order_id=o.id)
+
+
+def product_config_modal(request, product_id):
+    p = get_client().get_product(product_id)
+    pc_config = {
+        'productId': p.id,
+        'productName': p.name,
+        'variants': [
+            {
+                'id': v.id,
+                'name': v.name,
+                'price': float(v.currentPrice) if v.currentPrice is not None else 0,
+                'available': bool(v.available),
+                'ingredients': [
+                    {'id': i.ingredientId, 'name': i.name, 'removable': bool(i.removable)}
+                    for i in v.ingredients
+                ],
+            }
+            for v in p.variants
+        ],
+        'modifierGroups': {
+            g.id: {
+                'name': g.name,
+                'min': g.minSelections,
+                'max': g.maxSelections,
+                'options': [o.id for o in g.options],
+            }
+            for g in p.modifierGroups
+        },
+        'optionMeta': {
+            o.id: {
+                'name': o.name,
+                'priceDelta': float(o.priceDelta) if o.priceDelta is not None else 0,
+                'groupId': g.id,
+            }
+            for g in p.modifierGroups
+            for o in g.options
+        },
+    }
+    return page(request, 'orders/partials/product_config_modal.html', {'product': p, 'pc_config': pc_config})

@@ -26,6 +26,8 @@ urlpatterns = [
     path("pedidos/nuevo/carrito/", orders.wizard_cart, name="orders_new_cart"),
     path("pedidos/nuevo/cupon/", orders.wizard_coupon, name="orders_new_coupon"),
     path("pedidos/nuevo/confirmar/", orders.wizard_confirm, name="orders_new_confirm"),
+    path("pedidos/nuevo/producto/<str:product_id>/configurar/", orders.product_config_modal, name="orders_new_product_config"),
+
     path("pedidos/<str:order_id>/", orders.detail, name="order_detail"),
     path("pedidos/<str:order_id>/estado/", orders.change_status, name="order_change_status"),
     path("pedidos/<str:order_id>/cancelar/", orders.cancel, name="order_cancel"),
@@ -43,6 +45,19 @@ urlpatterns = [
     path("productos/<str:product_id>/guardar/", products.save, name="product_save"),
     path("productos/<str:product_id>/disponibilidad/", products.toggle_availability, name="product_toggle"),
     path("productos/<str:product_id>/precio/", products.add_price, name="product_add_price"),
+
+    path("productos/<str:product_id>/variantes/guardar/", products.variant_save, name="product_variant_save"),
+    path("productos/<str:product_id>/opcionales/guardar/", products.modifier_group_save, name="product_modifier_group_save"),
+    path("ingredientes/guardar/", products.ingredient_save, name="ingredient_save"),
+
+    path("variantes/<str:variant_id>/ingredientes/guardar/", products.variant_ingredients_save, name="product_variant_ingredients_save"),
+    path("variantes/<str:variant_id>/precio/guardar/", products.variant_price_save, name="product_variant_price_save"),
+
+    path("opcionales/<str:group_id>/opcion/guardar/", products.modifier_option_save, name="product_modifier_option_save"),
+    path("opcionales/<str:group_id>/actualizar/", products.modifier_group_update, name="product_modifier_group_update"),
+    path("opcionales/<str:group_id>/eliminar/", products.modifier_group_delete, name="product_modifier_group_delete"),
+    path("opcionales/opcion/<str:option_id>/eliminar/", products.modifier_option_delete, name="product_modifier_option_delete"),
+
 
     # Payments
     path("pagos/", payments.index, name="payments"),

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 class StartDraftOrderSerializer(serializers.Serializer):
     client_id = serializers.UUIDField(required=False, allow_null=True)
+    client_name = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
     business_config_id = serializers.CharField(required=False, allow_null=True)
     conversation_id = serializers.UUIDField(required=False, allow_null=True)
     origin = serializers.ChoiceField(

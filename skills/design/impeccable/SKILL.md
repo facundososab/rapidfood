@@ -6,7 +6,7 @@ user-invocable: true
 argument-hint: '[craft|teach|extract]'
 license: Apache 2.0. Based on Anthropic's frontend-design skill. See NOTICE.md for attribution.
 metadata:
-  scope: [root, frontend]
+  scope: [root, ui]
   auto-invoke: 'When the user asks to build web components, pages, artifacts, posters, or applications, or when any design skill requires project context.'
 ---
 

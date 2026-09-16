@@ -1,0 +1,139 @@
+{{ pc_config|json_script:"pc-config" }}
+<div class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid place-items-center p-4"
+     x-data="productConfig" x-transition.opacity>
+  <div class="card w-full max-w-[400px] max-h-[90vh] flex flex-col overflow-hidden shadow-xl"
+       @click.outside="$el.closest('.fixed').remove()">
+
+    {# ---- Header ---- #}
+    <div class="px-5 py-4 border-b border-line flex justify-between items-start gap-3">
+      <div class="min-w-0">
+        <h3 class="font-display font-bold text-[17px] leading-tight truncate">{{ product.name }}</h3>
+        {% if product.description %}<p class="text-[12px] text-ink-muted mt-0.5 line-clamp-2">{{ product.description }}</p>{% endif %}
+      </div>
+      <button type="button" class="btn btn-ghost !px-2 shrink-0 -mt-1 -mr-1" aria-label="Cerrar"
+              @click="$el.closest('.fixed').remove()">
+        {% icon 'x' 'w-4 h-4' %}
+      </button>
+    </div>
+
+    {# ---- Body ---- #}
+    <div class="px-5 py-5 overflow-y-auto space-y-6">
+
+      {% if product.variants %}
+      <section>
+        <div class="th mb-2.5">Variante / Tamaño</div>
+        <div class="grid gap-1.5">
+          {% for variant in product.variants %}{% if variant.available %}
+          <label class="flex items-center justify-between gap-3 min-h-[44px] px-3 py-2 border rounded-lg cursor-pointer transition-colors"
+                 :class="isVariantSelected('{{ variant.id }}') ? 'border-primary bg-primary/5' : 'border-line hover:bg-subtle'">
+            <span class="flex items-center gap-3 min-w-0">
+              <input type="radio" name="pc-variant" value="{{ variant.id }}"
+                     :checked="isVariantSelected('{{ variant.id }}')"
+                     @change="selectVariant('{{ variant.id }}', '{{ variant.name|escapejs }}', {{ variant.currentPrice|default:0 }})"
+                     class="text-primary focus:ring-primary">
+              <span class="text-[14px] font-medium truncate">{{ variant.name }}</span>
+            </span>
+            <span class="font-mono text-[13px] text-ink-soft shrink-0">{{ variant.currentPrice|money }}</span>
+          </label>
+          {% endif %}{% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% for group in product.modifierGroups %}
+      <section>
+        <div class="flex items-baseline justify-between gap-2 mb-2.5">
+          <div class="th">{{ group.name }}</div>
+          {% if group.minSelections > 0 %}
+          <span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
+                :class="isGroupSatisfied('{{ group.id }}') ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'"
+                x-text="isGroupSatisfied('{{ group.id }}') ? 'Listo' : 'Requerido'"></span>
+          {% else %}
+          <span class="text-[10px] font-semibold uppercase tracking-wide text-ink-faint shrink-0">Opcional{% if group.maxSelections > 1 %} · hasta {{ group.maxSelections }}{% endif %}</span>
+          {% endif %}
+        </div>
+        <div class="grid gap-1.5">
+          {% for opt in group.options %}{% if opt.available %}
+          <label class="flex items-center justify-between gap-3 min-h-[44px] px-3 py-2 border rounded-lg cursor-pointer transition-colors"
+                 :class="isSelected('{{ opt.id }}') ? 'border-primary bg-primary/5' : 'border-line hover:bg-subtle'">
+            <span class="flex items-center gap-3 min-w-0">
+              <input type="{% if group.maxSelections == 1 %}radio{% else %}checkbox{% endif %}"
+                     {% if group.maxSelections == 1 %}name="pc-group-{{ group.id }}"{% endif %}
+                     value="{{ opt.id }}"
+                     :checked="isSelected('{{ opt.id }}')"
+                     @change="toggleOption('{{ opt.id }}', $event)"
+                     class="text-primary focus:ring-primary {% if group.maxSelections == 1 %}rounded-full{% else %}rounded{% endif %}">
+              <span class="text-[14px] leading-snug">{{ opt.name }}</span>
+            </span>
+            {% if opt.priceDelta > 0 %}<span class="font-mono text-[12px] text-ink-muted shrink-0">+{{ opt.priceDelta|money }}</span>{% endif %}
+          </label>
+          {% endif %}{% endfor %}
+          {% if group.maxSelections == 1 and group.minSelections == 0 %}
+          <label class="flex items-center gap-3 min-h-[44px] px-3 py-2 border rounded-lg cursor-pointer transition-colors"
+                 :class="isGroupEmpty('{{ group.id }}') ? 'border-primary bg-primary/5' : 'border-line hover:bg-subtle'">
+            <input type="radio" name="pc-group-{{ group.id }}" value="__none__"
+                   :checked="isGroupEmpty('{{ group.id }}')"
+                   @change="selectNone('{{ group.id }}')"
+                   class="text-primary focus:ring-primary rounded-full">
+            <span class="text-[14px] leading-snug text-ink-muted">{{ group.name|sin_label }}</span>
+          </label>
+          {% endif %}
+        </div>
+        <p x-show="noticeFor('{{ group.id }}')" style="display:none"
+           class="mt-2 text-[12px] text-warning flex items-center gap-1.5">
+          {% icon 'alert-triangle' 'w-3.5 h-3.5' %}
+          <span x-text="noticeFor('{{ group.id }}')"></span>
+        </p>
+        <p x-show="groupError('{{ group.id }}')" style="display:none" role="alert"
+           class="mt-2 text-[12px] text-danger flex items-center gap-1.5">
+          {% icon 'alert-triangle' 'w-3.5 h-3.5' %}
+          <span x-text="groupErrorMessage('{{ group.id }}')"></span>
+        </p>
+      </section>
+      {% endfor %}
+
+      {% if product.variants %}
+      <section x-show="ingredientsForVariant(selectedVariant).length > 0" style="display:none">
+        <div class="th mb-2.5">Quitar ingredientes</div>
+        <div class="grid gap-1.5">
+          <template x-for="ing in ingredientsForVariant(selectedVariant)" :key="ing.id">
+            <label class="flex items-center gap-3 min-h-[44px] px-3 py-2 border rounded-lg cursor-pointer transition-colors"
+                   :class="isIngredientRemoved(ing.id) ? 'border-danger bg-danger-soft' : 'border-line hover:bg-subtle'">
+              <input type="checkbox" :value="ing.id"
+                     :checked="!isIngredientRemoved(ing.id)"
+                     @change="toggleIngredient(ing.id, ing.name, $event)"
+                     class="text-primary focus:ring-primary rounded">
+              <span class="text-[14px] leading-snug"
+                    x-text="isIngredientRemoved(ing.id) ? 'Sin ' + ing.name : 'Con ' + ing.name"></span>
+            </label>
+          </template>
+        </div>
+      </section>
+      {% endif %}
+
+    </div>
+
+    {# ---- Footer ---- #}
+    <div class="border-t border-line bg-subtle/50">
+      <div x-show="showErrors && firstError()" style="display:none" role="alert"
+           class="px-5 py-2.5 bg-danger-soft text-danger text-[12px] flex items-center gap-2 border-b border-line">
+        {% icon 'alert-triangle' 'w-4 h-4 shrink-0' %}
+        <span x-text="errorSummary()"></span>
+      </div>
+      <div class="p-4 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-1.5">
+          <button type="button" @click="if(qty > 1) qty--" class="btn btn-ghost !px-2.5" aria-label="Quitar uno">
+            {% icon 'minus' 'w-4 h-4' %}
+          </button>
+          <span class="w-7 text-center font-mono tnum" x-text="qty"></span>
+          <button type="button" @click="qty++" class="btn btn-ghost !px-2.5" aria-label="Sumar uno">
+            {% icon 'plus' 'w-4 h-4' %}
+          </button>
+        </div>
+        <button type="button" class="btn btn-primary flex-1 justify-center h-11" @click="addToCart">
+          Agregar <span class="font-mono" x-text="fmt(totalPrice() * qty)"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

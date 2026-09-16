@@ -36,3 +36,19 @@ def get_app_container() -> OrderContainer:
     catalog = get_catalog_container()
     catalog_query = CatalogProductQuery(catalog.product_query)
     return OrderContainer(catalog_query=catalog_query)
+
+
+from modules.config_coupon.configuration.container import get_coupon_container, CouponContainer
+@lru_cache(maxsize=1)
+def get_app_coupon_container() -> CouponContainer:
+    return get_coupon_container()
+
+from modules.conversation.configuration.container import build_container, ConversationContainer
+@lru_cache(maxsize=1)
+def get_app_conversation_container() -> ConversationContainer:
+    return build_container()
+
+from modules.delivery.configuration.container import get_delivery_container, DeliveryContainer
+@lru_cache(maxsize=1)
+def get_app_delivery_container() -> DeliveryContainer:
+    return get_delivery_container()

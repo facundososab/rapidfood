@@ -12,7 +12,7 @@ Rapidfood is a backend application built in Python. It exposes an HTTP shell usi
 | ↳ config_coupon module | `api/modules/config_coupon/` | Coupons & configuration |
 | ↳ order module | `api/modules/order/` | Order orchestration |
 | ↳ conversation module | `api/modules/conversation/` | Conversational AI module |
-| Frontend | `ui/` | (Currently empty) |
+| Frontend | `ui/` | Django, HTMX, Alpine.js, Tailwind CSS |
 | Docs | `docs/` | Architecture guide |
 
 ---

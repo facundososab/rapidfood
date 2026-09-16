@@ -12,7 +12,7 @@ Rapidfood is a backend application built in Python. It exposes an HTTP shell usi
 | ↳ config_coupon module | `api/modules/config_coupon/` | Coupons & configuration |
 | ↳ order module | `api/modules/order/` | Order orchestration |
 | ↳ conversation module | `api/modules/conversation/` | Conversational AI module |
-| Frontend | `ui/` | (Currently empty) |
+| Frontend | `ui/` | Django, HTMX, Alpine.js, Tailwind CSS |
 | Docs | `docs/` | Architecture guide |
 
 ---
@@ -54,3 +54,13 @@ When performing these actions, ALWAYS invoke the corresponding skill FIRST:
 | Regenerate AGENTS.md Auto-invoke tables (sync.sh) | `skill-sync` |
 | Reviewing or auditing UI/UX | `ui-ux-pro-max` |
 | Troubleshoot why a skill is missing from AGENTS.md auto-invoke | `skill-sync` |
+| When adding animations, transitions, or motion to frontend components | `animate` |
+| When applying high-quality design engineering principles and polish | `emil-design-eng` |
+| When creating a UI prototype, mockup, or wireframe | `prototype` |
+| When discussing animation terminology, curves, or concepts | `animation-vocabulary` |
+| When implementing Apple-style design patterns, blur, or typography | `apple-design` |
+| When improving, refining, or debugging existing animations | `improve-animations` |
+| When picking a UI library, component, or primitive for a frontend task | `pick-ui-library` |
+| When reviewing UI to find animation or motion opportunities | `find-animation-opportunities` |
+| When reviewing animations for quality, timing, and feel | `review-animations` |
+| When using, configuring, or troubleshooting the Sonner toast library | `ask-sonner` |

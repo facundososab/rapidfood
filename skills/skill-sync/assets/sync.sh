@@ -51,6 +51,7 @@ get_agents_path() {
     case "$scope" in
         root)       echo "$REPO_ROOT/AGENTS.md" ;;
         frontend)   echo "$REPO_ROOT/frontend/AGENTS.md" ;;
+        ui)         echo "$REPO_ROOT/ui/AGENTS.md" ;;
         backend)    echo "$REPO_ROOT/backend/AGENTS.md" ;;
         docs)       echo "$REPO_ROOT/docs/AGENTS.md" ;;
         *)          echo "" ;;
@@ -212,7 +213,7 @@ while IFS= read -r skill_file; do
             _scope_set "$scope" "$existing|$skill_name:$auto_invoke"
         fi
     done
-done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print | sort)
+done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 3 -name SKILL.md -print | sort)
 
 # Generate Auto-invoke section for each scope
 # Deterministic scope order (stable diffs)
@@ -339,7 +340,7 @@ while IFS= read -r skill_file; do
         echo -e "  ${YELLOW}$skill_name${NC} - missing: ${scope_raw:+}${scope_raw:-scope} ${auto_invoke:+}${auto_invoke:-auto_invoke}"
         missing=$((missing + 1))
     fi
-done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 2 -name SKILL.md -print | sort)
+done < <(find "$SKILLS_DIR" -mindepth 2 -maxdepth 3 -name SKILL.md -print | sort)
 
 if [ $missing -eq 0 ]; then
     echo -e "  ${GREEN}All skills have sync metadata${NC}"

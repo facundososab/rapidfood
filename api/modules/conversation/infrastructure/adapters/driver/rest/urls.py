@@ -1,6 +1,6 @@
 from django.urls import path
 
-from modules.conversation.configuration.container import build_container
+from composition.container import get_app_conversation_container as build_container
 from modules.conversation.infrastructure.adapters.driver.rest.views import (
     ConversationMessagesView,
     ConversationWebhookView,

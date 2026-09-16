@@ -142,6 +142,12 @@ ALTER TABLE "price" ADD COLUMN     "product_variant_id" UUID;
 -- CreateIndex
 CREATE INDEX "discount_product_id_idx" ON "discount"("product_id");
 
+
+-- AlterTable (Add Columns as Nullable)
+ALTER TABLE "discount" ADD COLUMN     "product_variant_id" UUID;
+ALTER TABLE "order_line" ADD COLUMN     "product_variant_id" UUID;
+ALTER TABLE "price" ADD COLUMN     "product_variant_id" UUID;
+
 -- CreateIndex
 CREATE INDEX "discount_product_variant_id_idx" ON "discount"("product_variant_id");
 
@@ -150,6 +156,7 @@ CREATE INDEX "order_line_product_variant_id_idx" ON "order_line"("product_varian
 
 -- CreateIndex
 CREATE INDEX "price_product_variant_id_since_date_idx" ON "price"("product_variant_id", "since_date");
+
 
 -- Backfill SQL
 INSERT INTO product_variant (product_variant_id, product_id, name, available)

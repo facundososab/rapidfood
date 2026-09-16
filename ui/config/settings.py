@@ -33,14 +33,21 @@ RAPIDFOOD_API_TOKEN = os.environ.get("RAPIDFOOD_API_TOKEN", "")
 
 INSTALLED_APPS = [
     "django.contrib.staticfiles",
+    "django.contrib.sessions",
+    "django.contrib.messages",
     "panel",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "panel.middleware.ApiErrorToastMiddleware",
 ]
+
+# Messages are surfaced as toasts; signed cookies avoid needing a database.
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 ROOT_URLCONF = "config.urls"
 
@@ -52,6 +59,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.contrib.messages.context_processors.messages",
                 "panel.context.nav",
             ],
             "builtins": ["panel.templatetags.rapidfood"],

@@ -18,12 +18,16 @@ class PrismaPriceRepository(PriceRepositoryPort):
             }
         )
 
-    def list_for_product(self, product_variant_id: str) -> list[Price]:
+    def list_for_variant(self, product_variant_id: str) -> list[Price]:
         records = db.client.price.find_many(
             where={"productVariantId": product_variant_id},
             order={"sinceDate": "desc"},
         )
         return [self._to_domain(record) for record in records]
+
+    def list_for_product(self, product_variant_id: str) -> list[Price]:
+        # Legacy alias kept for existing callers; every price belongs to a variant.
+        return self.list_for_variant(product_variant_id)
 
     def find_current(self, product_variant_id: str, on_date: date) -> Price | None:
         records = db.client.price.find_many(

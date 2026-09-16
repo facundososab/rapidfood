@@ -179,6 +179,7 @@ model Order {
   totalAmount     Decimal?        @map("total_amount") @db.Decimal(10, 2)
   clientId        String?         @map("client_id") @db.Uuid
   client          Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientName      String?         @map("client_name") // free-text name for unidentified clients (POS)
   addressId       String?         @map("address_id") @db.Uuid // nullable: BORRADOR needs no address (RN-020)
   address         Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
   conversationId  String?         @map("conversation_id") @db.Uuid // RN-030: order references its conversation; RN-031: 1 conv -> many orders

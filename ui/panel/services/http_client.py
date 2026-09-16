@@ -57,6 +57,7 @@ class HttpRapidfoodClient(RapidfoodClient):
                 session.headers["Authorization"] = f"Bearer {token}"
         self.session = session
         self._cats = None
+        self._variants = None
 
     # -- transport helpers --------------------------------------------------
     def _get(self, path: str, **params) -> object:
@@ -99,6 +100,60 @@ class HttpRapidfoodClient(RapidfoodClient):
         raise RuntimeError(message)
 
     # -- mappers (JSON -> DTO) ---------------------------------------------
+
+    def _price(self, d) -> Optional[dtos.Price]:
+        if not d:
+            return None
+        return dtos.Price(id=d["id"], productId=d.get("product_id"),
+                          price=_dec(d["price"]), sinceDate=_parse_dt(d["since_date"]))
+
+    def _ingredient(self, d) -> Optional[dtos.Ingredient]:
+        if not d:
+            return None
+        return dtos.Ingredient(id=d.get("ingredient_id", d.get("id")), name=d["name"])
+
+    def _variant(self, d) -> Optional[dtos.Variant]:
+        if not d:
+            return None
+        return dtos.Variant(id=d.get("variant_id", d.get("id")), name=d.get("variant_name", d.get("name")), 
+                            available=d.get("is_available", d.get("available", True)),
+                            currentPrice=_dec(d.get("price", d.get("current_price"))),
+                            ingredients=[self._variant_ingredient(i) for i in d.get("ingredients", []) if i],
+                            prices=sorted(
+                                (self._variant_price(p) for p in d.get("prices", []) if p),
+                                key=lambda p: p.sinceDate,
+                                reverse=True,
+                            ))
+
+    def _variant_price(self, d) -> Optional[dtos.Price]:
+        if not d:
+            return None
+        return dtos.Price(id=d["id"], productId=d.get("product_id", ""),
+                          price=_dec(d["price"]), sinceDate=_parse_dt(d["since_date"]))
+
+    def _variant_ingredient(self, d) -> Optional[dtos.VariantIngredient]:
+        if not d:
+            return None
+        return dtos.VariantIngredient(
+            id=d.get("id", ""),
+            ingredientId=d.get("ingredient_id", d.get("id")),
+            name=d.get("name", ""),
+            removable=d.get("removable", True)
+        )
+
+    def _modifier_option(self, d) -> Optional[dtos.ModifierOption]:
+        if not d:
+            return None
+        return dtos.ModifierOption(id=d.get("option_id", d.get("id")), name=d["name"], priceDelta=_dec(d.get("price_delta")),
+                                   available=d.get("available", True))
+
+    def _modifier_group(self, d) -> Optional[dtos.ModifierGroup]:
+        if not d:
+            return None
+        return dtos.ModifierGroup(id=d.get("group_id", d.get("id")), name=d["name"], minSelections=d.get("min_selections", 0),
+                                  maxSelections=d.get("max_selections", 1),
+                                  options=[self._modifier_option(o) for o in d.get("options", []) if o])
+
     def _client(self, d) -> Optional[dtos.Client]:
         if not d:
             return None
@@ -107,10 +162,6 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     def _category(self, d) -> Optional[dtos.Category]:
         return None if not d else dtos.Category(id=d["id"], description=d["description"])
-
-    def _price(self, d) -> dtos.Price:
-        return dtos.Price(id=d["id"], productId=d["product_id"],
-                          sinceDate=_parse_dt(d["since_date"]), price=_dec(d["price"]))
 
     def _product(self, d) -> Optional[dtos.Product]:
         if not d:
@@ -122,13 +173,16 @@ class HttpRapidfoodClient(RapidfoodClient):
         return dtos.Product(id=d["id"], name=d["name"], description=d["description"], available=bool(available),
                             categoryId=d["category_id"], category=self._category(d.get("category")),
                             prices=[self._price(p) for p in d.get("prices", [])],
-                            imageUrl=d.get("image_url") or None)
+                            imageUrl=d.get("image_url") or None,
+                            variants=[self._variant(v) for v in d.get("variants", []) if v],
+                            modifierGroups=[self._modifier_group(g) for g in d.get("modifierGroups", []) if g])
 
     def _line(self, d) -> dtos.OrderLine:
-        return dtos.OrderLine(id=d["id"], orderId=d["order_id"], productId=d["product_id"],
+        return dtos.OrderLine(id=d["id"], orderId=d["order_id"], productId=d.get("product_id"),
                               quantity=d["quantity"], subtotal=_dec(d["subtotal"]),
                               unitPrice=_dec(d.get("unit_price")), discountId=d.get("discount_id"),
-                              product=self._product(d.get("product")))
+                              product=self._product(d.get("product")),
+                              productVariantId=d.get("product_variant_id"))
 
     def _applied_coupon(self, d) -> dtos.AppliedCoupon:
         return dtos.AppliedCoupon(id=d["id"], orderId=d["orderId"], couponId=d.get("couponId"),
@@ -167,19 +221,20 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _order(self, d) -> Optional[dtos.Order]:
         if not d:
             return None
-        return dtos.Order(
+        order = dtos.Order(
             id=d["id"], status=d["status"], origin=d.get("origin", "IN_PLACE"),
             subtotal=_dec(d["subtotal"]), discount=_dec(d["discount"]),
-            createdAt=_parse_dt(d["created_at"]), estimatedTime=d.get("estimated_time"),
+            createdAt=_parse_dt(d.get("created_at")), estimatedTime=d.get("estimated_time"),
             deliveryType=d.get("delivery_type"), paymentType=d.get("payment_type"),
             shippingCost=_dec(d.get("shipping_cost")), totalAmount=_dec(d.get("total_amount")),
-            clientId=d.get("client_id"), addressId=d.get("address_id"),
+            clientId=d.get("client_id"), clientName=d.get("client_name"), addressId=d.get("address_id"),
             conversationId=d.get("conversation_id"), appliedCouponId=d.get("applied_coupon_id"),
             confirmedAt=_parse_dt(d.get("confirmed_at")), client=self._client(d.get("client")),
             address=self._address(d.get("address")),
             lines=[self._line(x) for x in d.get("lines", [])],
             appliedCoupons=[self._applied_coupon(x) for x in d.get("appliedCoupons", [])],
             payments=[self._payment(x) for x in d.get("payments", [])])
+        return self._map_line_products(order)
 
     def _coupon(self, d) -> Optional[dtos.Coupon]:
         if not d:
@@ -210,18 +265,36 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     # -- helpers ------------------------------------------------------------
     def _categories_map(self) -> dict:
-        if self._cats is None:
-            data = self._get("/api/catalog/categories/")
-            self._cats = {cat["id"]: self._category(cat) for cat in data}
-        return self._cats
+        data = self._get("/api/catalog/categories/")
+        return {cat["id"]: self._category(cat) for cat in data}
+
+    def _variant_product_index(self) -> dict:
+        if self._variants is None:
+            index = {}
+            try:
+                for product in self.list_products(only_available=False, page_size=1000).items:
+                    for variant in product.variants or []:
+                        index[variant.id] = product
+            except Exception:
+                index = {}
+            self._variants = index
+        return self._variants
+
+    def _map_line_products(self, order: dtos.Order) -> dtos.Order:
+        """The order API exposes lines by variant id, so resolve each line's product."""
+        pending = [line for line in order.lines if line.product is None and line.productVariantId]
+        if not pending:
+            return order
+        index = self._variant_product_index()
+        for line in pending:
+            product = index.get(line.productVariantId)
+            if product is not None:
+                line.product = product
+                line.productId = product.id
+        return order
 
     def _enrich_line_products(self, order: dtos.Order) -> dtos.Order:
-        for line in order.lines:
-            try:
-                line.product = self.get_product(line.productId) or line.product
-            except Exception:
-                line.product = line.product
-        return order
+        return self._map_line_products(order)
 
     # -- interface ----------------------------------------------------------
     def list_orders(self, *, status=None, delivery_type=None, payment_type=None, client_id=None,
@@ -250,14 +323,20 @@ class HttpRapidfoodClient(RapidfoodClient):
         body = {}
         if payload.get("client_id"):
             body["client_id"] = payload["client_id"]
+        if payload.get("client_name"):
+            body["client_name"] = payload["client_name"]
         body["origin"] = payload.get("origin") or "IN_PLACE"
         draft = self._post("/api/orders/draft/", body)
         order_id = draft["order_id"]
 
         for item in payload.get("lines", []):
-            self._post(f"/api/orders/{order_id}/lines/", {
-                "product_id": item["product_id"], "quantity": int(item["quantity"]),
-            })
+            line_payload = {
+                "product_variant_id": item.get("product_variant_id") or item.get("product_id"),
+                "quantity": int(item["quantity"]),
+                "modifier_option_ids": item.get("modifier_option_ids", []),
+                "removed_ingredient_ids": item.get("removed_ingredient_ids", [])
+            }
+            self._post(f"/api/orders/{order_id}/lines/", line_payload)
 
         delivery = payload.get("delivery_type")
         if delivery:
@@ -340,6 +419,47 @@ class HttpRapidfoodClient(RapidfoodClient):
             raise RuntimeError("Actualizar categorías aún no está soportado por el backend.")
         return self._category(self._post("/api/catalog/categories/",
                                          {"description": payload["description"]}))
+
+    def list_ingredients(self):
+        return [self._ingredient(x) for x in self._get("/api/catalog/ingredients/")]
+
+    def create_ingredient(self, payload):
+        return self._ingredient(self._post("/api/catalog/ingredients/", payload))
+
+    def update_ingredient(self, ingredient_id, payload):
+        return self._ingredient(self._patch(f"/api/catalog/ingredients/{ingredient_id}/", payload))
+
+    def create_variant(self, product_id, payload):
+        return self._variant(self._post(f"/api/catalog/products/{product_id}/variants/", payload))
+
+    def update_variant(self, variant_id, payload):
+        return self._variant(self._patch(f"/api/catalog/variants/{variant_id}/", payload))
+
+    def set_variant_price(self, variant_id, price, since_date=None):
+        self._post(f"/api/catalog/variants/{variant_id}/prices/", {
+            "price": str(price), "since_date": (since_date or date.today()).isoformat(),
+        })
+
+    def set_variant_ingredients(self, variant_id, payload):
+        return self._put(f"/api/catalog/variants/{variant_id}/ingredients/", payload)
+
+    def create_modifier_group(self, product_id, payload):
+        return self._modifier_group(self._post(f"/api/catalog/products/{product_id}/modifier-groups/", payload))
+
+    def update_modifier_group(self, group_id, payload):
+        return self._modifier_group(self._patch(f"/api/catalog/modifier-groups/{group_id}/", payload))
+
+    def create_modifier_option(self, group_id, payload):
+        return self._modifier_option(self._post(f"/api/catalog/modifier-groups/{group_id}/options/", payload))
+
+    def update_modifier_option(self, option_id, payload):
+        return self._modifier_option(self._patch(f"/api/catalog/modifier-options/{option_id}/", payload))
+
+    def delete_modifier_group(self, group_id):
+        self._delete(f"/api/catalog/modifier-groups/{group_id}/")
+
+    def delete_modifier_option(self, option_id):
+        self._delete(f"/api/catalog/modifier-options/{option_id}/")
 
     # -- payments (not in scope yet) ---------------------------------------
     def list_payments(self, *, status=None, provider=None, date_from=None, date_to=None, page=1, page_size=15):

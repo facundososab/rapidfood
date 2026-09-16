@@ -1,0 +1,4 @@
+# Django templates use single-line-only tags; prettier's HTML formatter wraps
+# long lines mid-tag and prints them as literal text. Do not format them.
+ui/templates/
+ui/vendor/
