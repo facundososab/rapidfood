@@ -12,6 +12,7 @@ class ProductRepositoryPort(Protocol):
         self,
         category_id: str | None = None,
         state: ProductState | None = None,
+        search: str | None = None,
     ) -> list[Product]: ...
 
     def delete(self, product_id: str) -> None: ...

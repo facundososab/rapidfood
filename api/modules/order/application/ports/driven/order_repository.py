@@ -12,8 +12,13 @@ from modules.order.domain.models.payment_method import PaymentMethod
 @dataclass
 class OrderFilter:
     status: Optional[OrderState] = None
+    status_in: Optional[List[OrderState]] = None
     delivery_type: Optional[DeliveryType] = None
     payment_type: Optional[PaymentMethod] = None
+    conversation_id: Optional[str] = None
+    business_config_id: Optional[str] = None
+    client_id: Optional[str] = None
+    exclude_status_in: Optional[List[OrderState]] = None
     date_from: Optional[datetime] = None
     date_to: Optional[datetime] = None
 

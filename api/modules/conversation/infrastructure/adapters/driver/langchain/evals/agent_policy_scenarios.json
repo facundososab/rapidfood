@@ -1,0 +1,70 @@
+{
+  "name": "rapidfood-agent-policy",
+  "description": "Behaviour scenarios for the Rapidfood conversational agent. Run them in LangSmith (or LangGraph Studio) to check tool selection, not exact wording. The deterministic parts are covered by the pytest suite; these are LLM-behaviour evals.",
+  "prompt_version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "menu-question-uses-search",
+      "input": "¿Qué tienen?",
+      "expected_tools": ["search_products"],
+      "forbidden_tools": ["add_item", "confirm_order"],
+      "notes": "Informational question: no order is created."
+    },
+    {
+      "id": "product-question-uses-detail",
+      "input": "¿La Stacker trae cebolla?",
+      "expected_tools": ["get_product_detail"],
+      "forbidden_tools": ["add_item", "add_item_to_order"],
+      "notes": "Must not add anything or invent ingredients."
+    },
+    {
+      "id": "purchase-intent-adds-item",
+      "input": "Quiero una Stacker doble",
+      "expected_tools": ["add_item"],
+      "forbidden_tools": ["confirm_order"],
+      "notes": "Concrete purchase intent creates/reuses the draft."
+    },
+    {
+      "id": "second-item-is-a-second-line",
+      "input": "Y otra con bacon",
+      "history": ["Quiero una Stacker doble"],
+      "expected_tools": ["add_item"],
+      "forbidden_tools": [],
+      "notes": "Adds a NEW line; must not update the previous one."
+    },
+    {
+      "id": "delivery-question-quotes-only",
+      "input": "¿Llegan a San Juan 3250?",
+      "expected_tools": ["quote_delivery"],
+      "forbidden_tools": ["set_delivery", "add_item", "confirm_order"],
+      "notes": "A quote must not create or modify an order."
+    },
+    {
+      "id": "delivery-request-sets-delivery",
+      "input": "Mandámelo a San Juan 3250",
+      "history": ["Quiero una Stacker doble"],
+      "expected_tools": ["set_delivery"],
+      "forbidden_tools": ["confirm_order"],
+      "notes": "The backend quotes; the agent never states a shipping cost it did not receive."
+    },
+    {
+      "id": "bare-yes-does-not-confirm",
+      "input": "Sí",
+      "history": ["¿Querés agregar bacon?"],
+      "expected_tools": [],
+      "forbidden_tools": ["confirm_order"],
+      "notes": "An affirmative answer to an unrelated question is NOT a confirmation."
+    },
+    {
+      "id": "explicit-confirmation-after-summary-confirms",
+      "input": "Sí, confirmo",
+      "history": [
+        "Quiero una Stacker doble",
+        "Tu pedido es: 1 x Stacker Doble. Total: 1200. Pago: efectivo. ¿Confirmás el pedido?"
+      ],
+      "expected_tools": ["confirm_order"],
+      "forbidden_tools": [],
+      "notes": "Only after the summary was presented does an explicit confirmation confirm."
+    }
+  ]
+}

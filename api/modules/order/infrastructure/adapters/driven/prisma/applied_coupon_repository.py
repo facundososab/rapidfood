@@ -8,9 +8,14 @@ from shared.infrastructure.prisma.db import db
 
 
 class PrismaAppliedCouponRepository(AppliedCouponRepositoryPort):
+    def __init__(self, client=None) -> None:
+        # Accepts a transaction client so a coupon application can be recorded
+        # in the same transaction as the order mutation.
+        self._client = client if client is not None else db.client
+
     def add(self, snapshot: AppliedCouponSnapshot) -> AppliedCouponSnapshot:
         record_id = snapshot.id or str(uuid.uuid4())
-        db.client.appliedcoupon.create(
+        self._client.appliedcoupon.create(
             data={
                 "id": record_id,
                 "orderId": snapshot.order_id,
@@ -28,7 +33,7 @@ class PrismaAppliedCouponRepository(AppliedCouponRepositoryPort):
         return snapshot
 
     def list_by_coupon(self, coupon_id: str) -> list[AppliedCouponSnapshot]:
-        records = db.client.appliedcoupon.find_many(
+        records = self._client.appliedcoupon.find_many(
             where={"couponId": coupon_id},
             order={"appliedAt": "desc"},
         )

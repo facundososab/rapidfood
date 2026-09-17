@@ -367,6 +367,15 @@ class HttpRapidfoodClient(RapidfoodClient):
                     delivery_body[key] = payload[key]
             self._patch(f"/api/orders/{order_id}/delivery/", delivery_body)
 
+        # The payment method is part of the snapshot being confirmed; the POS
+        # always chooses one, so persist it before confirming.
+        payment_type = payload.get("payment_type")
+        if payment_type:
+            self._patch(
+                f"/api/orders/{order_id}/payment-type/",
+                {"payment_type": payment_type},
+            )
+
         if payload.get("coupon_code"):
             # Best-effort: a coupon that can't be applied must not block the order.
             try:

@@ -39,6 +39,8 @@ class ConversationRecord:
     client_id: str | None = None
     last_intent: DetectedIntent | None = None
     overall_sentiment: Sentiment | None = None
+    external_thread_id: str | None = None
+    business_config_id: str | None = None
 
 
 def coerce_enum(value, enum_cls, field_name: str):

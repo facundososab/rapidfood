@@ -33,6 +33,29 @@ class SetDeliveryDetailsSerializer(serializers.Serializer):
     province = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
 
+class SetClientSerializer(serializers.Serializer):
+    client_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True, allow_null=True
+    )
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SetPaymentTypeSerializer(serializers.Serializer):
+    payment_type = serializers.ChoiceField(choices=["CASH", "ONLINE"])
+
+
+class CurrentDraftSerializer(serializers.Serializer):
+    business_config_id = serializers.CharField()
+    conversation_id = serializers.CharField()
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+    client_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True, allow_null=True
+    )
+    origin = serializers.ChoiceField(
+        choices=["IN_PLACE", "AGENT"], required=False, allow_null=True
+    )
+
+
 class ConfirmOrderSerializer(serializers.Serializer):
     # No additional fields needed since the order ID comes from the URL
     pass

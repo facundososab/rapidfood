@@ -8,6 +8,7 @@ from modules.catalog.domain.models.product import ProductState
 class ListProductsQuery:
     category_id: str | None = None
     state: ProductState | None = None
+    search: str | None = None
 
 
 @dataclass(frozen=True)

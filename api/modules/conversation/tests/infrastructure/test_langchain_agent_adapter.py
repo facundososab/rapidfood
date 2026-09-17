@@ -1,0 +1,253 @@
+"""Incoming message flow and the LangChain agent adapter."""
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+from langchain_core.messages import AIMessage
+
+from modules.conversation.domain.models.agent_execution_context import (
+    AgentExecutionContext,
+)
+from modules.conversation.application.ports.driven.agent_runner import AgentTurn
+from modules.conversation.application.use_cases.handle_incoming_message import (
+    HandleIncomingMessageCommand,
+    HandleIncomingMessageUseCase,
+    message_id_for,
+)
+from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+    LangChainConversationAgentAdapter,
+)
+
+
+class FakeMessageRepository:
+    def __init__(self):
+        self.messages = []
+
+    def add(self, message):
+        self.messages.append(message)
+        return message
+
+    def list_by_conversation(self, conversation_id):
+        return [m for m in self.messages if m.conversation_id == conversation_id]
+
+
+class FakeClock:
+    def now(self):
+        from datetime import datetime, timezone
+
+        return datetime(2026, 9, 17, tzinfo=timezone.utc)
+
+
+class FakeRunner:
+    def __init__(self, response="Listo", error=None):
+        self.response = response
+        self.error = error
+        self.turns = []
+
+    def run(self, turn):
+        self.turns.append(turn)
+        if self.error:
+            raise self.error
+        return self.response
+
+
+def _context(**overrides):
+    values = dict(
+        business_configuration_id="biz-1",
+        conversation_id="conv-1",
+        channel="LANGSMITH",
+        external_message_id="msg-1",
+    )
+    values.update(overrides)
+    return AgentExecutionContext(**values)
+
+
+def _use_case(runner, repository=None):
+    repository = repository or FakeMessageRepository()
+    return HandleIncomingMessageUseCase(repository, runner, FakeClock()), repository
+
+
+def test_persists_user_then_assistant():
+    runner = FakeRunner(response="Tenemos estas hamburguesas...")
+    use_case, repository = _use_case(runner)
+
+    result = use_case.execute(
+        HandleIncomingMessageCommand(
+            context=_context(external_message_id="11111111-1111-1111-1111-111111111111"),
+            content="¿Qué hamburguesas tienen?",
+        )
+    )
+
+    assert result.response == "Tenemos estas hamburguesas..."
+    roles = [m.role for m in repository.messages]
+    assert roles == ["USER", "AGENT"]
+    assert repository.messages[0].message_id == "11111111-1111-1111-1111-111111111111"
+    assert result.assistant_message_id == repository.messages[1].message_id
+
+
+def test_user_message_is_persisted_before_the_agent_runs():
+    seen = {}
+
+    class InspectingRunner:
+        def run(self, turn):
+            seen["roles_at_run"] = [m.role for m in repository.messages]
+            return "ok"
+
+    repository = FakeMessageRepository()
+    use_case = HandleIncomingMessageUseCase(repository, InspectingRunner(), FakeClock())
+
+    use_case.execute(HandleIncomingMessageCommand(context=_context(), content="hola"))
+
+    assert seen["roles_at_run"] == ["USER"]
+
+
+def test_agent_failure_keeps_the_user_message():
+    repository = FakeMessageRepository()
+    runner = FakeRunner(error=RuntimeError("model down"))
+    use_case = HandleIncomingMessageUseCase(repository, runner, FakeClock())
+
+    with pytest.raises(RuntimeError):
+        use_case.execute(HandleIncomingMessageCommand(context=_context(), content="hola"))
+
+    assert [m.role for m in repository.messages] == ["USER"]
+
+
+def test_history_is_passed_without_the_new_message():
+    runner = FakeRunner()
+    use_case, repository = _use_case(runner)
+
+    use_case.execute(HandleIncomingMessageCommand(context=_context(), content="uno"))
+    use_case.execute(
+        HandleIncomingMessageCommand(
+            context=_context(external_message_id="msg-2"), content="dos"
+        )
+    )
+
+    second_turn = runner.turns[1]
+    assert second_turn.message == "dos"
+    assert [content for _, content in second_turn.history] == ["uno", "Listo"]
+
+
+def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
+    captured = {}
+
+    class FakeAgent:
+        def invoke(self, payload, config=None):
+            captured["messages"] = payload["messages"]
+            captured["config"] = config
+            return {"messages": [*payload["messages"], AIMessage(content="Tu pedido está listo")]}
+
+    def fake_create_agent(model, tools, system_prompt=None):
+        captured["tools"] = tools
+        captured["prompt"] = system_prompt
+        return FakeAgent()
+
+    monkeypatch.setattr(
+        "modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter.create_agent",
+        fake_create_agent,
+    )
+
+    container = SimpleNamespace()
+    adapter = LangChainConversationAgentAdapter(container, model=object())
+    turn = AgentTurn(
+        message="¿cómo viene mi pedido?",
+        context=_context(),
+        history=(("user", "hola"), ("assistant", "¡Hola!")),
+    )
+
+    response = adapter.run(turn)
+
+    assert response == "Tu pedido está listo"
+    assert len(captured["tools"]) == 17
+    assert [m.type for m in captured["messages"]] == ["human", "ai", "human"]
+    assert "NUNCA inventes" in captured["prompt"]
+
+
+def test_message_id_is_a_valid_and_stable_uuid_for_any_channel_id():
+    import uuid
+
+    context = _context(external_message_id="whatsapp:abc-123")
+
+    first = message_id_for(context)
+    second = message_id_for(context)
+
+    assert first == second  # stable across retries (idempotency)
+    uuid.UUID(first)  # valid UUID for the Message primary key
+    assert message_id_for(_context(external_message_id="other")) != first
+    assert message_id_for(_context(conversation_id="conv-2")) != first
+
+
+def test_a_uuid_external_message_id_is_used_as_is():
+    value = "22222222-2222-2222-2222-222222222222"
+    assert message_id_for(_context(external_message_id=value)) == value
+
+
+def test_a_missing_external_message_id_generates_a_random_uuid():
+    import uuid
+
+    first = message_id_for(_context(external_message_id=None))
+    second = message_id_for(_context(external_message_id=None))
+
+    uuid.UUID(first)
+    assert first != second
+
+
+def test_groq_model_factory_uses_the_configured_model_and_key(monkeypatch):
+    import langchain_groq
+
+    captured = {}
+
+    class FakeGroq:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(langchain_groq, "ChatGroq", FakeGroq)
+
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        build_agent_model,
+    )
+
+    build_agent_model("llama-3.3-70b-versatile", "test-key")
+
+    assert captured["model"] == "llama-3.3-70b-versatile"
+    assert captured["api_key"] == "test-key"
+    # No temperature is sent unless explicitly requested (models may fix sampling).
+    assert "temperature" not in captured
+
+
+def test_agent_runner_builds_with_the_configured_model(monkeypatch):
+    import langchain_groq
+
+    captured = {}
+
+    class FakeGroq:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(langchain_groq, "ChatGroq", FakeGroq)
+
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        build_agent_runner,
+    )
+
+    runner = build_agent_runner(SimpleNamespace(), model_name="llama-3.1-8b-instant", api_key="k")
+
+    assert captured["model"] == "llama-3.1-8b-instant"
+    assert isinstance(runner, LangChainConversationAgentAdapter)
+
+
+def test_trace_metadata_never_includes_secrets(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "super-secret")
+    from modules.conversation.application.ports.driven.agent_runner import AgentTurn
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _trace_config,
+    )
+
+    config = _trace_config(AgentTurn(message="hola", context=_context()))
+    serialized = str(config)
+
+    assert "super-secret" not in serialized
+    assert config["metadata"]["channel"] == "LANGSMITH"
+    assert config["metadata"]["businessConfigId"] == "biz-1"
+    assert config["metadata"]["conversationId"] == "conv-1"

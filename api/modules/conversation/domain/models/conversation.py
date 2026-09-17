@@ -14,6 +14,10 @@ class Conversation:
     overall_sentiment: Sentiment | None = None
     last_intent: DetectedIntent | None = None
     client_id: str | None = None
+    # External channel identity (LangSmith thread, WhatsApp chat, ...). The
+    # internal id stays a Rapidfood UUID so the channel can be swapped.
+    external_thread_id: str | None = None
+    business_config_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.conversation_id:

@@ -1,0 +1,32 @@
+change: conversation-agent
+status: in_progress
+created: 2026-09-17
+artifact_store: openspec
+supersedes:
+  - conversation/specs/conversations (agent portion; the deterministic scaffold was kept wired for the legacy webhook)
+phases:
+  explore: done
+  propose: done
+  spec: done
+  design: done
+  tasks: done
+  apply: done
+  verify: pass
+  archive: pending
+verification_status: pass
+verification_evidence:
+  pytest: "464 passed"
+  import_linter: "10 kept, 0 broken"
+  django_check: "no issues"
+  prisma_validate: "valid"
+  end_to_end: "agent answered a menu question from real catalog data over HTTP (Gemini + tools); thread -> Conversation; add_item/pickup/payment/summary produced a DRAFT"
+specs:
+  - conversation-agent
+  - order-lifecycle
+  - order-idempotency
+  - order-payments
+  - catalog-query
+notes:
+  - LangGraph + Google Gemini; LangSmith/Studio is the first test driver.
+  - Payments stay inside the `order` bounded context.
+  - Live LLM evals hit the Gemini free-tier quota (20 req/day for gemini-3.6-flash).

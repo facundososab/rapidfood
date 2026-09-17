@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "rapidfood_agent": "./api/modules/conversation/infrastructure/adapters/driver/langchain/graph.py:graph"
+  },
+  "env": ".env"
+}

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from modules.order.domain.models.payment import Payment
+from modules.order.domain.models.payment_attempt import PaymentAttempt
 from modules.order.domain.models.payment_status import PaymentStatus
 from modules.order.infrastructure.adapters.driven.prisma.payment_repository import (
     PrismaPaymentRepository,
@@ -122,7 +122,7 @@ def test_save_updates_existing_payment_without_creating_duplicates(db) -> None:
     )
 
     repo.save(
-        Payment(
+        PaymentAttempt(
             id=payment.id,
             order_id=order_id,
             provider="MERCADOPAGO",

@@ -5,13 +5,18 @@ from django.urls import resolve
 from rest_framework.test import APIRequestFactory
 
 from modules.order.application.ports.driver.payment_ports import (
-    CreatePaymentLinkResult,
-    ProcessPaymentNotificationResult,
+    CancelSupersededCheckoutResult,
+    CreatePaymentCheckoutResult,
+    HandlePaymentWebhookResult,
 )
 from modules.order.infrastructure.adapters.driver.rest.views import (
+    CancelSupersededCheckoutView,
     MercadoPagoWebhookView,
     PaymentLinkView,
 )
+
+ORDER_ID = "11111111-1111-1111-1111-111111111111"
+ATTEMPT_ID = "22222222-2222-2222-2222-222222222222"
 
 
 class FakeUseCase:
@@ -26,22 +31,32 @@ class FakeUseCase:
 
 class FakeContainer:
     def __init__(self, webhook_secret=None):
-        self.create_payment_link_use_case = FakeUseCase(
-            CreatePaymentLinkResult(
-                order_id="11111111-1111-1111-1111-111111111111",
-                payment_id="payment-1",
+        self.create_payment_checkout_use_case = FakeUseCase(
+            CreatePaymentCheckoutResult(
+                order_id=ORDER_ID,
+                payment_attempt_id=ATTEMPT_ID,
                 provider="MERCADOPAGO",
                 checkout_url="https://pay.example/checkout",
                 status="PENDING",
+                order_version=5,
+                created=True,
             )
         )
-        self.process_payment_notification_use_case = FakeUseCase(
-            ProcessPaymentNotificationResult(
-                payment_id="payment-1",
+        self.handle_payment_webhook_use_case = FakeUseCase(
+            HandlePaymentWebhookResult(
+                payment_attempt_id=ATTEMPT_ID,
                 status="APPROVED",
-                order_id="11111111-1111-1111-1111-111111111111",
+                order_id=ORDER_ID,
                 order_status="PAID",
                 processed=True,
+                applied=True,
+            )
+        )
+        self.cancel_superseded_checkout_use_case = FakeUseCase(
+            CancelSupersededCheckoutResult(
+                payment_attempt_id=ATTEMPT_ID,
+                cancellation_status="CANCELLED",
+                already_cancelled=False,
             )
         )
         self.mercadopago_settings = type(
@@ -62,26 +77,43 @@ def sign(data_id, request_id, timestamp, secret):
     return f"ts={timestamp},v1={digest}"
 
 
-def test_payment_link_endpoint_delegates_to_use_case(monkeypatch):
+def test_checkout_endpoint_delegates_to_use_case(monkeypatch):
     container = FakeContainer()
     patch_container(monkeypatch, container)
     request = APIRequestFactory().post("/payment-link/", {}, format="json")
 
-    response = PaymentLinkView.as_view()(
-        request, order_id="11111111-1111-1111-1111-111111111111"
-    )
+    response = PaymentLinkView.as_view()(request, order_id=ORDER_ID)
 
     assert response.status_code == 201
     assert response.data == {
-        "order_id": "11111111-1111-1111-1111-111111111111",
-        "payment_id": "payment-1",
+        "order_id": ORDER_ID,
+        "payment_attempt_id": ATTEMPT_ID,
         "provider": "MERCADOPAGO",
         "checkout_url": "https://pay.example/checkout",
         "status": "PENDING",
+        "order_version": 5,
+        "created": True,
     }
-    assert len(container.create_payment_link_use_case.commands) == 1
-    assert container.create_payment_link_use_case.commands[0].order_id == (
-        "11111111-1111-1111-1111-111111111111"
+    assert len(container.create_payment_checkout_use_case.commands) == 1
+    assert container.create_payment_checkout_use_case.commands[0].order_id == ORDER_ID
+
+
+def test_cancel_checkout_endpoint_delegates(monkeypatch):
+    container = FakeContainer()
+    patch_container(monkeypatch, container)
+    request = APIRequestFactory().post("/cancel/", {}, format="json")
+
+    response = CancelSupersededCheckoutView.as_view()(request, payment_attempt_id=ATTEMPT_ID)
+
+    assert response.status_code == 200
+    assert response.data == {
+        "payment_attempt_id": ATTEMPT_ID,
+        "cancellation_status": "CANCELLED",
+        "already_cancelled": False,
+    }
+    assert (
+        container.cancel_superseded_checkout_use_case.commands[0].payment_attempt_id
+        == ATTEMPT_ID
     )
 
 
@@ -102,9 +134,15 @@ def test_webhook_endpoint_validates_signature_and_delegates(monkeypatch):
     response = MercadoPagoWebhookView.as_view()(request)
 
     assert response.status_code == 200
-    assert response.data == {"processed": True, "status": "APPROVED"}
-    assert len(container.process_payment_notification_use_case.commands) == 1
-    command = container.process_payment_notification_use_case.commands[0]
+    assert response.data == {
+        "processed": True,
+        "applied": True,
+        "status": "APPROVED",
+        "order_status": "PAID",
+        "payment_attempt_id": ATTEMPT_ID,
+    }
+    assert len(container.handle_payment_webhook_use_case.commands) == 1
+    command = container.handle_payment_webhook_use_case.commands[0]
     assert command.provider == "MERCADOPAGO"
     assert command.data_id == "mp-1"
     assert command.topic == "payment"
@@ -126,12 +164,16 @@ def test_webhook_endpoint_rejects_invalid_signature_before_use_case(monkeypatch)
     response = MercadoPagoWebhookView.as_view()(request)
 
     assert response.status_code == 403
-    assert container.process_payment_notification_use_case.commands == []
+    assert container.handle_payment_webhook_use_case.commands == []
 
 
 def test_order_payment_routes_are_registered():
     payment_link = resolve(
-        "/11111111-1111-1111-1111-111111111111/payment-link/",
+        f"/{ORDER_ID}/payment-link/",
+        urlconf="modules.order.infrastructure.adapters.driver.rest.urls",
+    )
+    cancel = resolve(
+        f"/payments/attempts/{ATTEMPT_ID}/cancel/",
         urlconf="modules.order.infrastructure.adapters.driver.rest.urls",
     )
     webhook = resolve(
@@ -140,4 +182,5 @@ def test_order_payment_routes_are_registered():
     )
 
     assert payment_link.func.view_class is PaymentLinkView
+    assert cancel.func.view_class is CancelSupersededCheckoutView
     assert webhook.func.view_class is MercadoPagoWebhookView

@@ -19,5 +19,5 @@ def test_django_settings_and_conversation_urls_are_canonical():
     assert settings.ROOT_URLCONF == "config.urls"
     assert os.environ["DJANGO_SETTINGS_MODULE"] == "config.settings"
 
-    match = resolve("/conversation/webhook/")
+    match = resolve("/api/conversation/webhook/")
     assert match.url_name == "conversation-webhook"

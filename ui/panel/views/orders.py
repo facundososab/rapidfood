@@ -31,16 +31,8 @@ def index(request):
     c=get_client()
     products=[]
     for p in c.list_products(only_available=False, page_size=200).items:
-        price=pricing.current_price(p)
-        is_variable = False
-        if price is None:
-            full=c.get_product(p.id)
-            price=pricing.current_price(full) if full else None
-            if price is None and full and full.variants:
-                v_prices = [v.currentPrice for v in full.variants if v.available and v.currentPrice is not None]
-                if v_prices:
-                    price = min(v_prices)
-                    is_variable = True
+        price = pricing.current_price(p)
+        is_variable = pricing.has_variable_price(p)
         products.append({'id':p.id,'name':p.name,'description':p.description,'available':p.available,'imageUrl':p.imageUrl,'categoryId':p.categoryId,'category':p.category.description if p.category else '','price':price,'is_variable':is_variable})
     business = c.get_business_config()
     pos_config = {
@@ -121,9 +113,6 @@ def new_order(request):
     products=[]
     for p in c.list_products(only_available=True,page_size=200).items:
         price=pricing.current_price(p)
-        if price is None:
-            full=c.get_product(p.id)
-            price=pricing.current_price(full) if full else None
         products.append({'id':p.id,'name':p.name,'category':p.category.description if p.category else '','price':price})
     return page(request,'orders/new.html',{**_ctx(request),'clients':c.search_clients(''),'products':products,'coupons':c.list_coupons()})
 def wizard_client_search(request):

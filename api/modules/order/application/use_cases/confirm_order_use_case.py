@@ -45,6 +45,15 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
             raise OrderNotFound("Order not found")
 
         if order.status != OrderState.DRAFT:
+            # Idempotent retry: this confirmation already succeeded. Return the
+            # current state without re-applying any effect. An incompatible
+            # state (e.g. cancelled) still fails normally.
+            if order.confirmed_at is not None and order.status != OrderState.CANCELLED:
+                return ConfirmOrderResponse(
+                    order_id=order.id,
+                    status=order.status.value,
+                    confirmed_at=order.confirmed_at.isoformat(),
+                )
             raise OrderNotModifiableError("Only DRAFT orders can be confirmed")
 
         if not order.lines:
