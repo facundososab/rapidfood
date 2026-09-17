@@ -1,1 +1,43 @@
-{% extends 'base.html' %}{% block title %}{{ coupon.couponCode }}{% endblock %}{% block heading %}<span class="font-mono">{{ coupon.couponCode }}</span>{% endblock %}{% block content %}<div class="grid gap-5 xl:grid-cols-[.8fr_1.2fr]"><div class="card p-5"><div class="th">Estado</div><div class="mt-2"><span class="badge bg-primary-soft text-primary">{{ coupon|coupon_state_label }}</span></div><div class="mt-6 grid grid-cols-2 gap-4"><div><div class="th">Tipo</div><div class="mt-1 text-[13px]">{{ coupon.type }}</div></div><div><div class="th">Monto</div><div class="mt-1 font-mono">{{ coupon.amount|money }}</div></div><div><div class="th">Usos</div><div class="mt-1 font-mono">{{ coupon.availableUses }}</div></div><div><div class="th">Vence</div><div class="mt-1 text-[13px]">{{ coupon.dateOfExpiration|date_fmt }}</div></div></div></div><div class="card overflow-hidden"><div class="px-5 py-4 border-b border-line font-display font-bold">Aplicaciones registradas</div><table class="w-full"><tbody>{% for a in applied %}<tr class="border-b border-line"><td class="px-5 py-3"><a href="{% url 'order_detail' a.orderId %}" class="font-mono text-primary text-[13px]">{{ a.orderId|short_id }}</a></td><td class="px-4 py-3 text-[13px] text-ink-muted">{{ a.appliedAt|datetime_fmt }}</td><td class="px-5 py-3 text-right font-mono">− {{ a.discountAmount|money }}</td></tr>{% empty %}<tr><td>{% include 'components/empty_state.html' with title='Este cupón aún no fue aplicado' %}</td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}
+{% extends 'base.html' %}{% block title %}{{ coupon.couponCode }}{% endblock %}{% block heading %}<span class="font-mono">{{ coupon.couponCode }}</span>{% endblock %}{% block header_actions %}<div class="flex gap-2"><form method="post" action="{% url 'coupon_toggle' coupon.id %}">{% csrf_token %}<button class="btn btn-ghost text-[13px]">{% if coupon.isActive %}Pausar{% else %}Activar{% endif %}</button></form><button type="button" class="btn btn-ghost text-[13px]" @click="$dispatch('open-coupon-edit')">Editar</button></div>{% endblock %}{% block content %}<div x-data="{ editOpen: false }" @open-coupon-edit.window="editOpen = true" @keydown.escape.window="editOpen = false" class="grid gap-5 xl:grid-cols-[.8fr_1.2fr]"><div class="card p-5"><div class="th">Estado</div><div class="mt-2"><span class="badge {% if coupon.isActive %}bg-success-soft text-success{% else %}bg-neutral-soft text-neutral{% endif %}">{{ coupon|coupon_state_label }}</span></div><div class="mt-6 grid grid-cols-2 gap-4"><div><div class="th">Tipo</div><div class="mt-1 text-[13px]">{% if coupon.type == 'PERCENTAGE' %}Porcentaje{% else %}Monto fijo{% endif %}</div></div><div><div class="th">{% if coupon.type == 'PERCENTAGE' %}Porcentaje{% else %}Monto{% endif %}</div><div class="mt-1 font-mono">{% if coupon.type == 'PERCENTAGE' %}{{ coupon.amount|floatformat:0 }} %{% else %}{{ coupon.amount|money }}{% endif %}</div></div><div><div class="th">Usos disponibles</div><div class="mt-1 font-mono">{% if coupon.availableUses is None %}Ilimitados{% else %}{{ coupon.availableUses }}{% endif %}</div></div><div><div class="th">Vence</div><div class="mt-1 text-[13px]">{{ coupon.dateOfExpiration|date_fmt }}</div></div><div><div class="th">Pedido mínimo</div><div class="mt-1 font-mono">{% if coupon.minOrderAmount %}{{ coupon.minOrderAmount|money }}{% else %}—{% endif %}</div></div></div></div><div class="card overflow-hidden"><div class="px-5 py-4 border-b border-line font-display font-bold">Aplicaciones registradas</div><table class="w-full"><tbody>{% for a in applied %}<tr class="border-b border-line"><td class="px-5 py-3"><a href="{% url 'order_detail' a.orderId %}" class="font-mono text-primary text-[13px]">{{ a.orderId|short_id }}</a></td><td class="px-4 py-3 text-[13px] text-ink-muted">{{ a.appliedAt|datetime_fmt }}</td><td class="px-5 py-3 text-right font-mono">− {{ a.discountAmount|money }}</td></tr>{% empty %}<tr><td>{% include 'components/empty_state.html' with title='Este cupón aún no fue aplicado' %}</td></tr>{% endfor %}</tbody></table></div>
+  <div x-show="editOpen" x-transition.opacity class="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-ink/40 backdrop-blur-sm" style="display: none">
+    <div class="card w-full max-w-lg my-8 overflow-hidden" @click.outside="editOpen = false">
+      <div class="px-5 py-4 border-b border-line flex items-center justify-between">
+        <h3 class="font-display font-bold text-[15px]">Editar cupón</h3>
+        <button type="button" class="btn btn-ghost !px-2" @click="editOpen = false" aria-label="Cerrar">{% icon 'x' 'w-4 h-4' %}</button>
+      </div>
+      <form method="post" action="{% url 'coupon_update' coupon.id %}" class="p-5 grid sm:grid-cols-2 gap-5">
+        {% csrf_token %}
+        <div class="sm:col-span-2">
+          <label class="th block mb-2">Código</label>
+          <input class="field font-mono uppercase opacity-60" value="{{ coupon.couponCode }}" disabled />
+        </div>
+        <div>
+          <label class="th block mb-2">{% if coupon.type == 'PERCENTAGE' %}Porcentaje (%){% else %}Monto{% endif %}</label>
+          <input name="amount" type="number" min="0" step="0.01" {% if coupon.type == 'PERCENTAGE' %}max="100"{% endif %} class="field" value="{{ coupon.amount }}" required />
+        </div>
+        <div>
+          <label class="th block mb-2">Usos disponibles <span class="normal-case font-normal">(vacío = ilimitados)</span></label>
+          <input name="available_uses" type="number" min="0" class="field font-mono" value="{{ coupon.availableUses|default_if_none:'' }}" />
+        </div>
+        <div>
+          <label class="th block mb-2">Pedido mínimo <span class="normal-case font-normal">(opcional)</span></label>
+          <input name="min_order_amount" type="number" min="0" step="0.01" class="field font-mono" value="{{ coupon.minOrderAmount|default_if_none:'' }}" {% if coupon.type == 'FIXED_AMOUNT' %}required{% endif %} />
+        </div>
+        <div>
+          <label class="th block mb-2">Fecha de vencimiento</label>
+          <input name="date_of_expiration" type="date" class="field" value="{{ coupon.dateOfExpiration|date:'Y-m-d' }}" />
+        </div>
+        <div class="sm:col-span-2">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="is_active" class="rounded text-primary focus:ring-primary" {% if coupon.isActive %}checked{% endif %} />
+            <span class="text-[14px] font-medium text-ink">Activo</span>
+          </label>
+        </div>
+        <div class="sm:col-span-2 flex justify-end gap-2">
+          <button type="button" class="btn btn-ghost" @click="editOpen = false">Cancelar</button>
+          <button class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>{% endblock %}

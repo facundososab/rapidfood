@@ -21,6 +21,10 @@ from modules.config_coupon.application.ports.driver.coupon_admin_ports import (
     GetCouponByCodeQuery,
     ListCouponsQuery,
     ToggleCouponStatusCommand,
+    UpdateCouponCommand,
+)
+from modules.config_coupon.application.ports.driver.coupon_application_ports import (
+    ValidateCouponCommand,
 )
 from modules.config_coupon.domain.errors.coupon_errors import (
     CouponAlreadyExistsError,
@@ -30,6 +34,8 @@ from modules.config_coupon.domain.errors.coupon_errors import (
 from modules.config_coupon.infrastructure.adapters.driver.rest.serializers import (
     CreateCouponSerializer,
     ToggleCouponStatusSerializer,
+    UpdateCouponSerializer,
+    ValidateCouponSerializer,
 )
 
 
@@ -153,4 +159,80 @@ class ToggleCouponStatusView(APIView):
             return _error_response(exc)
         return Response(
             {"coupon_id": result.coupon_id, "is_active": result.is_active}
+        )
+
+
+class ValidateCouponView(APIView):
+    """POST /api/coupons/validate/ — read-only discount preview for the POS.
+
+    Returns 200 in both cases so the caller can render the reason; an invalid
+    coupon is not an HTTP error, just `valid: false`.
+    """
+
+    validate_coupon = None  # injected by the container
+
+    def post(self, request: Request) -> Response:
+        serializer = ValidateCouponSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            result = self.validate_coupon.execute(
+                ValidateCouponCommand(
+                    coupon_code=data["coupon_code"],
+                    subtotal=data["subtotal"],
+                )
+            )
+        except DomainError as exc:
+            return Response({"valid": False, "reason": str(exc)})
+        return Response(
+            {
+                "valid": True,
+                "coupon_id": result.coupon_id,
+                "coupon_code": result.coupon_code,
+                "coupon_type": result.coupon_type,
+                "amount": str(result.amount),
+                "discount_amount": str(result.discount_amount),
+                "available_uses": result.available_uses,
+                "date_of_expiration": result.date_of_expiration,
+            }
+        )
+
+
+class UpdateCouponView(APIView):
+    """PATCH /api/coupons/<coupon_id>/ — edit a coupon's editable fields."""
+
+    update_coupon = None  # injected by the container
+
+    def patch(self, request: Request, coupon_id: str) -> Response:
+        serializer = UpdateCouponSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            result = self.update_coupon.execute(
+                UpdateCouponCommand(
+                    coupon_id=str(coupon_id),
+                    amount=data["amount"],
+                    available_uses=data.get("available_uses"),
+                    min_order_amount=data.get("min_order_amount"),
+                    date_of_expiration=data.get("date_of_expiration"),
+                    is_active=data.get("is_active", True),
+                )
+            )
+        except DomainError as exc:
+            return _error_response(exc)
+        return Response(
+            {
+                "coupon_id": result.coupon_id,
+                "coupon_code": result.coupon_code,
+                "coupon_type": result.coupon_type,
+                "amount": str(result.amount),
+                "available_uses": result.available_uses,
+                "min_order_amount": (
+                    str(result.min_order_amount)
+                    if result.min_order_amount is not None
+                    else None
+                ),
+                "date_of_expiration": result.date_of_expiration,
+                "is_active": result.is_active,
+            }
         )

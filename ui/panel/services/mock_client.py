@@ -450,15 +450,38 @@ class MockRapidfoodClient(RapidfoodClient):
         db.coupons.append(c)
         return c
 
+    def update_coupon(self, coupon_id, payload):
+        c = self.get_coupon(coupon_id)
+        if c is None:
+            return None
+        c.amount = D(str(payload.get("amount", c.amount)))
+        if payload.get("availableUses") is not None:
+            c.availableUses = int(payload["availableUses"])
+        c.minOrderAmount = (D(str(payload["minOrderAmount"]))
+                            if payload.get("minOrderAmount") is not None else None)
+        c.dateOfExpiration = payload.get("dateOfExpiration")
+        if payload.get("isActive") is not None:
+            c.isActive = bool(payload["isActive"])
+        return c
+
+    def set_coupon_active(self, coupon_id, is_active):
+        c = self.get_coupon(coupon_id)
+        if c is not None:
+            c.isActive = bool(is_active)
+
     def validate_coupon(self, code: str, subtotal) -> CouponValidation:
         cou = self.get_coupon_by_code(code)
         if cou is None:
             return CouponValidation(valid=False, reason="El cupón no existe.")
+        if not getattr(cou, "isActive", True):
+            return CouponValidation(valid=False, reason="El cupón está pausado.", coupon=cou)
         if cou.dateOfExpiration is not None and cou.dateOfExpiration < datetime.now():
             return CouponValidation(valid=False, reason="El cupón está vencido.", coupon=cou)
-        if cou.availableUses <= 0:
+        if cou.availableUses is not None and cou.availableUses <= 0:
             return CouponValidation(valid=False, reason="El cupón no tiene usos disponibles.", coupon=cou)
         subtotal = D(str(subtotal))
+        if cou.minOrderAmount is not None and subtotal < cou.minOrderAmount:
+            return CouponValidation(valid=False, reason="El pedido no alcanza el mínimo del cupón.", coupon=cou)
         if cou.type == "PERCENTAGE":
             discount = (subtotal * cou.amount / D("100")).quantize(D("0.01"))
         else:
@@ -534,6 +557,17 @@ class MockRapidfoodClient(RapidfoodClient):
     def delete_business_address(self, business_config_id: str, address_id: str) -> None:
         biz = self.db.business
         biz.addresses = [a for a in biz.addresses if a.id != address_id]
+
+    # ---- Delivery --------------------------------------------------------
+    def quote_delivery(self, business_config_id, address):
+        shipping = self.db.business.shippingCost if hasattr(self.db, "business") else D("0")
+        return {
+            "available": True,
+            "shipping_cost": str(shipping or 0),
+            "distance_km": 3.0,
+            "estimated_duration_minutes": 12.0,
+            "demand_level": "LOW",
+        }
 
     # ---- Delivery configuration ------------------------------------------
     def get_delivery_config(self, business_config_id: str) -> dict:

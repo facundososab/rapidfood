@@ -24,6 +24,9 @@ urlpatterns = [
     path("pedidos/nuevo/cliente/crear/", orders.wizard_client_create, name="orders_new_client_create"),
     path("pedidos/nuevo/productos/buscar/", orders.wizard_product_search, name="orders_new_product_search"),
     path("pedidos/nuevo/carrito/", orders.wizard_cart, name="orders_new_cart"),
+    path("pedidos/cotizacion/", orders.wizard_quote, name="orders_quote"),
+    path("pedidos/cupon/validar/", orders.wizard_validate_coupon, name="orders_validate_coupon"),
+    path("pedidos/cliente/crear/", orders.orders_client_create, name="orders_client_create"),
     path("pedidos/nuevo/cupon/", orders.wizard_coupon, name="orders_new_coupon"),
     path("pedidos/nuevo/confirmar/", orders.wizard_confirm, name="orders_new_confirm"),
     path("pedidos/nuevo/producto/<str:product_id>/configurar/", orders.product_config_modal, name="orders_new_product_config"),
@@ -74,6 +77,8 @@ urlpatterns = [
     path("cupones/", coupons.index, name="coupons"),
     path("cupones/nuevo/", coupons.form, name="coupon_new"),
     path("cupones/guardar/", coupons.save, name="coupon_save"),
+    path("cupones/<str:coupon_id>/editar/", coupons.update, name="coupon_update"),
+    path("cupones/<str:coupon_id>/estado/", coupons.toggle, name="coupon_toggle"),
     path("cupones/<str:coupon_id>/", coupons.detail, name="coupon_detail"),
 
     # Conversations

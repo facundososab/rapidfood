@@ -8,6 +8,7 @@ from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.payment_method import PaymentMethod
 from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_line import OrderLine
+from modules.order.domain.models.delivery_address import DeliveryAddress
 from modules.order.domain.errors.order_errors import OrderStateError, InvalidLineError
 
 
@@ -25,6 +26,8 @@ class Order:
     client_name: Optional[str] = None
     business_config_id: Optional[str] = None
     address_id: Optional[str] = None
+    delivery_address: Optional[DeliveryAddress] = None
+    coupon_code: Optional[str] = None
     conversation_id: Optional[str] = None
     estimated_time: Optional[int] = None
     delivery_type: Optional[DeliveryType] = None

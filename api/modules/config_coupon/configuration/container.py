@@ -27,6 +27,9 @@ from modules.config_coupon.application.use_cases.list_coupons_use_case import (
 from modules.config_coupon.application.use_cases.toggle_coupon_status_use_case import (
     ToggleCouponStatusUseCase,
 )
+from modules.config_coupon.application.use_cases.update_coupon_use_case import (
+    UpdateCouponUseCase,
+)
 from modules.config_coupon.application.use_cases.validate_coupon_use_case import (
     ValidateCouponUseCase,
 )
@@ -46,6 +49,7 @@ class CouponContainer:
         clock = SystemClock()
 
         self.create_coupon = CreateCouponUseCase(coupon_repository)
+        self.update_coupon = UpdateCouponUseCase(coupon_repository)
         self.validate_coupon = ValidateCouponUseCase(coupon_repository, clock)
         self.consume_coupon = ConsumeCouponUseCase(coupon_repository, clock)
         self.toggle_coupon_status = ToggleCouponStatusUseCase(coupon_repository)

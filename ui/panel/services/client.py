@@ -196,6 +196,12 @@ class RapidfoodClient(ABC):
     def save_coupon(self, payload: dict) -> dtos.Coupon: ...
 
     @abstractmethod
+    def update_coupon(self, coupon_id: str, payload: dict) -> dtos.Coupon: ...
+
+    @abstractmethod
+    def set_coupon_active(self, coupon_id: str, is_active: bool) -> None: ...
+
+    @abstractmethod
     def validate_coupon(self, code: str, subtotal) -> CouponValidation: ...
 
     @abstractmethod
@@ -226,6 +232,10 @@ class RapidfoodClient(ABC):
 
     @abstractmethod
     def delete_business_address(self, business_config_id: str, address_id: str) -> None: ...
+
+    # ---- Delivery --------------------------------------------------------
+    @abstractmethod
+    def quote_delivery(self, business_config_id: str, address: dict) -> dict: ...
 
     # ---- Delivery configuration ------------------------------------------
     @abstractmethod

@@ -90,15 +90,14 @@ def _data(coupon: Coupon) -> dict[str, object]:
     Uses the Prisma schema FIELD names (camelCase); ``@map`` only affects the
     database column names, not the client field names.
     """
-    data: dict[str, object] = {
+    # Include nullable fields unconditionally so UPDATE can clear them
+    # (omitting them would leave the previous value in place).
+    return {
         "couponCode": coupon.coupon_code.value,
         "type": coupon.coupon_type.value,
         "amount": coupon.amount,
         "availableUses": coupon.available_uses,
+        "minOrderAmount": coupon.min_order_amount,
+        "dateOfExpiration": coupon.date_of_expiration,
         "isActive": coupon.is_active,
     }
-    if coupon.min_order_amount is not None:
-        data["minOrderAmount"] = coupon.min_order_amount
-    if coupon.date_of_expiration is not None:
-        data["dateOfExpiration"] = coupon.date_of_expiration
-    return data

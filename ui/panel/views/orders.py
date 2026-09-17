@@ -1,5 +1,5 @@
 from decimal import Decimal
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from .common import page, required, int_param
@@ -42,9 +42,9 @@ def index(request):
                     price = min(v_prices)
                     is_variable = True
         products.append({'id':p.id,'name':p.name,'description':p.description,'available':p.available,'imageUrl':p.imageUrl,'categoryId':p.categoryId,'category':p.category.description if p.category else '','price':price,'is_variable':is_variable})
-    shipping = c.get_business_config().shippingCost or 0
+    business = c.get_business_config()
     pos_config = {
-        'shipping': float(shipping),
+        'minOrder': float(business.minOrder or 0),
         'productConfigUrl': reverse('orders_new_product_config', args=['0000']),
     }
     return page(request,'orders/index.html',{**_ctx(request),'recent_orders':c.list_orders(page_size=16).items,'categories':c.list_categories(),'products':products,'client_options':[{'id':x.id,'name':x.name,'lastName':x.lastName,'phoneNumber':x.phoneNumber} for x in c.search_clients('')],'pos_config':pos_config})
@@ -131,6 +131,25 @@ def wizard_client_search(request):
 def wizard_client_create(request):
     if request.method!='POST': return HttpResponseBadRequest()
     c=get_client().create_client(request.POST.get('name',''),request.POST.get('last_name',''),request.POST.get('phone','')); return HttpResponse(f'<div class="text-[13px] text-success font-medium">Cliente creado: {c.name} {c.lastName}</div>')
+def orders_client_create(request):
+    """Create a client from the POS (JSON so the Alpine modal can react)."""
+    if request.method!='POST': return HttpResponseBadRequest()
+    full=(request.POST.get('name') or '').strip()
+    last=(request.POST.get('last_name') or '').strip()
+    phone=(request.POST.get('phone') or '').strip()
+    if full and not last:
+        parts=full.split()
+        full, last = parts[0], ' '.join(parts[1:])
+    if not (full and phone):
+        return JsonResponse({'ok':False,'error':'Completá nombre y teléfono.'})
+    try:
+        c=get_client().create_client(full, last, phone)
+    except Exception as e:
+        msg=str(e) or 'No se pudo crear el cliente.'
+        if 'already exists' in msg.lower():
+            msg='Ya existe un cliente con ese teléfono.'
+        return JsonResponse({'ok':False,'error':msg})
+    return JsonResponse({'ok':True,'client':{'id':c.id,'name':c.name,'lastName':c.lastName,'phoneNumber':c.phoneNumber}})
 def wizard_product_search(request):
     c=get_client(); return page(request,'orders/partials/product_results.html',{**_ctx(request),'products':c.list_products(search=request.GET.get('q',''),only_available=True,page_size=100).items})
 def wizard_cart(request):
@@ -151,9 +170,13 @@ def wizard_confirm(request):
         lines = json.loads(cart_payload)
     if not lines: return HttpResponseBadRequest('Agregá al menos un producto.')
     client_id=request.POST.get('client_id') or None
+    # Keep the typed/selected name as a snapshot even when a client is linked, so the
+    # order still shows who it belonged to if the client is later deleted.
     client_name=(request.POST.get('client_name') or '').strip() or None
-    if client_id: client_name=None  # a linked client already identifies the order
-    payload={'client_id':client_id,'client_name':client_name,'origin':'IN_PLACE','delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':request.POST.get('coupon_code') or None,'lines':lines}
+    payload={'client_id':client_id,'client_name':client_name,'origin':'IN_PLACE','delivery_type':request.POST.get('delivery_type') or None,'payment_type':request.POST.get('payment_type') or None,'coupon_code':(request.POST.get('coupon_code') or '').strip() or None,'lines':lines}
+    for field in ('street','street_number','floor','apartment','city','province','postal_code'):
+        value=(request.POST.get(field) or '').strip()
+        if value: payload[field]=value
     if payload['delivery_type']=='DELIVERY' and request.POST.get('street'):
         c=get_client()
         try:
@@ -163,6 +186,33 @@ def wizard_confirm(request):
             pass
     o=get_client().create_order(payload)
     return redirect('order_detail',order_id=o.id)
+
+
+def wizard_validate_coupon(request):
+    """Coupon discount preview for the POS (read-only)."""
+    if request.method!='POST': return HttpResponseBadRequest()
+    code=(request.POST.get('coupon_code') or '').strip()
+    if not code: return JsonResponse({'valid':False,'reason':'','discount_amount':''})
+    subtotal=Decimal(request.POST.get('subtotal') or '0')
+    v=get_client().validate_coupon(code, subtotal)
+    return JsonResponse({'valid':v.valid,'reason':v.reason,
+                         'discount_amount':str(v.discount_amount or '')})
+
+
+def wizard_quote(request):
+    """Delivery quote proxy for the POS (server-side call to the backend)."""
+    if request.method!='POST': return HttpResponseBadRequest()
+    address={field:(request.POST.get(field) or '').strip() for field in
+             ('street','street_number','floor','apartment','city','province','postal_code')}
+    if not (address['street'] and address['street_number'] and address['city'] and address['province']):
+        return JsonResponse({'available':False,'error':'Completá calle, número, ciudad y provincia.'})
+    c=get_client()
+    try:
+        business=c.get_business_config()
+        result=c.quote_delivery(business.id, address)
+    except Exception as e:
+        return JsonResponse({'available':False,'error':str(e) or 'No se pudo calcular el envío.'})
+    return JsonResponse(result)
 
 
 def product_config_modal(request, product_id):

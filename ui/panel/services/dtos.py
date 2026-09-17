@@ -287,8 +287,10 @@ class Coupon:
     couponCode: str
     type: str  # FIXED_AMOUNT | PERCENTAGE | ... open vocab
     amount: Decimal
-    availableUses: int
+    availableUses: Optional[int] = None
+    minOrderAmount: Optional[Decimal] = None
     dateOfExpiration: Optional[datetime] = None
+    isActive: bool = True
 
 
 @dataclass

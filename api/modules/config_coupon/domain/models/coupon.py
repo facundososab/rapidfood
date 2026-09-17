@@ -113,7 +113,7 @@ class Coupon:
         1. inactive (paused)
         2. depleted (no global uses left; skipped when unlimited)
         3. expired (past end of expiration day)
-        4. fixed-amount minimum order not reached
+        4. minimum order not reached (when a minimum is configured, any type)
         """
         if not self.is_active:
             raise CouponInactiveError(self.coupon_code.value)
@@ -121,9 +121,8 @@ class Coupon:
             raise CouponDepletedError(self.coupon_code.value)
         if self.is_expired(current_datetime):
             raise CouponExpiredError(self.coupon_code.value)
-        if self.is_fixed_amount:
-            if self.min_order_amount is not None and subtotal < self.min_order_amount:
-                raise CouponMinOrderNotReachedError(self.coupon_code.value)
+        if self.min_order_amount is not None and subtotal < self.min_order_amount:
+            raise CouponMinOrderNotReachedError(self.coupon_code.value)
 
     def calculate_discount(self, subtotal: Decimal) -> Decimal:
         """Compute the discount for a subtotal (assumes coupon is applicable).

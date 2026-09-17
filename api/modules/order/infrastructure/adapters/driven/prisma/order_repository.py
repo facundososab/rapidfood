@@ -13,6 +13,7 @@ from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
 from modules.order.domain.models.order_line_removed_ingredient import OrderLineRemovedIngredient
+from modules.order.domain.models.delivery_address import DeliveryAddress
 from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment_method import PaymentMethod
@@ -87,19 +88,36 @@ def _to_prisma_data(order: Order) -> dict:
         "origin": enums.OrderOrigin(order.origin.value),
         "subtotal": order.subtotal,
         "discount": order.discount,
-        "clientId": order.client_id,
+        "clientId": _id(order.client_id),
         "clientName": order.client_name,
-        "businessConfigId": order.business_config_id,
-        "addressId": order.address_id,
-        "conversationId": order.conversation_id,
+        "businessConfigId": _id(order.business_config_id),
+        "addressId": _id(order.address_id),
+        "conversationId": _id(order.conversation_id),
         "estimatedTime": order.estimated_time,
         "deliveryType": _to_prisma_enum(enums.DeliveryType, order.delivery_type),
         "paymentType": _to_prisma_enum(enums.PaymentType, order.payment_type),
         "shippingCost": order.shipping_cost,
         "totalAmount": order.total_amount,
-        "appliedCouponId": order.applied_coupon_id,
+        "appliedCouponId": _id(order.applied_coupon_id),
+        "couponCode": order.coupon_code,
+        "deliveryStreet": _da(order, "street"),
+        "deliveryStreetNumber": _da(order, "street_number"),
+        "deliveryFloor": _da(order, "floor"),
+        "deliveryApartment": _da(order, "apartment"),
+        "deliveryCity": _da(order, "city"),
+        "deliveryProvince": _da(order, "province"),
+        "deliveryPostalCode": _da(order, "postal_code"),
         "confirmedAt": order.confirmed_at,
     }
+
+
+def _da(order: Order, field: str):
+    return getattr(order.delivery_address, field) if order.delivery_address else None
+
+
+def _id(value):
+    """Normalize ids to str (Prisma can't serialize uuid.UUID objects)."""
+    return str(value) if value else None
 
 
 def _to_prisma_enum(enum_cls, value) -> Optional[str]:
@@ -203,9 +221,25 @@ def _to_domain(record) -> Order:
         shipping_cost=record.shippingCost,
         total_amount=record.totalAmount,
         applied_coupon_id=record.appliedCouponId,
+        coupon_code=record.couponCode,
+        delivery_address=_delivery_address(record),
         confirmed_at=record.confirmedAt,
         created_at=record.createdAt,
         lines=lines,
+    )
+
+
+def _delivery_address(record):
+    if not record.deliveryStreet:
+        return None
+    return DeliveryAddress(
+        street=record.deliveryStreet,
+        street_number=record.deliveryStreetNumber or "",
+        city=record.deliveryCity or "",
+        province=record.deliveryProvince or "",
+        floor=record.deliveryFloor,
+        apartment=record.deliveryApartment,
+        postal_code=record.deliveryPostalCode,
     )
 
 

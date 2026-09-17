@@ -23,5 +23,24 @@ class CreateCouponSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(required=False, default=True)
 
 
+class UpdateCouponSerializer(serializers.Serializer):
+    """Editable fields of a coupon (code/type are immutable)."""
+
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    available_uses = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    min_order_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    date_of_expiration = serializers.DateTimeField(required=False, allow_null=True)
+    is_active = serializers.BooleanField(required=False, default=True)
+
+
 class ToggleCouponStatusSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
+
+
+class ValidateCouponSerializer(serializers.Serializer):
+    """Read-only validation request used by the POS to preview a discount."""
+
+    coupon_code = serializers.CharField()
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0)

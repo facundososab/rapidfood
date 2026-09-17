@@ -43,6 +43,26 @@ class MinimumOrderNotMetError(OrderDomainError):
     pass
 
 
+class OrderClientRequiredError(OrderDomainError):
+    """Raised when an order is confirmed with no client reference (id or name)."""
+    pass
+
+
+class DeliveryNotAvailableError(OrderDomainError):
+    """Raised when the destination is outside the delivery zone or delivery is not configured."""
+    pass
+
+
+class DeliveryAddressRequiredError(OrderDomainError):
+    """Raised when a DELIVERY order is configured without a destination address."""
+    pass
+
+
+class DeliveryQuoteFailedError(OrderDomainError):
+    """Raised when the delivery provider could not produce a quote."""
+    pass
+
+
 class IngredientNotRemovableError(OrderDomainError):
     """Raised when a client tries to remove a non-removable ingredient."""
     pass

@@ -8,6 +8,7 @@ class BusinessConfigSnapshot:
     is_open: bool
     shipping_cost: Decimal
     min_order_amount: Decimal
+    business_config_id: str = "default"
 
 
 class BusinessConfigQueryPort(ABC):

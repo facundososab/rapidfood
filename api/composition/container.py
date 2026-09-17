@@ -7,14 +7,39 @@ place allowed to glue concrete adapters across bounded contexts.
 
 from functools import lru_cache
 
+from modules.business.configuration.container import (
+    BusinessContainer,
+    get_business_container,
+)
 from modules.catalog.configuration.container import (
     CatalogContainer,
     get_catalog_container,
 )
 from modules.client.configuration.container import ClientContainer
+from modules.config_coupon.configuration.container import CouponContainer, get_coupon_container
+from modules.conversation.configuration.container import (
+    ConversationContainer,
+    build_container,
+)
+from modules.delivery.configuration.container import DeliveryContainer, get_delivery_container
 from modules.order.configuration.container import OrderContainer
+from modules.order.infrastructure.adapters.driven.business.business_config_query_adapter import (
+    BusinessConfigQueryAdapter,
+)
 from modules.order.infrastructure.adapters.driven.catalog.catalog_product_query import (
     CatalogProductQuery,
+)
+from modules.order.infrastructure.adapters.driven.client.client_query_adapter import (
+    ClientQueryAdapter,
+)
+from modules.order.infrastructure.adapters.driven.coupon.coupon_consume_adapter import (
+    CouponConsumeAdapter,
+)
+from modules.order.infrastructure.adapters.driven.coupon.coupon_query_adapter import (
+    CouponQueryAdapter,
+)
+from modules.order.infrastructure.adapters.driven.delivery.delivery_quote_adapter import (
+    DeliveryQuoteAdapter,
 )
 
 
@@ -31,24 +56,39 @@ def get_app_client_container() -> ClientContainer:
 
 
 @lru_cache(maxsize=1)
-def get_app_container() -> OrderContainer:
-    """Builds the order module wired to the real catalog query adapter."""
-    catalog = get_catalog_container()
-    catalog_query = CatalogProductQuery(catalog.product_query)
-    return OrderContainer(catalog_query=catalog_query)
+def get_app_business_container() -> BusinessContainer:
+    return get_business_container()
 
 
-from modules.config_coupon.configuration.container import get_coupon_container, CouponContainer
 @lru_cache(maxsize=1)
 def get_app_coupon_container() -> CouponContainer:
     return get_coupon_container()
 
-from modules.conversation.configuration.container import build_container, ConversationContainer
+
 @lru_cache(maxsize=1)
 def get_app_conversation_container() -> ConversationContainer:
     return build_container()
 
-from modules.delivery.configuration.container import get_delivery_container, DeliveryContainer
+
 @lru_cache(maxsize=1)
 def get_app_delivery_container() -> DeliveryContainer:
     return get_delivery_container()
+
+
+@lru_cache(maxsize=1)
+def get_app_container() -> OrderContainer:
+    """Builds the order module wired to the real cross-context adapters."""
+    catalog = get_catalog_container()
+    client = get_app_client_container()
+    business = get_app_business_container()
+    coupon = get_app_coupon_container()
+    delivery = get_app_delivery_container()
+
+    return OrderContainer(
+        catalog_query=CatalogProductQuery(catalog.product_query),
+        client_query=ClientQueryAdapter(client.client_query_adapter),
+        config_query=BusinessConfigQueryAdapter(business.get_configuration),
+        coupon_query=CouponQueryAdapter(coupon.validate_coupon),
+        coupon_consume=CouponConsumeAdapter(coupon.consume_coupon),
+        delivery_quote=DeliveryQuoteAdapter(delivery.calculate_delivery_quote),
+    )

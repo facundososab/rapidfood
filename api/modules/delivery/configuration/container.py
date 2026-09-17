@@ -26,8 +26,8 @@ from modules.delivery.domain.services.delivery_price_calculator import (
 from modules.delivery.infrastructure.adapters.driven.clock.system_clock import (
     SystemClock,
 )
-from modules.delivery.infrastructure.adapters.driven.geocoding.ors_geocoding_adapter import (
-    OpenRouteServiceGeocodingAdapter,
+from modules.delivery.infrastructure.adapters.driven.geocoding.photon_geocoding_adapter import (
+    PhotonGeocodingAdapter,
 )
 from modules.delivery.infrastructure.adapters.driven.geometry.shapely_delivery_zone_adapter import (
     ShapelyDeliveryZoneAdapter,
@@ -58,7 +58,9 @@ class DeliveryContainer:
         address_query = BusinessAddressQuery(db.client)
         demand_adapter = OrderDemandAdapter(db.client)
         geometry = ShapelyDeliveryZoneAdapter()
-        geocoding = OpenRouteServiceGeocodingAdapter(api_key=api_key)
+        # Geocoding uses Photon (same OSM geocoder as the admin panel) so the zone
+        # drawn on the map and the backend agree. Routing stays on ORS.
+        geocoding = PhotonGeocodingAdapter()
         routing = OpenRouteServiceRoutingAdapter(api_key=api_key)
         clock = SystemClock()
         price_calculator = DeliveryPriceCalculator()

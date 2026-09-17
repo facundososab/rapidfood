@@ -8,6 +8,14 @@ class SetDeliveryDetailsCommand:
     order_id: str
     delivery_type: str
     address_id: Optional[str] = None
+    # Delivery destination snapshot (required when delivery_type == DELIVERY).
+    street: Optional[str] = None
+    street_number: Optional[str] = None
+    floor: Optional[str] = None
+    apartment: Optional[str] = None
+    city: Optional[str] = None
+    province: Optional[str] = None
+    postal_code: Optional[str] = None
 
 
 @dataclass

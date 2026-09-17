@@ -6,9 +6,12 @@ from modules.order.application.ports.driver.confirm_order_ports import (
     ConfirmOrderCommand,
     ConfirmOrderResponse,
 )
+from typing import Optional
+
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.application.ports.driven.business_config_query import BusinessConfigQueryPort
 from modules.order.application.ports.driven.catalog_query import CatalogQuery
+from modules.order.application.ports.driven.coupon_consume import CouponConsumePort
 from modules.order.domain.errors.order_errors import (
     OrderNotFound,
     OrderNotModifiableError,
@@ -17,7 +20,9 @@ from modules.order.domain.errors.order_errors import (
     InvalidLineError,
     IngredientNotRemovableError,
     ModifierValidationError,
+    OrderClientRequiredError,
 )
+from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order_state import OrderState
 
 
@@ -27,10 +32,12 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
         order_repo: OrderRepository,
         config_query: BusinessConfigQueryPort,
         catalog_query: CatalogQuery,
+        coupon_consume: Optional[CouponConsumePort] = None,
     ) -> None:
         self.order_repo = order_repo
         self.config_query = config_query
         self.catalog_query = catalog_query
+        self.coupon_consume = coupon_consume
 
     def execute(self, command: ConfirmOrderCommand) -> ConfirmOrderResponse:
         order = self.order_repo.get_by_id(command.order_id)
@@ -43,12 +50,17 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
         if not order.lines:
             raise InvalidLineError("Cannot confirm an empty order")
 
+        # Every order must be attributable to a client (linked id or a typed name).
+        if not (order.client_id or (order.client_name or "").strip()):
+            raise OrderClientRequiredError("El pedido debe tener un cliente.")
+
         # Business availability check
         config = self.config_query.get_config()
         if not config.is_open:
             raise BusinessClosedError("Business is currently closed")
 
-        if order.subtotal < config.min_order_amount:
+        # Minimum order applies to delivery only; pickup has no minimum.
+        if order.delivery_type == DeliveryType.DELIVERY and order.subtotal < config.min_order_amount:
             raise MinimumOrderNotMetError(
                 f"Minimum order amount is {config.min_order_amount}"
             )
@@ -127,6 +139,10 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
 
         # Recalculate order totals with frozen line prices
         order._recalculate_totals()
+
+        # Consume one use of the applied coupon as the order leaves DRAFT.
+        if order.coupon_code and self.coupon_consume is not None:
+            self.coupon_consume.consume(order.coupon_code)
 
         # Transition state and record confirmation time via domain method
         order.confirm()

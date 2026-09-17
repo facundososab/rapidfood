@@ -12,15 +12,19 @@ from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
 from modules.order.domain.models.order_state import OrderState
-from modules.order.domain.errors.order_errors import ModifierValidationError
+from modules.order.domain.errors.order_errors import (
+    ModifierValidationError,
+    OrderClientRequiredError,
+)
 
 
-def make_order_with_line(modifier_option_ids=None):
+def make_order_with_line(modifier_option_ids=None, client_name="Cliente Test"):
     order = Order(
         id="o-1",
         status=OrderState.DRAFT,
         subtotal=Decimal("0"),
         discount=Decimal("0"),
+        client_name=client_name,  # orders must be attributable to a client
     )
     modifiers = []
     if modifier_option_ids:
@@ -68,6 +72,20 @@ def make_config_query(is_open=True, min_order=Decimal("0"), shipping=Decimal("0"
         shipping_cost=shipping,
     )
     return mock
+
+
+def test_confirm_requires_a_client():
+    order = make_order_with_line(client_name=None)
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("12500")),
+    )
+    with pytest.raises(OrderClientRequiredError):
+        uc.execute(ConfirmOrderCommand(order_id="o-1"))
 
 
 def test_confirm_freezes_prices():

@@ -25,6 +25,13 @@ class UpdateLineQuantitySerializer(serializers.Serializer):
 class SetDeliveryDetailsSerializer(serializers.Serializer):
     delivery_type = serializers.CharField(max_length=50, required=True)
     address_id = serializers.UUIDField(required=False, allow_null=True)
+    street = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    street_number = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
+    floor = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    apartment = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    province = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
 
 class ConfirmOrderSerializer(serializers.Serializer):
     # No additional fields needed since the order ID comes from the URL

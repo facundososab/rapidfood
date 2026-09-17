@@ -32,6 +32,19 @@ services:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-key}
+      # Delivery routing (read by api/config/settings.py). Set in the repo-root .env.
+      OPENROUTESERVICE_API_KEY: ${OPENROUTESERVICE_API_KEY:-}
+      # MercadoPago integrates into the order module and reads these from env;
+      # MERCADOPAGO_ACCESS_TOKEN is required for the app to boot. Set the real
+      # values in the repo-root .env (empty keeps the stack running without them).
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      MERCADOPAGO_NOTIFICATION_URL: ${MERCADOPAGO_NOTIFICATION_URL:-}
+      MERCADOPAGO_SUCCESS_URL: ${MERCADOPAGO_SUCCESS_URL:-}
+      MERCADOPAGO_FAILURE_URL: ${MERCADOPAGO_FAILURE_URL:-}
+      MERCADOPAGO_PENDING_URL: ${MERCADOPAGO_PENDING_URL:-}
+      MERCADOPAGO_CURRENCY: ${MERCADOPAGO_CURRENCY:-ARS}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     # Dev: bind-mount the source so runserver auto-reloads on edits.

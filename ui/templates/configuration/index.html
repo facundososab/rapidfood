@@ -374,6 +374,16 @@
 </div>
 
 <script>
+// Base map tiles. Esri's CDN (stable, no API key) instead of OpenStreetMap's
+// volunteer tile servers, which rate-limit heavy use and return 403
+// "Access blocked / tile usage policy" — leaving the map blank.
+function addBaseTiles(map) {
+  L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: 'Tiles &copy; Esri' }
+  ).addTo(map);
+}
+
 function configPage() {
   // Initial delivery data from Django
   const initialDelivery = {{ delivery_json|default:'null'|safe }};
@@ -533,9 +543,7 @@ function configPage() {
       if (this.addressMapInited) return;
       this.addressMapInited = true;
       this.addressMap = L.map('address-map').setView([-34.6037, -58.3816], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(this.addressMap);
+      addBaseTiles(this.addressMap);
 
       const q = (savedAddressQuery || '').trim();
       if (q && !this.skipSavedGeocode) {
@@ -666,10 +674,7 @@ function configPage() {
       this.mapInited = true;
 
       this.map = L.map('delivery-map').setView([-34.6037, -58.3816], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(this.map);
+      addBaseTiles(this.map);
 
       // Center on current address; draw existing polygon if any
       const q = (savedAddressQuery || '').trim();

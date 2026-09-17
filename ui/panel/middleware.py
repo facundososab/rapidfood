@@ -3,6 +3,10 @@
 The HTTP client raises RuntimeError for API error responses; requests raises its
 own exception hierarchy for connection/timeout issues. On a POST we surface the
 message as a Django message and send the user back where they came from.
+
+Implemented via the `process_exception` hook (not a try/except around
+`get_response`): Django converts view exceptions to responses *before* they
+reach `__call__`, so only `process_exception` sees them.
 """
 from __future__ import annotations
 
@@ -24,10 +28,12 @@ class ApiErrorToastMiddleware:
         self._error_types = _client_error_types()
 
     def __call__(self, request):
-        try:
-            return self.get_response(request)
-        except self._error_types as exc:
-            if request.method != "POST":
-                raise
-            messages.error(request, str(exc) or "No se pudo completar la operación.")
-            return redirect(request.META.get("HTTP_REFERER") or "/")
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        if request.method != "POST":
+            return None
+        if not isinstance(exception, self._error_types):
+            return None
+        messages.error(request, str(exception) or "No se pudo completar la operación.")
+        return redirect(request.META.get("HTTP_REFERER") or "/")

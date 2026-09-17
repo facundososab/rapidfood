@@ -11,6 +11,7 @@ from .views import (
     AdvanceStateView,
     OrderListView,
     AllOrdersView,
+    AppliedCouponListView,
     OrderDetailView,
     UpdateOrderStatusView,
     PaymentLinkView,
@@ -20,6 +21,7 @@ from .views import (
 urlpatterns = [
     path('', OrderListView.as_view(), name='order-list'),
     path('all/', AllOrdersView.as_view(), name='order-all'),
+    path('applied-coupons/', AppliedCouponListView.as_view(), name='order-applied-coupons'),
     path('draft/', StartDraftOrderView.as_view(), name='start-draft-order'),
     path('payments/mercadopago/webhook/', MercadoPagoWebhookView.as_view(), name='mercadopago-webhook'),
     path('<uuid:order_id>/', OrderDetailView.as_view(), name='order-detail'),

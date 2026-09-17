@@ -136,6 +136,23 @@ class TestCouponApplicability:
         coupon = _make_coupon(coupon_type=CouponType.PERCENTAGE, amount=Decimal("10"))
         coupon.validate_applicable(Decimal("1000"), _utc(2026, 8, 1))  # no raise
 
+    def test_percentage_with_min_order_below_rejected(self) -> None:
+        coupon = _make_coupon(
+            coupon_type=CouponType.PERCENTAGE,
+            amount=Decimal("10"),
+            min_order_amount=Decimal("5000"),
+        )
+        with pytest.raises(CouponMinOrderNotReachedError):
+            coupon.validate_applicable(Decimal("4999"), _utc(2026, 8, 1))
+
+    def test_percentage_with_min_order_reaching_accepted(self) -> None:
+        coupon = _make_coupon(
+            coupon_type=CouponType.PERCENTAGE,
+            amount=Decimal("10"),
+            min_order_amount=Decimal("5000"),
+        )
+        coupon.validate_applicable(Decimal("5000"), _utc(2026, 8, 1))  # no raise
+
 
 class TestCouponDiscount:
     def test_percentage_discount_no_cap(self) -> None:

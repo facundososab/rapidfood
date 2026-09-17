@@ -33,6 +33,12 @@ from modules.order.infrastructure.adapters.driven.prisma.order_repository import
 from modules.order.infrastructure.adapters.driven.prisma.payment_repository import (
     PrismaPaymentRepository,
 )
+from modules.order.infrastructure.adapters.driven.prisma.applied_coupon_repository import (
+    PrismaAppliedCouponRepository,
+)
+from modules.order.application.use_cases.list_applied_coupons_use_case import (
+    ListAppliedCouponsUseCase,
+)
 from modules.order.infrastructure.adapters.driven.fakes.fakes import (
     FakeClientQuery, FakeCatalogQuery, FakeBusinessConfigQuery, FakeCouponQuery
 )
@@ -51,16 +57,24 @@ class OrderContainer:
     def __init__(
         self,
         catalog_query: Optional[CatalogQuery] = None,
+        client_query: Optional[Any] = None,
+        config_query: Optional[Any] = None,
+        coupon_query: Optional[Any] = None,
+        coupon_consume: Optional[Any] = None,
+        delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
     ):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
+        self.applied_coupon_repository = PrismaAppliedCouponRepository()
         self.payment_repository = PrismaPaymentRepository(prisma_client or db.client)
         self.mercadopago_settings = MercadoPagoSettings.from_env()
         self.payment_provider = MercadoPagoPaymentProvider(self.mercadopago_settings)
-        self.client_query = FakeClientQuery()
-        self.config_query = FakeBusinessConfigQuery()
-        self.coupon_query = FakeCouponQuery()
+        self.client_query = client_query if client_query is not None else FakeClientQuery()
+        self.config_query = config_query if config_query is not None else FakeBusinessConfigQuery()
+        self.coupon_query = coupon_query if coupon_query is not None else FakeCouponQuery()
+        self.coupon_consume = coupon_consume
+        self.delivery_quote = delivery_quote
         self.catalog_query = catalog_query if catalog_query is not None else FakeCatalogQuery()
         
         # Use Cases
@@ -81,17 +95,21 @@ class OrderContainer:
         )
         self.configure_order_use_case = ConfigureOrderUseCase(
             order_repo=self.order_repository,
-            config_query=self.config_query
+            config_query=self.config_query,
+            delivery_quote=self.delivery_quote
         )
         self.confirm_order_use_case = ConfirmOrderUseCase(
             order_repo=self.order_repository,
             config_query=self.config_query,
-            catalog_query=self.catalog_query
+            catalog_query=self.catalog_query,
+            coupon_consume=self.coupon_consume
         )
         self.apply_coupon_use_case = ApplyCouponUseCase(
             order_repo=self.order_repository,
-            coupon_query=self.coupon_query
+            coupon_query=self.coupon_query,
+            applied_coupon_repo=self.applied_coupon_repository
         )
+        self.list_applied_coupons = ListAppliedCouponsUseCase(self.applied_coupon_repository)
         self.cancel_order_use_case = CancelOrderUseCase(
             order_repo=self.order_repository
         )

@@ -158,9 +158,7 @@ class FixedDemandPort(OrderDemandProviderPort):
     def __init__(self, count: int = 0) -> None:
         self._count = count
 
-    def count_recent_active_delivery_orders(
-        self, business_config_id: str, since: datetime
-    ) -> int:
+    def count_active_delivery_orders(self, business_config_id: str) -> int:
         return self._count
 
 
@@ -170,9 +168,7 @@ class PerBusinessDemandPort(OrderDemandProviderPort):
     def __init__(self, counts: Dict[str, int]) -> None:
         self._counts = counts
 
-    def count_recent_active_delivery_orders(
-        self, business_config_id: str, since: datetime
-    ) -> int:
+    def count_active_delivery_orders(self, business_config_id: str) -> int:
         return self._counts.get(business_config_id, 0)
 
 

@@ -129,6 +129,7 @@ class TestDeliveryPricingConfig:
             DeliveryPricingConfig(
                 price_per_km=Decimal("150.00"),
                 high_demand_threshold=5,
+                very_high_demand_threshold=5,
                 high_demand_multiplier=Decimal("1.50"),
                 very_high_demand_multiplier=Decimal("2.00"),
                 weekday_multipliers=_all_weekday_multipliers(),
@@ -142,7 +143,6 @@ class TestDeliveryPricingConfig:
                 very_high_demand_threshold=10,
                 high_demand_multiplier=Decimal("1.50"),
                 very_high_demand_multiplier=Decimal("2.00"),
-                demand_window_minutes=30,
                 weekday_multipliers=_all_weekday_multipliers(),
             )
 
@@ -154,7 +154,6 @@ class TestDeliveryPricingConfig:
                 very_high_demand_threshold=10,
                 high_demand_multiplier=Decimal("0"),
                 very_high_demand_multiplier=Decimal("2.00"),
-                demand_window_minutes=30,
                 weekday_multipliers=_all_weekday_multipliers(),
             )
 
@@ -167,7 +166,6 @@ class TestDeliveryPricingConfig:
                 very_high_demand_threshold=10,
                 high_demand_multiplier=Decimal("1.50"),
                 very_high_demand_multiplier=Decimal("2.00"),
-                demand_window_minutes=30,
                 weekday_multipliers=partial,
             )
 
@@ -181,6 +179,5 @@ class TestDeliveryPricingConfig:
                 very_high_demand_threshold=10,
                 high_demand_multiplier=Decimal("1.50"),
                 very_high_demand_multiplier=Decimal("2.00"),
-                demand_window_minutes=30,
                 weekday_multipliers=multipliers,
             )

@@ -32,9 +32,84 @@
       clientId: '',
       openClients: false,
       modal: false,
+      quote: null,
+      quoting: false,
+      addr: { street: '', street_number: '', floor: '', apartment: '', city: '', province: '', postal_code: '' },
+      couponCode: '',
+      coupon: null,
+      couponMsg: '',
+      newClientOpen: false,
+      newClientName: '',
+      newClientLast: '',
+      newClientPhone: '',
+      newClientMsg: '',
 
       get shipping() {
-        return Number(this.config.shipping || 0);
+        // Only the real quoted cost counts; before quoting there is no number.
+        return this.quote && this.quote.available && this.quote.shipping_cost !== undefined
+          ? Number(this.quote.shipping_cost)
+          : 0;
+      },
+
+      get quoteReady() {
+        return this.quote !== null && this.quote.available === true;
+      },
+
+      get hasClient() {
+        return !!this.clientId || (this.clientQ || '').trim() !== '';
+      },
+
+      get clientMissing() {
+        return this.items().length > 0 && !this.hasClient;
+      },
+
+      get minOrder() {
+        return Number(this.config.minOrder || 0);
+      },
+
+      get belowMinimum() {
+        // Minimum order applies to delivery only.
+        return this.delivery === 'DELIVERY' && this.items().length > 0
+          && this.minOrder > 0 && this.subtotal() < this.minOrder;
+      },
+
+      get missingForMinimum() {
+        return Math.max(0, this.minOrder - this.subtotal());
+      },
+
+      canConfirm() {
+        if (!this.items().length) return false;
+        if (!this.hasClient) return false;
+        if (this.belowMinimum) return false;
+        if (this.delivery === 'DELIVERY') return this.quoteReady;
+        return true;
+      },
+
+      setDelivery(kind) {
+        if (this.delivery === kind) return;
+        this.delivery = kind;
+        this.quote = null;
+      },
+
+      resetQuote() {
+        this.quote = null;
+      },
+
+      async requestQuote() {
+        this.quoting = true;
+        try {
+          const body = new URLSearchParams(this.addr).toString();
+          const res = await fetch('/pedidos/cotizacion/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+          });
+          this.quote = await res.json();
+        } catch (e) {
+          this.quote = { available: false, error: 'No se pudo calcular el envío.' };
+        } finally {
+          this.quoting = false;
+        }
       },
 
       filtered() {
@@ -54,6 +129,54 @@
         this.clientId = c.id;
         this.clientQ = c.name + ' ' + c.lastName;
         this.openClients = false;
+      },
+
+      toggleNewClient() {
+        if (!this.newClientOpen) {
+          if (!this.newClientName && this.clientQ) {
+            const parts = this.clientQ.trim().split(' ');
+            this.newClientName = parts[0] || '';
+            this.newClientLast = parts.slice(1).join(' ');
+          }
+          this.openClients = false;
+        }
+        this.newClientMsg = '';
+        this.newClientOpen = !this.newClientOpen;
+      },
+
+      cancelNewClient() {
+        this.newClientOpen = false;
+        this.newClientMsg = '';
+        this.newClientName = '';
+        this.newClientLast = '';
+        this.newClientPhone = '';
+      },
+
+      async createClient() {
+        const name = (this.newClientName || '').trim();
+        const lastName = (this.newClientLast || '').trim();
+        const phone = (this.newClientPhone || '').trim();
+        if (!name || !phone) {
+          this.newClientMsg = 'Completá nombre y teléfono.';
+          return;
+        }
+        try {
+          const res = await fetch('/pedidos/cliente/crear/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ name, last_name: lastName, phone }).toString(),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            this.newClientMsg = data.error || 'No se pudo crear el cliente.';
+            return;
+          }
+          this.clients.push(data.client);
+          this.pickClient(data.client);
+          this.cancelNewClient();
+        } catch (e) {
+          this.newClientMsg = 'No se pudo crear el cliente.';
+        }
       },
 
       openConfigModal(productId) {
@@ -104,11 +227,35 @@
       subtotal() {
         return this.items().reduce((s, i) => s + i.subtotal, 0);
       },
+      discount() {
+        return this.coupon && this.coupon.valid ? Number(this.coupon.discount_amount || 0) : 0;
+      },
       total() {
-        return this.subtotal() + (this.delivery === 'DELIVERY' ? this.shipping : 0);
+        const shipping = this.delivery === 'DELIVERY' ? this.shipping : 0;
+        return Math.max(0, this.subtotal() - this.discount() + shipping);
+      },
+      async applyCoupon() {
+        const code = (this.couponCode || '').trim();
+        if (!code) { this.coupon = null; this.couponMsg = ''; return; }
+        try {
+          const res = await fetch('/pedidos/cupon/validar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ coupon_code: code, subtotal: String(this.subtotal()) }).toString(),
+          });
+          this.coupon = await res.json();
+          this.couponMsg = this.coupon.valid ? '' : (this.coupon.reason || 'Cupón inválido.');
+        } catch (e) {
+          this.coupon = null;
+          this.couponMsg = 'No se pudo validar el cupón.';
+        }
       },
       confirm() {
-        if (this.items().length) this.modal = true;
+        if (!this.items().length) return;
+        if (this.belowMinimum) return;  // never open the modal below the minimum
+        // The client is entered inside the modal, so it stays openable without one;
+        // `canConfirm()` gates the final submit until a client is provided.
+        this.modal = true;
       },
       syncCart(form) {
         const lines = Object.values(this.cart).map((item) => ({

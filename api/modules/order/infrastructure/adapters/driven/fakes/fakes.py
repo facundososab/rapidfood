@@ -14,6 +14,11 @@ class FakeClientQuery(ClientQuery):
     def check_client_exists(self, client_id: str) -> bool:
         return True
 
+    def get_client(self, client_id: str):
+        from modules.order.application.ports.driven.client_query import ClientInfo
+
+        return ClientInfo(id=client_id, name="Cliente", last_name="Fake", phone_number="")
+
 
 class FakeCatalogQuery(CatalogQuery):
     """Returns a simple variant context suitable for tests."""

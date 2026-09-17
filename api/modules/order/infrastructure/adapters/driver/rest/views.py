@@ -22,6 +22,9 @@ from modules.order.application.ports.driver.payment_ports import (
     CreatePaymentLinkCommand,
     ProcessPaymentNotificationCommand,
 )
+from modules.order.application.ports.driver.list_applied_coupons_ports import (
+    ListAppliedCouponsQuery,
+)
 from modules.order.domain.errors.order_errors import OrderDomainError
 from modules.order.domain.models.order import Order
 from .mercadopago_signature import validate_mercadopago_signature
@@ -42,7 +45,25 @@ def _parse_dt(value) -> datetime | None:
         return None
 
 
-def _order_to_dict(order: Order) -> dict:
+def _client_dict(container, order: Order):
+    """Resolve the linked client (name/phone) for display, or None."""
+    if not order.client_id:
+        return None
+    try:
+        info = container.client_query.get_client(order.client_id)
+    except Exception:
+        return None
+    if info is None:
+        return None
+    return {
+        "id": info.id,
+        "name": info.name,
+        "lastName": info.last_name,
+        "phoneNumber": info.phone_number,
+    }
+
+
+def _order_to_dict(order: Order, client=None) -> dict:
     return {
         "id": order.id,
         "status": order.status.value,
@@ -51,7 +72,22 @@ def _order_to_dict(order: Order) -> dict:
         "discount": order.discount,
         "client_id": order.client_id,
         "client_name": order.client_name,
+        "client": client,
+        "coupon_code": order.coupon_code,
         "address_id": order.address_id,
+        "delivery_address": (
+            {
+                "street": order.delivery_address.street,
+                "street_number": order.delivery_address.street_number,
+                "floor": order.delivery_address.floor,
+                "apartment": order.delivery_address.apartment,
+                "city": order.delivery_address.city,
+                "province": order.delivery_address.province,
+                "postal_code": order.delivery_address.postal_code,
+            }
+            if order.delivery_address
+            else None
+        ),
         "conversation_id": order.conversation_id,
         "estimated_time": order.estimated_time,
         "delivery_type": order.delivery_type.value if order.delivery_type else None,
@@ -108,14 +144,44 @@ class OrderListView(APIView):
             orders = container.list_orders_use_case.execute(query)
         except OrderDomainError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response([_order_to_dict(order) for order in orders])
+        return Response([_order_to_dict(order, _client_dict(container, order)) for order in orders])
+
+
+class AppliedCouponListView(APIView):
+    """GET /api/orders/applied-coupons/?coupon_id=... — coupon application history."""
+
+    def get(self, request):
+        coupon_id = request.query_params.get("coupon_id")
+        if not coupon_id:
+            return Response([])
+        container = get_app_container()
+        rows = container.list_applied_coupons.execute(
+            ListAppliedCouponsQuery(coupon_id=str(coupon_id))
+        )
+        return Response(
+            [
+                {
+                    "id": r.id,
+                    "order_id": r.order_id,
+                    "coupon_id": r.coupon_id,
+                    "coupon_code": r.coupon_code,
+                    "coupon_type": r.coupon_type,
+                    "amount": str(r.amount),
+                    "discount_amount": str(r.discount_amount),
+                    "available_uses": r.available_uses,
+                    "date_of_expiration": r.date_of_expiration,
+                    "applied_at": r.applied_at,
+                }
+                for r in rows
+            ]
+        )
 
 
 class AllOrdersView(APIView):
     def get(self, request):
         container = get_app_container()
         orders = container.list_orders_use_case.execute(ListOrdersQuery())
-        return Response([_order_to_dict(order) for order in orders])
+        return Response([_order_to_dict(order, _client_dict(container, order)) for order in orders])
 
 
 class OrderDetailView(APIView):
@@ -126,7 +192,7 @@ class OrderDetailView(APIView):
             return Response(
                 {"detail": "La orden no existe"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(_order_to_dict(order))
+        return Response(_order_to_dict(order, _client_dict(container, order)))
 
 
 class UpdateOrderStatusView(APIView):
@@ -205,8 +271,14 @@ class StartDraftOrderView(APIView):
     def post(self, request):
         serializer = StartDraftOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        command = StartDraftOrderCommand(**serializer.validated_data)
+
+        # DRF UUIDField yields uuid.UUID; the domain and Prisma work with str ids.
+        data = dict(serializer.validated_data)
+        for key in ("client_id", "conversation_id"):
+            if data.get(key):
+                data[key] = str(data[key])
+
+        command = StartDraftOrderCommand(**data)
         
         container = get_app_container()
         try:
@@ -282,10 +354,14 @@ class SetDeliveryDetailsView(APIView):
     def patch(self, request, order_id):
         serializer = SetDeliveryDetailsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
+        data = dict(serializer.validated_data)
+        if data.get("address_id"):
+            data["address_id"] = str(data["address_id"])
+
         command = SetDeliveryDetailsCommand(
             order_id=str(order_id),
-            **serializer.validated_data
+            **data
         )
         
         container = get_app_container()

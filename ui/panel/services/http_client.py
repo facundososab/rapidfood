@@ -157,8 +157,12 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _client(self, d) -> Optional[dtos.Client]:
         if not d:
             return None
-        return dtos.Client(id=d["id"], name=d["name"], lastName=d["lastName"],
-                           phoneNumber=d["phoneNumber"])
+        return dtos.Client(
+            id=d.get("id", d.get("client_id")),
+            name=d["name"],
+            lastName=d.get("lastName", d.get("last_name", "")),
+            phoneNumber=d.get("phoneNumber", d.get("phone_number", "")),
+        )
 
     def _category(self, d) -> Optional[dtos.Category]:
         return None if not d else dtos.Category(id=d["id"], description=d["description"])
@@ -185,11 +189,18 @@ class HttpRapidfoodClient(RapidfoodClient):
                               productVariantId=d.get("product_variant_id"))
 
     def _applied_coupon(self, d) -> dtos.AppliedCoupon:
-        return dtos.AppliedCoupon(id=d["id"], orderId=d["orderId"], couponId=d.get("couponId"),
-                                  couponCode=d["couponCode"], type=d["type"], amount=_dec(d["amount"]),
-                                  discountAmount=_dec(d["discountAmount"]), availableUses=d["availableUses"],
-                                  dateOfExpiration=_parse_dt(d.get("dateOfExpiration")),
-                                  appliedAt=_parse_dt(d["appliedAt"]))
+        return dtos.AppliedCoupon(
+            id=d.get("id"),
+            orderId=d.get("orderId", d.get("order_id")),
+            couponId=d.get("couponId", d.get("coupon_id")),
+            couponCode=d.get("couponCode", d.get("coupon_code")),
+            type=d.get("type", d.get("coupon_type")),
+            amount=_dec(d.get("amount")),
+            discountAmount=_dec(d.get("discountAmount", d.get("discount_amount"))),
+            availableUses=d.get("availableUses", d.get("available_uses")),
+            dateOfExpiration=_parse_dt(d.get("dateOfExpiration", d.get("date_of_expiration"))),
+            appliedAt=_parse_dt(d.get("appliedAt", d.get("applied_at"))),
+        )
 
     def _payment(self, d) -> dtos.Payment:
         return dtos.Payment(id=d["id"], orderId=d["orderId"], provider=d["provider"],
@@ -239,9 +250,16 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _coupon(self, d) -> Optional[dtos.Coupon]:
         if not d:
             return None
-        return dtos.Coupon(id=d["id"], couponCode=d["couponCode"], type=d["type"],
-                           amount=_dec(d["amount"]), availableUses=d["availableUses"],
-                           dateOfExpiration=_parse_dt(d.get("dateOfExpiration")))
+        return dtos.Coupon(
+            id=d.get("coupon_id", d.get("id")),
+            couponCode=d.get("coupon_code", d.get("couponCode")),
+            type=d.get("coupon_type", d.get("type")),
+            amount=_dec(d.get("amount")),
+            availableUses=d.get("available_uses", d.get("availableUses")),
+            minOrderAmount=_dec(d.get("min_order_amount", d.get("minOrderAmount"))),
+            dateOfExpiration=_parse_dt(d.get("date_of_expiration", d.get("dateOfExpiration"))),
+            isActive=d.get("is_active", d.get("isActive", True)),
+        )
 
     def _message(self, d) -> dtos.Message:
         return dtos.Message(id=d["id"], conversationId=d["conversationId"], role=d["role"],
@@ -343,10 +361,35 @@ class HttpRapidfoodClient(RapidfoodClient):
             delivery_body = {"delivery_type": delivery}
             if payload.get("address_id"):
                 delivery_body["address_id"] = payload["address_id"]
+            for key in ("street", "street_number", "floor", "apartment",
+                        "city", "province", "postal_code"):
+                if payload.get(key):
+                    delivery_body[key] = payload[key]
             self._patch(f"/api/orders/{order_id}/delivery/", delivery_body)
+
+        if payload.get("coupon_code"):
+            # Best-effort: a coupon that can't be applied must not block the order.
+            try:
+                self._post(f"/api/orders/{order_id}/coupon/", {"coupon_code": payload["coupon_code"]})
+            except RuntimeError:
+                pass
 
         self._post(f"/api/orders/{order_id}/confirm/", {})
         return self.get_order(order_id)
+
+    def quote_delivery(self, business_config_id, address):
+        body = {
+            "destination_address": {
+                "street": address["street"],
+                "street_number": address["street_number"],
+                "city": address["city"],
+                "province": address["province"],
+                "floor": address.get("floor") or None,
+                "apartment": address.get("apartment") or None,
+                "postal_code": address.get("postal_code") or None,
+            }
+        }
+        return self._post(f"/api/delivery/{business_config_id}/quote/", body)
 
     def all_orders(self):
         orders = [self._order(x) for x in self._get("/api/orders/all/")]
@@ -485,34 +528,91 @@ class HttpRapidfoodClient(RapidfoodClient):
         self._delete(f"/api/clients/{client_id}/")
 
     def create_client(self, name, last_name, phone):
-        raise NotImplementedError("Crear clientes no está soportado por el backend todavía.")
+        return self._client(self._post("/api/clients/create/", {
+            "name": name, "last_name": last_name, "phone_number": phone,
+        }))
 
     def search_clients(self, query):
         return self.list_clients(search=query, page=1, page_size=8).items
 
-    # -- delivery addresses (not in scope yet) ----------------------------
     def create_address(self, payload):
-        raise NotImplementedError("El módulo de direcciones no existe en el backend todavía.")
+        client_id = payload.get("clientId") or payload.get("client_id")
+        body = {
+            "street": payload["street"],
+            "street_number": payload.get("streetNumber", payload.get("street_number")),
+            "city": payload["city"],
+            "province": payload["province"],
+            "floor": payload.get("floor"),
+            "apartment": payload.get("apartment"),
+            "postal_code": payload.get("postalCode", payload.get("postal_code")),
+            "latitude": str(payload["latitude"]),
+            "longitude": str(payload["longitude"]),
+            "delivery_instructions": payload.get("deliveryInstructions"),
+            "label": payload.get("label"),
+            "is_default": bool(payload.get("isDefault", payload.get("is_default", False))),
+        }
+        return self._address(self._post(f"/api/clients/{client_id}/addresses/", body))
 
-    # -- coupons (not in scope yet) ----------------------------------------
+    # -- coupons -----------------------------------------------------------
     def list_coupons(self):
-        return []
+        rows = [self._coupon(x) for x in self._get("/api/coupons/list/")]
+        return [c for c in rows if c is not None]
 
     def get_coupon(self, coupon_id):
-        return None
+        return next((c for c in self.list_coupons() if c.id == coupon_id), None)
 
     def get_coupon_by_code(self, code):
-        return None
+        try:
+            return self._coupon(self._get(f"/api/coupons/by-code/{code}/"))
+        except RuntimeError:
+            return None
 
     def save_coupon(self, payload):
-        raise NotImplementedError("El módulo de cupones no existe en el backend todavía.")
+        expiration = payload.get("dateOfExpiration", payload.get("date_of_expiration"))
+        body = {
+            "coupon_code": payload.get("couponCode", payload.get("coupon_code")),
+            "coupon_type": payload.get("type", payload.get("coupon_type")),
+            "amount": str(payload.get("amount", 0)),
+            "available_uses": payload.get("availableUses", payload.get("available_uses")),
+            "min_order_amount": (str(payload["minOrderAmount"])
+                                 if payload.get("minOrderAmount") is not None else None),
+            "date_of_expiration": expiration.isoformat() if hasattr(expiration, "isoformat") else expiration,
+            "is_active": payload.get("isActive", payload.get("is_active", True)),
+        }
+        return self._coupon(self._post("/api/coupons/", body))
+
+    def update_coupon(self, coupon_id, payload):
+        expiration = payload.get("dateOfExpiration", payload.get("date_of_expiration"))
+        body = {
+            "amount": str(payload.get("amount", 0)),
+            "available_uses": payload.get("availableUses", payload.get("available_uses")),
+            "min_order_amount": (str(payload["minOrderAmount"])
+                                 if payload.get("minOrderAmount") is not None else None),
+            "date_of_expiration": expiration.isoformat() if hasattr(expiration, "isoformat") else expiration,
+            "is_active": payload.get("isActive", payload.get("is_active", True)),
+        }
+        return self._coupon(self._patch(f"/api/coupons/{coupon_id}/", body))
+
+    def set_coupon_active(self, coupon_id, is_active):
+        self._patch(f"/api/coupons/{coupon_id}/status/", {"is_active": bool(is_active)})
 
     def validate_coupon(self, code, subtotal):
-        return CouponValidation(valid=False,
-                                reason="Módulo de cupones no disponible en el backend.")
+        try:
+            data = self._post("/api/coupons/validate/", {
+                "coupon_code": code, "subtotal": str(subtotal),
+            })
+        except RuntimeError as exc:
+            return CouponValidation(valid=False, reason=str(exc))
+        if not data.get("valid"):
+            return CouponValidation(valid=False, reason=data.get("reason", "Cupón inválido."))
+        return CouponValidation(valid=True, discount_amount=_dec(data.get("discount_amount")),
+                                coupon=self._coupon(data))
 
     def list_applied_coupons(self, *, coupon_id=None):
-        return []
+        if not coupon_id:
+            return []
+        rows = self._get("/api/orders/applied-coupons/", coupon_id=coupon_id)
+        return [self._applied_coupon(x) for x in rows if x]
 
     # -- conversations (not in scope yet) ----------------------------------
     def list_conversations(self):

@@ -182,6 +182,16 @@ model Order {
   clientName      String?         @map("client_name") // free-text name for unidentified clients (POS)
   addressId       String?         @map("address_id") @db.Uuid // nullable: BORRADOR needs no address (RN-020)
   address         Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  // Delivery destination snapshot (RN: captured per order so history stays immutable
+  // and anonymous POS deliveries are supported). Nullable for PICKUP.
+  deliveryStreet        String?  @map("delivery_street")
+  deliveryStreetNumber  String?  @map("delivery_street_number")
+  deliveryFloor         String?  @map("delivery_floor")
+  deliveryApartment     String?  @map("delivery_apartment")
+  deliveryCity          String?  @map("delivery_city")
+  deliveryProvince      String?  @map("delivery_province")
+  deliveryPostalCode    String?  @map("delivery_postal_code")
+  couponCode      String?         @map("coupon_code") // code applied; used to consume a use on confirm
   conversationId  String?         @map("conversation_id") @db.Uuid // RN-030: order references its conversation; RN-031: 1 conv -> many orders
   conversation    Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   appliedCouponId  String?               @map("applied_coupon_id") @db.Uuid // Optional coupon applied
