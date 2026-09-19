@@ -6,6 +6,10 @@ class ConversationValidationError(ConversationDomainError):
     """Raised when a conversation violates domain invariants."""
 
 
+class ConversationNotFoundError(ConversationDomainError):
+    """Raised when a conversation id does not exist."""
+
+
 class MessageValidationError(ConversationDomainError):
     """Raised when a message violates domain invariants."""
 

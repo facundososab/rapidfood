@@ -98,8 +98,18 @@ def test_create_checkout_posts_to_orders_api_with_idempotency_key():
     assert call["headers"]["Authorization"] == "Bearer token"
     assert call["json"]["total_amount"] == "1500.50"
     assert call["json"]["external_reference"] == "order-1"
-    assert call["json"]["notification_url"] == "https://api.example/webhook"
-    assert call["json"]["items"][0]["currency_id"] == "ARS"
+    # Checkout Pro (Orders API) shape: manual processing, no transparent
+    # `transactions` block, currency on the account (not on the item) and return
+    # URLs under config.online.
+    assert call["json"]["processing_mode"] == "manual"
+    assert "transactions" not in call["json"]
+    assert "notification_url" not in call["json"]
+    assert "currency_id" not in call["json"]["items"][0]
+    online = call["json"]["config"]["online"]
+    assert online["success_url"] == "https://front.example/success"
+    assert online["failure_url"] == "https://front.example/failure"
+    assert online["pending_url"] == "https://front.example/pending"
+    assert online["auto_return"] == "approved"
 
 
 def test_retry_reuses_the_same_provider_key():
@@ -124,6 +134,37 @@ def test_create_checkout_rejects_incomplete_provider_response():
 
     with pytest.raises(PaymentProviderError):
         provider.create_checkout(make_request())
+
+
+def test_provider_error_is_logged_with_status_and_body_without_secrets(caplog):
+    import logging
+
+    session = FakeSession(
+        [
+            FakeResponse(
+                400,
+                {
+                    "errors": [
+                        {
+                            "code": "required_properties",
+                            "message": "Missing properties",
+                            "details": ["'$.items[0]' - invalid"],
+                        }
+                    ]
+                },
+            )
+        ]
+    )
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(PaymentProviderError):
+            provider.create_checkout(make_request())
+
+    assert "status=400" in caplog.text
+    assert "required_properties" in caplog.text
+    # The Authorization header must never reach the logs.
+    assert "Bearer token" not in caplog.text
 
 
 def test_cancel_checkout_uses_its_own_key_and_reports_cancelled():

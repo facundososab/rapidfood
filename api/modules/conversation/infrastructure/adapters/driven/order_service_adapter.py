@@ -64,6 +64,9 @@ from modules.order.application.ports.driver.set_pickup_for_order_port import (
 from modules.order.application.ports.driver.update_item_in_order_port import (
     UpdateItemInOrderCommand,
 )
+from modules.order.application.ports.driven.payment_provider import (
+    PaymentProviderError,
+)
 from modules.order.application.ports.driver.order_errors import OrderDomainError
 
 
@@ -86,6 +89,15 @@ _ORDER_ERROR_CODES = {
     "BusinessClosedError": "BUSINESS_CLOSED",
     "InvalidPaymentTypeError": "INVALID_PAYMENT_TYPE",
     "PaymentAttemptNotFoundError": "PAYMENT_ATTEMPT_NOT_FOUND",
+    # Checkout preconditions: distinct, explainable business codes (never a
+    # generic state error the agent cannot act on).
+    "PaymentTypeRequiredError": "PAYMENT_TYPE_REQUIRED",
+    "OnlinePaymentRequiredError": "ONLINE_PAYMENT_REQUIRED",
+    "OrderNotConfirmedError": "ORDER_NOT_CONFIRMED",
+    # A technical provider failure (HTTP error, timeout, incomplete response) is
+    # a KNOWN, explainable outcome for the agent: "no pude generar el link ahora,
+    # reintentá". It must never degrade to a generic TECHNICAL_ERROR.
+    "PaymentProviderError": "PAYMENT_PROVIDER_ERROR",
 }
 
 
@@ -100,7 +112,7 @@ def _translate_order_errors(method):
     def wrapper(self, *args, **kwargs):
         try:
             return method(self, *args, **kwargs)
-        except OrderDomainError as exc:
+        except (OrderDomainError, PaymentProviderError) as exc:
             code = _ORDER_ERROR_CODES.get(type(exc).__name__, "ORDER_ERROR")
             raise AgentBusinessError(str(exc), code=code) from exc
 

@@ -54,6 +54,13 @@ from modules.conversation.application.use_cases.order_reads import (
     GetLatestActiveOrderForConversationUseCase,
     GetOrderSummaryForConversationUseCase,
 )
+from modules.conversation.application.use_cases.panel_conversations import (
+    AppendOperatorMessageUseCase,
+    GetConversationDetailUseCase,
+    ListConversationsUseCase,
+    ReplyAsClientForConversationUseCase,
+    SetConversationTakeoverUseCase,
+)
 from modules.conversation.application.use_cases.receive_message import ReceiveMessageUseCase
 from modules.conversation.application.use_cases.resolve_conversation_for_channel import (
     ResolveConversationForChannelUseCase,
@@ -80,6 +87,12 @@ class ConversationContainer:
     receive_message_use_case: ReceiveMessageUseCase
     # Set when an agent runner is injected (LangChain/LangGraph driver).
     handle_incoming_message_use_case: Optional[HandleIncomingMessageUseCase] = None
+    # Panel chat (list, human takeover, reply as the customer).
+    list_conversations_use_case: Optional[ListConversationsUseCase] = None
+    get_conversation_detail_use_case: Optional[GetConversationDetailUseCase] = None
+    append_operator_message_use_case: Optional[AppendOperatorMessageUseCase] = None
+    set_takeover_use_case: Optional[SetConversationTakeoverUseCase] = None
+    reply_as_client_use_case: Optional[ReplyAsClientForConversationUseCase] = None
 
     # Agent use cases (built when the cross-module services are injected).
     search_products_use_case: Optional[SearchProductsForConversationUseCase] = None
@@ -137,9 +150,26 @@ def build_container(
         ),
     )
 
+    container.list_conversations_use_case = ListConversationsUseCase(
+        conversation_repository, message_repository, client_service
+    )
+    container.get_conversation_detail_use_case = GetConversationDetailUseCase(
+        conversation_repository, message_repository, client_service
+    )
+    container.append_operator_message_use_case = AppendOperatorMessageUseCase(
+        conversation_repository, message_repository, clock
+    )
+    container.set_takeover_use_case = SetConversationTakeoverUseCase(
+        conversation_repository, message_repository
+    )
+
     if agent_runner_factory is not None:
-        container.handle_incoming_message_use_case = HandleIncomingMessageUseCase(
+        handler = HandleIncomingMessageUseCase(
             message_repository, agent_runner_factory(container), clock
+        )
+        container.handle_incoming_message_use_case = handler
+        container.reply_as_client_use_case = ReplyAsClientForConversationUseCase(
+            conversation_repository, message_repository, handler, clock
         )
 
     if catalog_service is not None:

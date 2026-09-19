@@ -27,7 +27,13 @@ from modules.order.application.ports.driver.payment_ports import (
     CreatePaymentCheckoutPort,
     CreatePaymentCheckoutResult,
 )
-from modules.order.domain.errors.order_errors import OrderNotFound, OrderStateError
+from modules.order.domain.errors.order_errors import (
+    OnlinePaymentRequiredError,
+    OrderNotConfirmedError,
+    OrderNotFound,
+    OrderStateError,
+    PaymentTypeRequiredError,
+)
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment_method import PaymentMethod
 
@@ -56,9 +62,17 @@ class CreatePaymentCheckoutUseCase(CreatePaymentCheckoutPort):
         if order is None:
             raise OrderNotFound("Order not found")
         if order.status is not OrderState.PENDING:
-            raise OrderStateError("Only PENDING orders can create a payment checkout")
+            raise OrderNotConfirmedError(
+                "Only a confirmed (PENDING) order can create a payment checkout"
+            )
+        if order.payment_type is None:
+            raise PaymentTypeRequiredError(
+                "The order has no payment type; set it to ONLINE before generating a link"
+            )
         if order.payment_type is not PaymentMethod.ONLINE:
-            raise OrderStateError("Only ONLINE orders can create a payment checkout")
+            raise OnlinePaymentRequiredError(
+                "Only an ONLINE order can create a payment checkout"
+            )
         if order.total_amount is None or order.total_amount <= 0:
             raise OrderStateError("Order must have a positive total")
 

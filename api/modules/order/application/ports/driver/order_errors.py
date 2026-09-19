@@ -22,10 +22,13 @@ from modules.order.domain.errors.order_errors import (  # noqa: F401
     NewOrderRequiredError,
     OrderClientRequiredError,
     OrderDomainError,
+    OrderNotConfirmedError,
     OrderNotFound,
     OrderNotModifiableError,
     OrderStateError,
+    OnlinePaymentRequiredError,
     PaymentAttemptNotFoundError,
+    PaymentTypeRequiredError,
 )
 
 __all__ = [
@@ -43,8 +46,11 @@ __all__ = [
     "NewOrderRequiredError",
     "OrderClientRequiredError",
     "OrderDomainError",
+    "OrderNotConfirmedError",
     "OrderNotFound",
     "OrderNotModifiableError",
     "OrderStateError",
+    "OnlinePaymentRequiredError",
     "PaymentAttemptNotFoundError",
+    "PaymentTypeRequiredError",
 ]

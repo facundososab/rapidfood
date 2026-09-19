@@ -92,7 +92,7 @@ OPENROUTESERVICE_API_KEY: str = os.environ.get("OPENROUTESERVICE_API_KEY", "")
 GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
 AGENT_MODEL: str = os.environ.get(
     "AGENT_MODEL",
-    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
 )
 # DEV FALLBACK ONLY, and optional: the definitive multi-tenant design resolves
 # the business from the channel/runtime context. When this is empty (or "default")

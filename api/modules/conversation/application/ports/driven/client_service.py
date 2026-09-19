@@ -6,10 +6,23 @@ concrete adapter delegates to the client module's public ports.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Protocol
 
 
+@dataclass(frozen=True, slots=True)
+class ClientInfoDTO:
+    id: str
+    name: str
+    last_name: str
+    phone_number: str
+
+
 class ClientServicePort(Protocol):
+    def get_client(self, client_id: str) -> Optional[ClientInfoDTO]:
+        """Display data for a known client (name/phone), or None."""
+        ...
+
     def resolve_client(
         self, full_name: str, phone_number: Optional[str] = None
     ) -> Optional[str]:

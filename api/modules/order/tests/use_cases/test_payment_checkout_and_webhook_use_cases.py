@@ -26,8 +26,11 @@ from modules.order.application.use_cases.handle_payment_webhook_use_case import 
     HandlePaymentWebhookUseCase,
 )
 from modules.order.domain.errors.order_errors import (
+    OnlinePaymentRequiredError,
+    OrderNotConfirmedError,
     OrderStateError,
     PaymentAttemptNotFoundError,
+    PaymentTypeRequiredError,
 )
 from modules.order.domain.models.cancellation_status import CancellationStatus
 from modules.order.domain.models.order import Order
@@ -227,6 +230,41 @@ def test_checkout_rejects_invalid_orders(order):
         use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
 
     assert attempt_repo.attempts == []
+    assert provider.create_calls == []
+
+
+def test_checkout_without_payment_type_is_a_payment_type_required_business_error():
+    provider = FakeProvider()
+    use_case, _, attempt_repo = _checkout_use_case(
+        make_order(payment_type=None), provider
+    )
+
+    with pytest.raises(PaymentTypeRequiredError):
+        use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert attempt_repo.attempts == []
+    assert provider.create_calls == []
+
+
+def test_checkout_cash_order_is_an_online_payment_required_business_error():
+    provider = FakeProvider()
+    use_case, _, _ = _checkout_use_case(
+        make_order(payment_type=PaymentMethod.CASH), provider
+    )
+
+    with pytest.raises(OnlinePaymentRequiredError):
+        use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert provider.create_calls == []
+
+
+def test_checkout_draft_order_is_an_order_not_confirmed_business_error():
+    provider = FakeProvider()
+    use_case, _, _ = _checkout_use_case(make_order(status=OrderState.DRAFT), provider)
+
+    with pytest.raises(OrderNotConfirmedError):
+        use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
     assert provider.create_calls == []
 
 

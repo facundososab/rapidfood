@@ -18,6 +18,8 @@ class Conversation:
     # internal id stays a Rapidfood UUID so the channel can be swapped.
     external_thread_id: str | None = None
     business_config_id: str | None = None
+    # A human took over: the agent must not reply while True.
+    agent_paused: bool = False
 
     def __post_init__(self) -> None:
         if not self.conversation_id:

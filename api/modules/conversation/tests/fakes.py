@@ -12,6 +12,20 @@ class InMemoryConversationRepository:
     def find_by_thread(self, business_config_id, channel, external_thread_id):
         return self.rows.get((business_config_id, channel, external_thread_id))
 
+    def get_by_id(self, conversation_id):
+        for conversation in self.rows.values():
+            if conversation.conversation_id == conversation_id:
+                return conversation
+        return None
+
+    def list_conversations(self):
+        return list(self.rows.values())
+
+    def set_agent_paused(self, conversation_id, paused):
+        conversation = self.get_by_id(conversation_id)
+        if conversation is not None:
+            conversation.agent_paused = bool(paused)
+
     def find_by_channel_identity(self, channel, channel_identity):
         for conversation in self.rows.values():
             if conversation.channel == channel and conversation.client_id is None:

@@ -19,8 +19,10 @@ from modules.conversation.application.use_cases.handle_incoming_message import (
 from modules.conversation.application.use_cases.resolve_conversation_for_channel import (
     ResolveConversationCommand,
 )
+from modules.conversation.domain.errors import ConversationNotFoundError
 from modules.conversation.infrastructure.adapters.driver.rest.serializers import (
     AgentMessageSerializer,
+    SendMessageSerializer,
     WebhookSerializer,
 )
 
@@ -61,27 +63,125 @@ class ConversationWebhookView(APIView):
 class ConversationMessagesView(APIView):
     def get(self, request, conversation_id: str):
         container = get_app_conversation_container()
-        result = container.list_messages_use_case.execute(
-            ListMessagesQuery(conversation_id=conversation_id)
-        )
-        return Response(
+        try:
+            detail = container.get_conversation_detail_use_case.execute(conversation_id)
+        except ConversationNotFoundError:
+            return Response({"error": "Conversation not found"}, status=404)
+        return Response(_detail_payload(detail))
+
+
+def _detail_payload(detail) -> dict:
+    return {
+        "conversation_id": detail.conversation_id,
+        "channel": detail.channel,
+        "external_thread_id": detail.external_thread_id,
+        "client_id": detail.client_id,
+        "agent_paused": detail.agent_paused,
+        "client_name": detail.client_name,
+        "client_phone": detail.client_phone,
+        "last_intent": detail.last_intent,
+        "overall_sentiment": detail.overall_sentiment,
+        "messages": [
             {
-                "conversation_id": result.conversation_id,
-                "messages": [
-                    {
-                        "message_id": message.message_id,
-                        "conversation_id": message.conversation_id,
-                        "role": message.role,
-                        "content": message.content,
-                        "detected_intent": message.detected_intent,
-                        "sentiment": message.sentiment,
-                        "status": message.status,
-                        "created_at": message.created_at,
-                    }
-                    for message in result.messages
-                ],
+                "message_id": message.message_id,
+                "role": message.role,
+                "author": message.author,
+                "content": message.content,
+                "created_at": message.created_at,
             }
+            for message in detail.messages
+        ],
+    }
+
+
+class ConversationListView(APIView):
+    """Panel: conversations with their last message and takeover state."""
+
+    def get(self, request):
+        container = get_app_conversation_container()
+        return Response(
+            [
+                {
+                    "id": c.conversation_id,
+                    "channel": c.channel,
+                    "external_thread_id": c.external_thread_id,
+                    "client_id": c.client_id,
+                    "agent_paused": c.agent_paused,
+                    "message_count": c.message_count,
+                    "client_name": c.client_name,
+                    "client_phone": c.client_phone,
+                    "last_message": c.last_message,
+                    "last_role": c.last_role,
+                    "last_at": c.last_at,
+                }
+                for c in container.list_conversations_use_case.execute()
+            ]
         )
+
+
+class ConversationOperatorMessageView(APIView):
+    """A human writes in the conversation (no LLM involved)."""
+
+    def post(self, request, conversation_id):
+        serializer = SendMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        container = get_app_conversation_container()
+        try:
+            detail = container.append_operator_message_use_case.execute(
+                conversation_id, serializer.validated_data["content"]
+            )
+        except ConversationNotFoundError:
+            return Response({"error": "Conversation not found"}, status=404)
+        return Response(_detail_payload(detail))
+
+
+class ConversationClientMessageView(APIView):
+    """Reply as the customer: the real agent answers (unless a human took over)."""
+
+    def post(self, request, conversation_id):
+        serializer = SendMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        container = get_app_conversation_container()
+        if container.reply_as_client_use_case is None:
+            return Response(
+                {"error": "The agent is not configured (missing GROQ_API_KEY)."},
+                status=503,
+            )
+        try:
+            result = container.reply_as_client_use_case.execute(
+                conversation_id, serializer.validated_data["content"]
+            )
+        except ConversationNotFoundError:
+            return Response({"error": "Conversation not found"}, status=404)
+        except Exception:
+            logger.exception("Agent reply failed (conversation=%s)", conversation_id)
+            return Response(
+                {"error": "No pude procesar el mensaje en este momento. Reintentá."},
+                status=502,
+            )
+        payload = _detail_payload(result.detail)
+        payload["paused"] = result.paused
+        payload["response"] = result.response
+        return Response(payload)
+
+
+class ConversationTakeoverView(APIView):
+    def post(self, request, conversation_id):
+        return _set_takeover(conversation_id, True)
+
+
+class ConversationReleaseView(APIView):
+    def post(self, request, conversation_id):
+        return _set_takeover(conversation_id, False)
+
+
+def _set_takeover(conversation_id, paused):
+    container = get_app_conversation_container()
+    try:
+        detail = container.set_takeover_use_case.execute(conversation_id, paused)
+    except ConversationNotFoundError:
+        return Response({"error": "Conversation not found"}, status=404)
+    return Response(_detail_payload(detail))
 
 
 class AgentMessageView(APIView):
@@ -129,9 +229,6 @@ class AgentMessageView(APIView):
                 HandleIncomingMessageCommand(context=context, content=data["content"])
             )
         except Exception:
-            # Technical failure (model/provider/transport). The USER message is
-            # already persisted; never leak a stack trace or an internal message,
-            # but DO log it so it is diagnosable.
             logger.exception(
                 "Agent turn failed (conversation=%s, thread=%s)",
                 context.conversation_id,

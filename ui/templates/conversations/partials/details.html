@@ -1,0 +1,81 @@
+{% comment %}Columna derecha: detalle del contacto y estado del agente.{% endcomment %}
+<aside class="chat-details">
+  <div class="chat-details-head">
+    <div class="flex items-center gap-2 text-[13px] font-semibold">
+      {% icon 'info' 'w-4 h-4 text-primary' %} Detalles del contacto
+    </div>
+    <button type="button" class="chat-icon-btn" title="Cerrar">{% icon 'x' 'w-4 h-4' %}</button>
+  </div>
+
+  <div class="text-center">
+    <span class="chat-avatar mx-auto" style="width:64px;height:64px;font-size:20px;background:var(--color-purple-soft)">{{ label|initials }}</span>
+    <div class="mt-3 text-[14px] font-bold">{{ label }}</div>
+    <div class="text-[12px] text-ink-muted mt-1">
+      {% if conversation.clientPhone %}📞 {{ conversation.clientPhone }}{% else %}Sin teléfono registrado{% endif %}
+    </div>
+  </div>
+
+  <div class="mt-6">
+    <div class="chat-eyebrow">Estado del agente</div>
+    <div class="flex items-center justify-between gap-2 mt-2">
+      {% if conversation.agentPaused %}
+        <span class="chat-pill chat-pill-neutral">Pausado</span>
+        <button class="btn btn-ghost"
+                hx-post="{% url 'conversation_release' conversation.id %}"
+                hx-target="#conversation-pane" hx-swap="outerHTML">
+          {% icon 'play' 'w-3.5 h-3.5' %} Reactivar
+        </button>
+      {% else %}
+        <span class="chat-pill chat-pill-green">Activo</span>
+        <button class="btn btn-ghost text-danger"
+                hx-post="{% url 'conversation_takeover' conversation.id %}"
+                hx-target="#conversation-pane" hx-swap="outerHTML">
+          {% icon 'pause' 'w-3.5 h-3.5' %} Pausar agente
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mt-6">
+    <div class="chat-eyebrow">Análisis de la conversación</div>
+    <dl class="chat-card mt-2">
+      <div class="chat-kv">
+        <dt class="flex items-center gap-1.5">{% icon 'sparkles' 'w-3.5 h-3.5' %} Última intención</dt>
+        <dd>
+          {% if conversation.lastIntent %}
+            <span class="chat-pill chat-pill-violet">{{ conversation.lastIntent }}</span>
+          {% else %}
+            <span class="text-ink-faint">—</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div class="chat-kv">
+        <dt class="flex items-center gap-1.5">{% icon 'smile' 'w-3.5 h-3.5' %} Emoción</dt>
+        <dd>
+          {% if conversation.overallSentiment %}
+            <span class="chat-pill chat-pill-green">{{ conversation.overallSentiment }}</span>
+          {% else %}
+            <span class="text-ink-faint">—</span>
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="mt-6">
+    <div class="chat-eyebrow">Canal y contexto</div>
+    <dl class="chat-card mt-2">
+      <div class="chat-kv"><dt>Canal</dt><dd>{{ conversation.channel }}</dd></div>
+      <div class="chat-kv"><dt>Mensajes</dt><dd class="tnum">{{ conversation.messages|length }}</dd></div>
+      {% if conversation.externalThreadId %}
+      <div class="chat-kv"><dt>Hilo</dt><dd class="font-mono text-[11px] truncate max-w-[150px]">{{ conversation.externalThreadId }}</dd></div>
+      {% endif %}
+      {% if conversation.clientId %}
+      <div class="chat-kv">
+        <dt>Cliente</dt>
+        <dd><a class="text-primary" href="{% url 'client_detail' conversation.clientId %}">Ver ficha</a></dd>
+      </div>
+      {% endif %}
+    </dl>
+  </div>
+</aside>

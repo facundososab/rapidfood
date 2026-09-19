@@ -120,7 +120,9 @@ def get_app_conversation_container() -> ConversationContainer:
     )
     client = get_app_client_container()
     client_service = ClientServiceAdapter(
-        client.client_query_adapter.find_by_phone_number, client.create_client
+        client.client_query_adapter.find_by_phone_number,
+        client.create_client,
+        client.client_query_adapter.find_by_id,
     )
 
     return build_container(
@@ -202,7 +204,7 @@ def _build_agent_runner(conversation_container):
         return None
     return build_agent_runner(
         conversation_container,
-        model_name=getattr(settings, "AGENT_MODEL", "openai/gpt-oss-120b"),
+        model_name=settings.AGENT_MODEL,
         api_key=api_key,
     )
 

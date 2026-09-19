@@ -9,12 +9,14 @@ from langchain_core.messages import AIMessage
 from modules.conversation.domain.models.agent_execution_context import (
     AgentExecutionContext,
 )
+from modules.conversation.domain.errors import NoActiveOrderError
 from modules.conversation.application.ports.driven.agent_runner import AgentTurn
 from modules.conversation.application.use_cases.handle_incoming_message import (
     HandleIncomingMessageCommand,
     HandleIncomingMessageUseCase,
     message_id_for,
 )
+from modules.conversation.domain.value_objects import MessageRole
 from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
     LangChainConversationAgentAdapter,
 )
@@ -127,6 +129,11 @@ def test_history_is_passed_without_the_new_message():
     second_turn = runner.turns[1]
     assert second_turn.message == "dos"
     assert [content for _, content in second_turn.history] == ["uno", "Listo"]
+    # The history carries the STORED domain roles, not a rewritten vocabulary.
+    assert [role for role, _ in second_turn.history] == [
+        MessageRole.USER,
+        MessageRole.AGENT,
+    ]
 
 
 def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
@@ -153,7 +160,7 @@ def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
     turn = AgentTurn(
         message="¿cómo viene mi pedido?",
         context=_context(),
-        history=(("user", "hola"), ("assistant", "¡Hola!")),
+        history=((MessageRole.USER, "hola"), (MessageRole.AGENT, "¡Hola!")),
     )
 
     response = adapter.run(turn)
@@ -162,6 +169,59 @@ def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
     assert len(captured["tools"]) == 17
     assert [m.type for m in captured["messages"]] == ["human", "ai", "human"]
     assert "NUNCA inventes" in captured["prompt"]
+
+
+def test_history_from_the_real_flow_maps_agent_replies_to_ai_messages(monkeypatch):
+    """Regression: the stored roles must reach the model as ai/human.
+
+    The previous hand-written test used lowercase ("assistant") strings the use
+    case never produces, so every historical message silently became a human
+    message and the agent read its own replies as the customer's.
+    """
+    captured = {}
+
+    class FakeAgent:
+        def invoke(self, payload, config=None):
+            captured["types"] = [m.type for m in payload["messages"]]
+            return {"messages": [*payload["messages"], AIMessage(content="ok")]}
+
+    monkeypatch.setattr(
+        "modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter.create_agent",
+        lambda model, tools, system_prompt=None: FakeAgent(),
+    )
+
+    runner = FakeRunner(response="¡Hola! ¿Qué querés pedir?")
+    use_case, _ = _use_case(runner)
+    use_case.execute(HandleIncomingMessageCommand(context=_context(), content="hola"))
+    use_case.execute(
+        HandleIncomingMessageCommand(
+            context=_context(external_message_id="msg-2"), content="¿cómo viene mi pedido?"
+        )
+    )
+
+    adapter = LangChainConversationAgentAdapter(SimpleNamespace(), model=object())
+    adapter.run(runner.turns[1])
+
+    assert captured["types"] == ["human", "ai", "human"]
+
+
+def test_an_unmappable_history_role_fails_loudly(monkeypatch):
+    """A role the adapter cannot map must raise, never degrade to a human turn."""
+    monkeypatch.setattr(
+        "modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter.create_agent",
+        lambda model, tools, system_prompt=None: SimpleNamespace(
+            invoke=lambda payload, config=None: {"messages": payload["messages"]}
+        ),
+    )
+    adapter = LangChainConversationAgentAdapter(SimpleNamespace(), model=object())
+    turn = AgentTurn(
+        message="hola",
+        context=_context(),
+        history=(("assistant", "¡Hola!"),),
+    )
+
+    with pytest.raises(ValueError, match="Unknown history role"):
+        adapter.run(turn)
 
 
 def test_message_id_is_a_valid_and_stable_uuid_for_any_channel_id():
@@ -251,3 +311,94 @@ def test_trace_metadata_never_includes_secrets(monkeypatch):
     assert config["metadata"]["channel"] == "LANGSMITH"
     assert config["metadata"]["businessConfigId"] == "biz-1"
     assert config["metadata"]["conversationId"] == "conv-1"
+
+
+def test_agent_prompt_includes_the_live_order_state(monkeypatch):
+    """The order is the source of truth: the model must SEE it every turn.
+
+    This is what prevents re-adding an item that is already in the order based on
+    a reconstruction from the chat history.
+    """
+    captured = {}
+
+    class FakeAgent:
+        def invoke(self, payload, config=None):
+            return {"messages": [*payload["messages"], AIMessage(content="ok")]}
+
+    def fake_create_agent(model, tools, system_prompt=None):
+        captured["prompt"] = system_prompt
+        return FakeAgent()
+
+    monkeypatch.setattr(
+        "modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter.create_agent",
+        fake_create_agent,
+    )
+
+    class SummaryUseCase:
+        def execute(self, context):
+            return SimpleNamespace(
+                order_id="o-1",
+                status="DRAFT",
+                version=3,
+                lines=[
+                    SimpleNamespace(
+                        product_variant_id="v-doble",
+                        line_id="l-1",
+                        quantity=1,
+                        unit_price="9500",
+                    )
+                ],
+                subtotal="9500",
+                discount="0",
+                shipping_cost=None,
+                total_amount="9500",
+                delivery_type=None,
+                payment_type=None,
+                missing_requirements=("payment_type",),
+            )
+
+    container = SimpleNamespace(get_order_summary_use_case=SummaryUseCase())
+    adapter = LangChainConversationAgentAdapter(container, model=object())
+    adapter.run(AgentTurn(message="sumale una coca", context=_context()))
+
+    prompt = captured["prompt"]
+    assert "ESTADO ACTUAL DEL PEDIDO" in prompt
+    assert "v-doble" in prompt
+    assert "line_id=l-1" in prompt
+    assert "cantidad=1" in prompt
+
+
+def test_agent_prompt_tolerates_a_conversation_without_order(monkeypatch):
+    captured = {}
+
+    class FakeAgent:
+        def invoke(self, payload, config=None):
+            return {"messages": [*payload["messages"], AIMessage(content="ok")]}
+
+    def fake_create_agent(model, tools, system_prompt=None):
+        captured["prompt"] = system_prompt
+        return FakeAgent()
+
+    monkeypatch.setattr(
+        "modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter.create_agent",
+        fake_create_agent,
+    )
+
+    class NoOrderUseCase:
+        def execute(self, context):
+            raise NoActiveOrderError("no order")
+
+    container = SimpleNamespace(get_order_summary_use_case=NoOrderUseCase())
+    adapter = LangChainConversationAgentAdapter(container, model=object())
+    adapter.run(AgentTurn(message="hola", context=_context()))
+
+    assert "todavía no tiene un pedido" in captured["prompt"]
+
+
+def test_system_prompt_translates_mercado_pago_to_online():
+    from modules.conversation.infrastructure.adapters.driver.langchain.prompt import (
+        SYSTEM_PROMPT,
+    )
+
+    assert "Mercado Pago" in SYSTEM_PROMPT
+    assert "SIEMPRE lo traducís a ONLINE" in SYSTEM_PROMPT

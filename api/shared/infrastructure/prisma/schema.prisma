@@ -149,6 +149,8 @@ model Conversation {
   // internal `id` stays a Rapidfood UUID so the channel can be replaced
   // without changing the domain.
   externalThreadId String?   @map("external_thread_id")
+  // When a human takes over the conversation, the agent stops replying.
+  agentPaused      Boolean   @default(false) @map("agent_paused")
   businessConfigId String    @map("business_config_id") @db.Uuid
   businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Restrict)
   clientId         String?   @map("client_id") @db.Uuid
@@ -167,6 +169,7 @@ model Message {
   conversationId String       @map("conversation_id") @db.Uuid
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String // USER | AGENT | SYSTEM - open vocab -> String
+  author         String       @default("AGENT") // CLIENT | AGENT | OPERATOR - who actually wrote it
   content        String
   detectedIntent String?      @map("detected_intent")
   sentiment      String?

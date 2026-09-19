@@ -5,7 +5,8 @@ every template without {% load %}.
 """
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django import template
@@ -38,6 +39,34 @@ def money(value) -> str:
 @register.filter
 def money_or_dash(value) -> str:
     return "—" if value is None else money(value)
+
+
+_MONTHS_ES = (
+    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+)
+
+
+@register.filter
+def day_label(value) -> str:
+    """Chat date divider: "HOY, 17 DE SEPTIEMBRE" / "AYER, 16 DE SEPTIEMBRE"."""
+    if not value:
+        return ""
+    moment = value.date() if hasattr(value, "date") else value
+    today = date.today()
+    prefix = ""
+    if moment == today:
+        prefix = "HOY, "
+    elif moment == today - timedelta(days=1):
+        prefix = "AYER, "
+    return f"{prefix}{moment.day} DE {_MONTHS_ES[moment.month - 1]}"
+
+
+@register.filter
+def initials(value) -> str:
+    """Avatar initials from a name: "Facundo Sosa" -> "FS"."""
+    parts = [p for p in re.split(r"\s+", str(value or "").strip()) if p]
+    return "".join(part[0] for part in parts[:2]).upper() or "?"
 
 
 @register.filter
@@ -182,6 +211,16 @@ def icon(name, cls=None):
 def status_badge(status):
     """Render an order status badge: {% status_badge order.status %}."""
     return {"status": status}
+
+
+@register.filter
+def chat_trim(value) -> str:
+    """Trim surrounding whitespace of a chat message.
+
+    Message bodies often end with a trailing newline; rendered inside a
+    `white-space: pre-wrap` bubble that would show as a blank line.
+    """
+    return (value or "").strip()
 
 
 @register.filter

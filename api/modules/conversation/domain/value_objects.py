@@ -10,6 +10,20 @@ class MessageRole(StrEnum):
     SYSTEM = "SYSTEM"
 
 
+class MessageAuthor(StrEnum):
+    """Who actually wrote a message.
+
+    `role` is the LLM-facing role (USER = the customer, AGENT = the business
+    side); `author` distinguishes an automated agent reply from a human operator
+    speaking on the business side. Both share the AGENT role so the model sees
+    operator messages as its own past turns.
+    """
+
+    CLIENT = "CLIENT"
+    AGENT = "AGENT"
+    OPERATOR = "OPERATOR"
+
+
 class MessageStatus(StrEnum):
     RECEIVED = "RECEIVED"
     PROCESSED = "PROCESSED"
@@ -41,6 +55,7 @@ class ConversationRecord:
     overall_sentiment: Sentiment | None = None
     external_thread_id: str | None = None
     business_config_id: str | None = None
+    agent_paused: bool = False
 
 
 def coerce_enum(value, enum_cls, field_name: str):

@@ -27,6 +27,30 @@ from modules.conversation.application.ports.driven.catalog_service import (
 _AVAILABLE_STATE = "available"
 
 
+def _tokens(query: Optional[str]) -> list[str]:
+    """Lowercased search tokens; punctuation/separators are neutralized."""
+    if not query:
+        return []
+    normalized = query.lower().replace("-", " ").replace(",", " ")
+    return [token for token in normalized.split() if token]
+
+
+def _matches(tokens: list[str], summary: Any, variants: tuple) -> bool:
+    """True when EVERY token appears in the product name/description or a variant.
+
+    All tokens must match ("Classic Burger Doble" needs both the product and the
+    "Doble" variant), which is what lets the agent find a variant by its name.
+    """
+    haystack = " ".join(
+        [
+            (summary.name or ""),
+            (summary.description or ""),
+            *[(v.name or "") for v in variants],
+        ]
+    ).replace("-", " ").lower()
+    return all(token in haystack for token in tokens)
+
+
 class CatalogServiceAdapter(CatalogServicePort):
     def __init__(
         self,
@@ -45,23 +69,36 @@ class CatalogServiceAdapter(CatalogServicePort):
         category_id: Optional[str] = None,
         only_available: bool = True,
     ) -> list[ProductSummaryDTO]:
+        # Match in the conversation boundary, not in the DB: the agent searches
+        # with human terms ("Coca-Cola 500", "Classic Burger Doble") that live in
+        # the VARIANT name, and a naive `name/description contains <full string>`
+        # misses them (and a free-form category id would blow up on a UUID
+        # column). Fetch the menu and match token-by-token against product AND
+        # variant names.
         summaries = self._list_products.execute(
-            ListProductsQuery(category_id=category_id, search=query)
+            ListProductsQuery(category_id=category_id, search=None)
         )
-        return [
-            ProductSummaryDTO(
-                id=s.id,
-                name=s.name,
-                description=s.description,
-                available=s.state == _AVAILABLE_STATE,
-                category_id=s.category_id,
-                # Variants + prices travel with the search result so the agent can
-                # quote each option without a detail call per product.
-                variants=self._variants_for(s.id),
+        tokens = _tokens(query)
+        results: list[ProductSummaryDTO] = []
+        for summary in summaries:
+            if only_available and summary.state != _AVAILABLE_STATE:
+                continue
+            variants = self._variants_for(summary.id)
+            if tokens and not _matches(tokens, summary, variants):
+                continue
+            results.append(
+                ProductSummaryDTO(
+                    id=summary.id,
+                    name=summary.name,
+                    description=summary.description,
+                    available=summary.state == _AVAILABLE_STATE,
+                    category_id=summary.category_id,
+                    # Variants + prices travel with the search result so the agent
+                    # can quote each option without a detail call per product.
+                    variants=variants,
+                )
             )
-            for s in summaries
-            if not only_available or s.state == _AVAILABLE_STATE
-        ]
+        return results
 
     def _variants_for(self, product_id: str):
         snapshot = self._product_query.find_product(product_id)

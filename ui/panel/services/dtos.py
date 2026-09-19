@@ -263,6 +263,7 @@ class Message:
     role: str  # USER | AGENT | SYSTEM | open vocab
     content: str
     createdAt: datetime
+    author: str = "AGENT"  # CLIENT | AGENT | OPERATOR - who actually wrote it
     detectedIntent: Optional[str] = None
     sentiment: Optional[str] = None
     status: Optional[str] = None
@@ -279,6 +280,14 @@ class Conversation:
     client: Optional[Client] = None
     messages: List[Message] = field(default_factory=list)
     orders: List[Order] = field(default_factory=list)
+    # chat panel
+    agentPaused: bool = False
+    externalThreadId: Optional[str] = None
+    clientName: Optional[str] = None
+    clientPhone: Optional[str] = None
+    messageCount: int = 0
+    lastMessage: Optional[str] = None
+    lastAt: Optional[datetime] = None
 
 
 @dataclass

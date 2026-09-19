@@ -7,20 +7,38 @@ from modules.client.application.ports.driver.create_client_ports import (
     CreateClientCommand,
 )
 from modules.conversation.application.ports.driven.client_service import (
+    ClientInfoDTO,
     ClientServicePort,
 )
 
 
 class ClientServiceAdapter(ClientServicePort):
-    def __init__(self, find_by_phone_number: Any, create_client: Any) -> None:
+    def __init__(
+        self, find_by_phone_number: Any, create_client: Any, find_by_id: Any = None
+    ) -> None:
         self._find_by_phone_number = find_by_phone_number
         self._create_client = create_client
+        self._find_by_id = find_by_id
+
+    def get_client(self, client_id: str) -> Optional[ClientInfoDTO]:
+        try:
+            found = self._find_by_id(client_id)
+        except Exception:
+            found = None
+        if found is None:
+            return None
+        return ClientInfoDTO(
+            id=found.id,
+            name=found.name,
+            last_name=found.last_name,
+            phone_number=found.phone_number,
+        )
 
     def resolve_client(
         self, full_name: str, phone_number: Optional[str] = None
     ) -> Optional[str]:
         phone = (phone_number or "").strip()
-        if not phone:
+        if not phone or self._create_client is None:
             return None
 
         try:

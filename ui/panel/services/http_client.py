@@ -262,10 +262,18 @@ class HttpRapidfoodClient(RapidfoodClient):
         )
 
     def _message(self, d) -> dtos.Message:
-        return dtos.Message(id=d["id"], conversationId=d["conversationId"], role=d["role"],
-                            content=d["content"], detectedIntent=d.get("detectedIntent"),
-                            sentiment=d.get("sentiment"), status=d.get("status"),
-                            createdAt=_parse_dt(d["createdAt"]))
+        # The conversation API answers snake_case; keep camelCase tolerance.
+        return dtos.Message(
+            id=d.get("message_id", d.get("id")),
+            conversationId=d.get("conversation_id", d.get("conversationId", "")),
+            role=d.get("role"),
+            author=d.get("author") or ("CLIENT" if d.get("role") == "USER" else "AGENT"),
+            content=d.get("content", ""),
+            detectedIntent=d.get("detected_intent", d.get("detectedIntent")),
+            sentiment=d.get("sentiment"),
+            status=d.get("status"),
+            createdAt=_parse_dt(d.get("created_at", d.get("createdAt"))),
+        )
 
     def _conversation(self, d) -> Optional[dtos.Conversation]:
         if not d:
@@ -623,12 +631,65 @@ class HttpRapidfoodClient(RapidfoodClient):
         rows = self._get("/api/orders/applied-coupons/", coupon_id=coupon_id)
         return [self._applied_coupon(x) for x in rows if x]
 
-    # -- conversations (not in scope yet) ----------------------------------
+    # -- conversations ------------------------------------------------------
     def list_conversations(self):
-        return []
+        rows = self._get("/api/conversation/")
+        result = []
+        for d in rows:
+            last = d.get("last_message")
+            result.append(
+                dtos.Conversation(
+                    id=d["id"],
+                    channel=d.get("channel", ""),
+                    clientId=d.get("client_id"),
+                    agentPaused=bool(d.get("agent_paused")),
+                    externalThreadId=d.get("external_thread_id"),
+                    clientName=d.get("client_name"),
+                    clientPhone=d.get("client_phone"),
+                    messageCount=int(d.get("message_count") or 0),
+                    lastMessage=last,
+                    lastAt=_parse_dt(d.get("last_at")),
+                )
+            )
+        return result
 
     def get_conversation(self, conversation_id):
-        return None
+        return self._conversation_detail(
+            self._get(f"/api/conversation/{conversation_id}/messages/")
+        )
+
+    def send_client_message(self, conversation_id, content):
+        return self._conversation_detail(
+            self._post(f"/api/conversation/{conversation_id}/client-message/", {"content": content})
+        )
+
+    def send_operator_message(self, conversation_id, content):
+        return self._conversation_detail(
+            self._post(f"/api/conversation/{conversation_id}/operator-message/", {"content": content})
+        )
+
+    def set_conversation_takeover(self, conversation_id, paused):
+        action = "takeover" if paused else "release"
+        return self._conversation_detail(
+            self._post(f"/api/conversation/{conversation_id}/{action}/", {})
+        )
+
+    def _conversation_detail(self, d) -> Optional[dtos.Conversation]:
+        if not d:
+            return None
+        return dtos.Conversation(
+            id=d["conversation_id"],
+            channel=d.get("channel", ""),
+            clientId=d.get("client_id"),
+            agentPaused=bool(d.get("agent_paused")),
+            externalThreadId=d.get("external_thread_id"),
+            clientName=d.get("client_name"),
+            clientPhone=d.get("client_phone"),
+            lastIntent=d.get("last_intent"),
+            overallSentiment=d.get("overall_sentiment"),
+            messages=[self._message(m) for m in d.get("messages", [])],
+            messageCount=len(d.get("messages", [])),
+        )
 
     # -- business configuration --------------------------------------------
     def get_business_config(self):

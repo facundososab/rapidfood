@@ -22,3 +22,7 @@ class AgentMessageSerializer(serializers.Serializer):
     content = serializers.CharField()
     external_message_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     client_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SendMessageSerializer(serializers.Serializer):
+    content = serializers.CharField()

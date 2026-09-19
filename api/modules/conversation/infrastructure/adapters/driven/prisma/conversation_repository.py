@@ -31,6 +31,21 @@ class PrismaConversationRepository:
             return None
         return _to_record(row)
 
+    def get_by_id(self, conversation_id: str) -> ConversationRecord | None:
+        row = self._db.conversation.find_unique(where={"id": conversation_id})
+        if row is None:
+            return None
+        return _to_record(row)
+
+    def list_conversations(self) -> list[ConversationRecord]:
+        rows = self._db.conversation.find_many(order={"id": "desc"})
+        return [_to_record(row) for row in rows]
+
+    def set_agent_paused(self, conversation_id: str, paused: bool) -> None:
+        self._db.conversation.update(
+            where={"id": conversation_id}, data={"agentPaused": bool(paused)}
+        )
+
     def find_by_channel_identity(self, channel: str, channel_identity: str):
         # Legacy channel-identity lookup kept for the deterministic scaffold.
         row = self._db.conversation.find_first(
@@ -50,6 +65,7 @@ class PrismaConversationRepository:
                 "lastIntent": conversation.last_intent.value if conversation.last_intent else None,
                 "overallSentiment": conversation.overall_sentiment.value if conversation.overall_sentiment else None,
                 "clientId": conversation.client_id,
+                "agentPaused": conversation.agent_paused,
             }
         )
         return _to_record(row)
@@ -71,4 +87,5 @@ def _to_record(row) -> ConversationRecord:
         overall_sentiment=getattr(row, "overallSentiment", None),
         external_thread_id=getattr(row, "externalThreadId", None),
         business_config_id=getattr(row, "businessConfigId", None),
+        agent_paused=bool(getattr(row, "agentPaused", False)),
     )

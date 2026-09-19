@@ -122,6 +122,21 @@ def test_search_products_maps_the_query_and_uses_the_context():
     assert passed_context is context
 
 
+def test_search_tool_does_not_expose_a_free_form_category_id():
+    """The model cannot know category UUIDs; exposing it caused technical errors."""
+    _, tools, _ = _tools()
+
+    assert "category_id" not in tools["search_products"].args
+
+
+def test_set_payment_type_tool_documents_mercado_pago_as_online():
+    _, tools, _ = _tools()
+
+    description = tools["set_payment_type"].description
+    assert "Mercado Pago" in description
+    assert "ONLINE" in description
+
+
 def test_add_item_maps_arguments_and_never_accepts_prices():
     container, tools, _ = _tools()
 

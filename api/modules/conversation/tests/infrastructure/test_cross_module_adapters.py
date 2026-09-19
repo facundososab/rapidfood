@@ -2,6 +2,9 @@
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
+from modules.conversation.domain.errors import AgentBusinessError
 from modules.conversation.infrastructure.adapters.driven.catalog_service_adapter import (
     CatalogServiceAdapter,
 )
@@ -10,6 +13,14 @@ from modules.conversation.infrastructure.adapters.driven.delivery_service_adapte
 )
 from modules.conversation.infrastructure.adapters.driven.order_service_adapter import (
     OrderServiceAdapter,
+)
+from modules.order.application.ports.driven.payment_provider import (
+    PaymentProviderError,
+)
+from modules.order.domain.errors.order_errors import (
+    OnlinePaymentRequiredError,
+    OrderNotConfirmedError,
+    PaymentTypeRequiredError,
 )
 
 
@@ -76,8 +87,53 @@ def test_catalog_search_maps_and_filters_availability():
 
     assert [p.id for p in result] == ["p-1"]
     assert result[0].available is True
+    # Matching moved to the conversation boundary (token + variant aware), so the
+    # DB is no longer asked to do a naive full-string search.
     command = list_products.commands[0]
-    assert command.search == "stacker"
+    assert command.search is None
+
+
+class _PerProductQuery:
+    """Returns a snapshot per product id (variant-aware search test)."""
+
+    def __init__(self, variants_by_product):
+        self._variants = variants_by_product
+
+    def find_product(self, product_id):
+        return SimpleNamespace(
+            product_id=product_id,
+            name=product_id,
+            is_available=True,
+            variants=self._variants.get(product_id, ()),
+        )
+
+
+def test_catalog_search_matches_variant_names_across_tokens():
+    list_products = StubUseCase(
+        result=[
+            SimpleNamespace(id="p-coke", name="Coca-Cola", description="Gaseosa Coca-Cola.", state="available", category_id="c-1"),
+            SimpleNamespace(id="p-classic", name="Classic Burger", description="Smash burger.", state="available", category_id="c-2"),
+        ]
+    )
+    variants = {
+        "p-coke": (
+            SimpleNamespace(variant_id="v-500", variant_name="500 ml", price=2200, is_available=True),
+            SimpleNamespace(variant_id="v-1500", variant_name="1,5 L", price=4200, is_available=True),
+        ),
+        "p-classic": (
+            SimpleNamespace(variant_id="v-doble", variant_name="Doble", price=9500, is_available=True),
+        ),
+    }
+    adapter = CatalogServiceAdapter(
+        list_products=list_products,
+        product_query=_PerProductQuery(variants),
+        get_product=StubUseCase(),
+    )
+
+    assert [p.id for p in adapter.search_products("biz", query="Coca-Cola 500")] == ["p-coke"]
+    assert [p.id for p in adapter.search_products("biz", query="Classic Burger Doble")] == ["p-classic"]
+    # A token that matches nothing must NOT silently return the whole menu.
+    assert adapter.search_products("biz", query="Coca-Cola 9999") == []
 
 
 def test_catalog_detail_maps_variants_ingredients_and_modifiers():
@@ -277,6 +333,20 @@ def test_order_confirm_cancel_and_checkout_map():
     assert adapter.confirm_order("o-1").status == "PENDING"
     assert adapter.cancel_order("o-1").status == "CANCELLED"
     assert adapter.create_payment_checkout("o-1").order_version == 7
+
+
+def test_order_adapter_maps_provider_and_precondition_errors_to_stable_codes():
+    cases = [
+        (PaymentProviderError("provider down"), "PAYMENT_PROVIDER_ERROR"),
+        (PaymentTypeRequiredError("no payment type"), "PAYMENT_TYPE_REQUIRED"),
+        (OnlinePaymentRequiredError("cash order"), "ONLINE_PAYMENT_REQUIRED"),
+        (OrderNotConfirmedError("draft order"), "ORDER_NOT_CONFIRMED"),
+    ]
+    for error, expected_code in cases:
+        adapter = _order_adapter(create_payment_checkout=StubUseCase(error=error))
+        with pytest.raises(AgentBusinessError) as excinfo:
+            adapter.create_payment_checkout("o-1")
+        assert excinfo.value.code == expected_code
 
 
 # --- delivery --------------------------------------------------------------

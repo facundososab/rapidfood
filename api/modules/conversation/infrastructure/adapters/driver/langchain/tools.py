@@ -89,15 +89,16 @@ def build_tools(container: Any, context: AgentExecutionContext) -> list[BaseTool
     """Build the 15 agent tools bound to one trusted execution context."""
 
     @tool
-    def search_products(
-        query: Optional[str] = None, category_id: Optional[str] = None
-    ) -> str:
-        """Busca productos del menú por texto (nombre o descripción) y/o categoría.
-        Devuelve cada producto con sus variantes y el precio de cada una: usalo para
-        responder precios sin otra consulta."""
+    def search_products(query: Optional[str] = None) -> str:
+        """Busca productos del menú por texto. Busca en el nombre del producto, su
+        descripción y el nombre de cada variante, así que sirve tanto para
+        "Classic Burger" como para "Classic Burger Doble" o "Coca-Cola 500".
+        Devuelve cada producto con sus variantes y el precio de cada una: usalo
+        para responder precios sin otra consulta. Sin texto devuelve el menú
+        completo (evitalo si podés acotar con palabras)."""
         return _run(
             lambda: container.search_products_use_case.execute(
-                SearchProductsQuery(query=query, category_id=category_id), context
+                SearchProductsQuery(query=query), context
             )
         )
 
@@ -244,7 +245,10 @@ def build_tools(container: Any, context: AgentExecutionContext) -> list[BaseTool
 
     @tool
     def set_payment_type(payment_type: Literal["CASH", "ONLINE"]) -> str:
-        """Define la forma de pago del pedido: CASH (efectivo) u ONLINE."""
+        """Define la forma de pago del pedido: CASH (efectivo) u ONLINE (pago
+        online con link). Si el cliente dice "Mercado Pago", "MP", "pagame con
+        link", "pago online" o "mandame el link", la forma de pago es ONLINE.
+        Mercado Pago NO es una forma de pago aparte: se traduce siempre a ONLINE."""
         return _run(
             lambda: container.set_payment_type_use_case.execute(
                 SetPaymentTypeCommand(payment_type=payment_type), context

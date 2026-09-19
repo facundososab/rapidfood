@@ -8,6 +8,28 @@ class OrderStateError(OrderDomainError):
     pass
 
 
+class PaymentTypeRequiredError(OrderStateError):
+    """Raised when an online checkout is requested but no payment type is set.
+
+    Known, explainable business outcome: the agent must ask the customer for the
+    payment method (and set ONLINE) before generating a checkout link.
+    """
+    pass
+
+
+class OnlinePaymentRequiredError(OrderStateError):
+    """Raised when a checkout is requested for a non-ONLINE (CASH) order."""
+    pass
+
+
+class OrderNotConfirmedError(OrderStateError):
+    """Raised when a checkout is requested for an order that is not confirmed.
+
+    Only a PENDING (confirmed) ONLINE order can create a checkout.
+    """
+    pass
+
+
 class InvalidPaymentTypeError(OrderDomainError):
     """Raised when a payment type outside CASH | ONLINE is provided."""
     pass
