@@ -45,9 +45,13 @@ services:
       MERCADOPAGO_FAILURE_URL: ${MERCADOPAGO_FAILURE_URL:-}
       MERCADOPAGO_PENDING_URL: ${MERCADOPAGO_PENDING_URL:-}
       MERCADOPAGO_CURRENCY: ${MERCADOPAGO_CURRENCY:-ARS}
-      # Conversation agent (LangGraph + Groq). Optional: without a key the
-      # agent endpoint returns a clear 503 and the rest of the app keeps working.
+      # Conversation agent (LangGraph). Provider is selectable: Groq or Gemini
+      # (AGENT_PROVIDER=groq|gemini|auto; "auto" infers from the model name).
+      # Optional: without the key for the selected provider the agent endpoint
+      # returns a clear 503 and the rest of the app keeps working.
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-auto}
       AGENT_MODEL: ${AGENT_MODEL:-llama-3.3-70b-versatile}
       AGENT_BUSINESS_CONFIG_ID: ${AGENT_BUSINESS_CONFIG_ID:-}
       # LangSmith tracing (optional).

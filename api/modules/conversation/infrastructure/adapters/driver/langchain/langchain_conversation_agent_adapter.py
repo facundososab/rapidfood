@@ -161,25 +161,40 @@ def _content_text(content: Any) -> str:
     return str(content) if content else ""
 
 
-def build_agent_model(model_name: str, api_key: str, temperature: Optional[float] = None):
-    """Groq chat model factory.
+def build_agent_model(
+    model_name: str,
+    api_key: str,
+    temperature: Optional[float] = None,
+    provider: str = "groq",
+):
+    """Chat model factory — the ONLY place a provider SDK is imported.
 
     Kept here so the application never imports a model provider; swapping
     providers only touches this function. ``temperature`` is only sent when the
     caller sets one.
     """
-    from langchain_groq import ChatGroq
-
     kwargs: dict[str, Any] = {"model": model_name, "api_key": api_key}
     if temperature is not None:
         kwargs["temperature"] = temperature
+
+    if provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(**kwargs)
+
+    from langchain_groq import ChatGroq
+
     return ChatGroq(**kwargs)
 
 
 def build_agent_runner(
-    container: Any, model_name: str, api_key: str, prompt: Optional[str] = None
+    container: Any,
+    model_name: str,
+    api_key: str,
+    prompt: Optional[str] = None,
+    provider: str = "groq",
 ) -> LangChainConversationAgentAdapter:
-    model = build_agent_model(model_name, api_key)
+    model = build_agent_model(model_name, api_key, provider=provider)
     return LangChainConversationAgentAdapter(
         container, model, prompt or SYSTEM_PROMPT
     )

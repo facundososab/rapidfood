@@ -297,6 +297,37 @@ def test_agent_runner_builds_with_the_configured_model(monkeypatch):
     assert isinstance(runner, LangChainConversationAgentAdapter)
 
 
+def test_gemini_model_factory_uses_the_configured_model_and_key(monkeypatch):
+    import langchain_google_genai
+
+    captured = {}
+
+    class FakeGemini:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(langchain_google_genai, "ChatGoogleGenerativeAI", FakeGemini)
+
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        build_agent_model,
+    )
+
+    build_agent_model("gemini-3.5-flash-lite", "g-key", provider="gemini")
+
+    assert captured["model"] == "gemini-3.5-flash-lite"
+    assert captured["api_key"] == "g-key"
+
+
+def test_agent_provider_resolution_infers_from_the_model_name():
+    from composition.container import _resolve_agent_provider
+
+    assert _resolve_agent_provider("auto", "gemini-3.5-flash-lite") == "gemini"
+    assert _resolve_agent_provider("auto", "openai/gpt-oss-120b") == "groq"
+    # An explicit provider always wins over the inference.
+    assert _resolve_agent_provider("groq", "gemini-3.5-flash-lite") == "groq"
+    assert _resolve_agent_provider("gemini", "llama-3.3-70b-versatile") == "gemini"
+
+
 def test_trace_metadata_never_includes_secrets(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "super-secret")
     from modules.conversation.application.ports.driven.agent_runner import AgentTurn

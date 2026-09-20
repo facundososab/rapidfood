@@ -87,9 +87,12 @@ REST_FRAMEWORK = {
 # Delivery module — OpenRouteService API key (required for geocoding/routing).
 OPENROUTESERVICE_API_KEY: str = os.environ.get("OPENROUTESERVICE_API_KEY", "")
 
-# Conversation agent — LangGraph runtime with Groq (the provider is swappable
-# behind the agent runner port).
+# Conversation agent — LangGraph runtime. The provider is swappable behind the
+# agent runner port; `AGENT_PROVIDER` selects it explicitly ("groq" | "gemini"),
+# or "auto" infers it from the model name (gemini-* -> Gemini, otherwise Groq).
 GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
+GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
+AGENT_PROVIDER: str = os.environ.get("AGENT_PROVIDER", "auto")
 AGENT_MODEL: str = os.environ.get(
     "AGENT_MODEL",
     "llama-3.3-70b-versatile",

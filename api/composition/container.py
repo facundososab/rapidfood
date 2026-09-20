@@ -182,11 +182,24 @@ def resolve_agent_business_config_id(requested: Optional[str] = None) -> str:
         ) from exc
 
 
-def _build_agent_runner(conversation_container):
-    """Build the LangChain agent runner when a Groq key is configured.
+def _resolve_agent_provider(configured: str, model_name: str) -> str:
+    """Explicit AGENT_PROVIDER ("groq" | "gemini"); "auto" infers from the model."""
+    configured = (configured or "auto").strip().lower()
+    if configured in ("gemini", "groq"):
+        return configured
+    return (
+        "gemini"
+        if (model_name or "").strip().lower().startswith("gemini")
+        else "groq"
+    )
 
-    Returns None when the key is missing so the REST/app wiring still boots; the
-    agent endpoint surfaces a clear error instead.
+
+def _build_agent_runner(conversation_container):
+    """Build the LangChain agent runner when the selected provider has a key.
+
+    Provider comes from AGENT_PROVIDER, or is inferred from the model name when
+    "auto". Returns None when the key is missing so the REST/app wiring still
+    boots; the agent endpoint surfaces a clear error instead.
 
     LangSmith tracing is opt-in and read directly from the environment by the
     LangChain client (LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT);
@@ -199,13 +212,27 @@ def _build_agent_runner(conversation_container):
         build_agent_runner,
     )
 
-    api_key = getattr(settings, "GROQ_API_KEY", "")
+    model_name = getattr(settings, "AGENT_MODEL", "")
+    provider = _resolve_agent_provider(
+        getattr(settings, "AGENT_PROVIDER", "auto"), model_name
+    )
+    api_key = (
+        getattr(settings, "GEMINI_API_KEY", "")
+        if provider == "gemini"
+        else getattr(settings, "GROQ_API_KEY", "")
+    )
     if not api_key:
+        logger.warning(
+            "Agent provider %r selected but no API key is configured; the agent "
+            "stays disabled.",
+            provider,
+        )
         return None
     return build_agent_runner(
         conversation_container,
-        model_name=settings.AGENT_MODEL,
+        model_name=model_name,
         api_key=api_key,
+        provider=provider,
     )
 
 
