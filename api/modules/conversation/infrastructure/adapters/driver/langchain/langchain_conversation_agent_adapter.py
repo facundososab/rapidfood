@@ -7,6 +7,7 @@ final assistant text. Framework types stay inside this adapter.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Iterable, Optional
 
 from langchain.agents import create_agent
@@ -33,7 +34,8 @@ class LangChainConversationAgentAdapter(AgentRunnerPort):
         self._prompt = prompt
 
     def run(self, turn: AgentTurn) -> str:
-        tools = build_tools(self._container, turn.context)
+        turn_state: dict = {}
+        tools = build_tools(self._container, turn.context, turn_state)
         agent = create_agent(
             self._model,
             tools,
@@ -46,7 +48,36 @@ class LangChainConversationAgentAdapter(AgentRunnerPort):
         messages.append(HumanMessage(content=turn.message))
 
         result = agent.invoke({"messages": messages}, _trace_config(turn))
-        return _final_text(result["messages"])
+        return _guard_payment_links(
+            _final_text(result["messages"]), turn_state.get("checkout_url")
+        )
+
+
+# Any URL pointing at a Mercado Pago checkout. Used to stop the model from
+# emitting a FABRICATED payment link: only the URL returned by
+# create_payment_checkout in THIS turn is allowed through.
+_PAYMENT_LINK_RE = re.compile(
+    r"https?://[^\s\)\]]*(?:mercadopago|mercadolibre)[^\s\)\]]*",
+    re.IGNORECASE,
+)
+
+
+def _guard_payment_links(text: str, real_checkout_url: Optional[str]) -> str:
+    """Never let a payment URL the backend did not produce reach the customer.
+
+    If the model wrote a checkout link but the tool did not return one this turn
+    (it failed, or the model invented it), the link is replaced with a safe
+    message instead of sending the buyer to a broken/dummy URL. When a real URL
+    exists, any payment URL is normalized to it.
+    """
+    if not _PAYMENT_LINK_RE.search(text):
+        return text
+    if real_checkout_url:
+        return _PAYMENT_LINK_RE.sub(real_checkout_url, text)
+    return _PAYMENT_LINK_RE.sub(
+        "(no pude generar el link de pago en este momento, ¿querés que reintente?)",
+        text,
+    )
 
 
 def _compose_prompt(base_prompt: str, container: Any, context) -> str:

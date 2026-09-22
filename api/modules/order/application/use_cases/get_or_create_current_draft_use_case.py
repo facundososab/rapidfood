@@ -19,6 +19,7 @@ from modules.order.application.ports.driver.start_draft_order_ports import (
     StartDraftOrderCommand,
     StartDraftOrderPort,
 )
+from modules.order.domain.errors.order_errors import DuplicateActiveOrderError
 from modules.order.domain.models.order_state import OrderState
 
 
@@ -34,6 +35,38 @@ class GetOrCreateCurrentDraftUseCase(GetOrCreateCurrentDraftPort):
     def execute(
         self, command: GetOrCreateCurrentDraftCommand
     ) -> GetOrCreateCurrentDraftResult:
+        existing = self._read_draft(command)
+        if existing is not None:
+            return GetOrCreateCurrentDraftResult(
+                order_id=existing.id, status=existing.status.value, created=False
+            )
+
+        try:
+            created = self._start_draft_order.execute(
+                StartDraftOrderCommand(
+                    client_id=command.client_id,
+                    client_name=command.client_name,
+                    business_config_id=command.business_config_id,
+                    conversation_id=command.conversation_id,
+                    origin=command.origin,
+                )
+            )
+        except DuplicateActiveOrderError:
+            # A parallel tool call won the race and created the draft first; the
+            # partial unique index rejected ours. Reuse the winner instead of
+            # failing: this is what keeps ONE active order per conversation.
+            existing = self._read_draft(command)
+            if existing is None:
+                raise
+            return GetOrCreateCurrentDraftResult(
+                order_id=existing.id, status=existing.status.value, created=False
+            )
+
+        return GetOrCreateCurrentDraftResult(
+            order_id=created.order_id, status=created.status, created=True
+        )
+
+    def _read_draft(self, command: GetOrCreateCurrentDraftCommand):
         existing = self._order_repo.list(
             OrderFilter(
                 business_config_id=command.business_config_id,
@@ -41,21 +74,4 @@ class GetOrCreateCurrentDraftUseCase(GetOrCreateCurrentDraftPort):
                 status=OrderState.DRAFT,
             )
         )
-        if existing:
-            draft = existing[0]
-            return GetOrCreateCurrentDraftResult(
-                order_id=draft.id, status=draft.status.value, created=False
-            )
-
-        created = self._start_draft_order.execute(
-            StartDraftOrderCommand(
-                client_id=command.client_id,
-                client_name=command.client_name,
-                business_config_id=command.business_config_id,
-                conversation_id=command.conversation_id,
-                origin=command.origin,
-            )
-        )
-        return GetOrCreateCurrentDraftResult(
-            order_id=created.order_id, status=created.status, created=True
-        )
+        return existing[0] if existing else None

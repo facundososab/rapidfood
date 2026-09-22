@@ -137,6 +137,20 @@ def test_set_payment_type_tool_documents_mercado_pago_as_online():
     assert "ONLINE" in description
 
 
+def test_create_payment_checkout_records_the_real_url_for_the_guard():
+    state = {}
+    container = _container(
+        create_checkout_use_case=FakeUseCase(
+            result=SimpleNamespace(checkout_url="https://mp/real")
+        )
+    )
+    tools = {t.name: t for t in build_tools(container, _context(), state)}
+
+    tools["create_payment_checkout"].invoke({})
+
+    assert state["checkout_url"] == "https://mp/real"
+
+
 def test_add_item_maps_arguments_and_never_accepts_prices():
     container, tools, _ = _tools()
 

@@ -45,6 +45,17 @@ class OrderNotFound(OrderDomainError):
     pass
 
 
+class DuplicateActiveOrderError(OrderDomainError):
+    """Raised when creating an order would leave two active orders for a conversation.
+
+    A conversation can have at most ONE active order (DRAFT or PENDING),
+    enforced by a partial unique index. A parallel create that loses the race
+    hits the index and gets this error so the caller can reuse the winner
+    instead of failing.
+    """
+    pass
+
+
 class InvalidLineError(OrderDomainError):
     """Raised when an order line is invalid (e.g. quantity < 1)."""
     pass

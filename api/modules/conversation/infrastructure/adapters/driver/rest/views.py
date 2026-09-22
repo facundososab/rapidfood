@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -144,7 +145,7 @@ class ConversationClientMessageView(APIView):
         container = get_app_conversation_container()
         if container.reply_as_client_use_case is None:
             return Response(
-                {"error": "The agent is not configured (missing GROQ_API_KEY)."},
+                {"error": "The agent is not configured (missing the provider API key)."},
                 status=503,
             )
         try:
@@ -203,7 +204,7 @@ class AgentMessageView(APIView):
         container = get_app_conversation_container()
         if container.handle_incoming_message_use_case is None:
             return Response(
-                {"error": "The agent is not configured (missing GROQ_API_KEY)."},
+                {"error": "The agent is not configured (missing the provider API key)."},
                 status=503,
             )
 
@@ -221,7 +222,10 @@ class AgentMessageView(APIView):
             channel=data["channel"],
             client_id=resolution.client_id,
             external_thread_id=data["external_thread_id"],
-            external_message_id=data.get("external_message_id") or None,
+            # Write operations require an idempotency id. The channel may supply
+            # one; when it does not, generate it here (same rule as the LangGraph
+            # driver) so mutations never fail for a missing id.
+            external_message_id=data.get("external_message_id") or str(uuid.uuid4()),
         )
 
         try:

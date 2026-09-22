@@ -1,5 +1,6 @@
 from datetime import datetime
 import dataclasses
+import logging
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -45,6 +46,9 @@ from modules.order.application.ports.driver.payment_ports import (
 from modules.order.application.ports.driver.list_applied_coupons_ports import (
     ListAppliedCouponsQuery,
 )
+from modules.order.application.ports.driven.payment_provider import (
+    PaymentProviderError,
+)
 from modules.order.domain.errors.order_errors import OrderDomainError, PaymentAttemptNotFoundError
 from modules.order.domain.models.order import Order
 from .mercadopago_signature import validate_mercadopago_signature
@@ -55,6 +59,8 @@ from .serializers import (
     CreatePaymentLinkSerializer, MercadoPagoWebhookSerializer,
     SetPaymentTypeSerializer, CurrentDraftSerializer, SetClientSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_dt(value) -> datetime | None:
@@ -295,6 +301,17 @@ class MercadoPagoWebhookView(APIView):
             x_signature=request.headers.get("x-signature", ""),
             secret=secret,
         ):
+            # Diagnostics only (never the secret): shows whether MP sent the
+            # signing headers, so a secret mismatch is distinguishable from a
+            # missing-header problem.
+            logger.warning(
+                "Mercado Pago webhook rejected: data_id=%s has_request_id=%s "
+                "has_signature=%s secret_configured=%s",
+                data_id,
+                bool(request.headers.get("x-request-id")),
+                bool(request.headers.get("x-signature")),
+                bool(secret),
+            )
             return Response({"error": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
@@ -311,6 +328,15 @@ class MercadoPagoWebhookView(APIView):
         except PaymentAttemptNotFoundError:
             return Response(
                 {"error": "Unknown payment attempt"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except PaymentProviderError:
+            # Transient provider failure: answer 503 so Mercado Pago retries.
+            logger.warning(
+                "Mercado Pago webhook: provider fetch failed for data_id=%s", data_id
+            )
+            return Response(
+                {"error": "Payment provider unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response(
             {

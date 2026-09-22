@@ -45,6 +45,17 @@ class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
 
     def execute(self, command: HandlePaymentWebhookCommand) -> HandlePaymentWebhookResult:
         remote = self._payment_provider.get_payment(command.data_id)
+        if remote is None:
+            # The provider does not know this id (simulated/unknown): acknowledge
+            # it so Mercado Pago stops retrying, and apply no local effect.
+            return HandlePaymentWebhookResult(
+                payment_attempt_id=None,
+                status="UNKNOWN",
+                order_id=None,
+                order_status=None,
+                processed=False,
+                applied=False,
+            )
 
         attempt = self._payment_repo.get_by_external_id(remote.external_id)
         if attempt is None:

@@ -109,13 +109,20 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
         # an idempotent success. A 2xx means WE cancelled it now.
         return CancelCheckoutResult(already_cancelled=status_code in (404, 409))
 
-    def get_payment(self, external_id: str) -> ProviderPayment:
-        response = self._request("GET", f"{_ORDERS_PATH}/{external_id}", expected=(200,))
+    def get_payment(self, external_id: str) -> Optional[ProviderPayment]:
+        body, status_code = self._request_raw(
+            "GET", f"{_ORDERS_PATH}/{external_id}", expected=(200, 400, 404)
+        )
+        if status_code in (400, 404):
+            # Mercado Pago answers 404, or 400 `invalid_path_param`, for an id it
+            # does not know (e.g. a simulated notification). Nothing to reconcile,
+            # and retrying would not help, so the webhook can acknowledge it.
+            return None
         return ProviderPayment(
-            external_id=str(response.get("id", external_id)),
-            status=map_mercadopago_status(_extract_status(response)),
-            external_reference=response.get("external_reference"),
-            amount=_decimal_or_none(response.get("total_amount")),
+            external_id=str(body.get("id", external_id)),
+            status=map_mercadopago_status(_extract_status(body)),
+            external_reference=body.get("external_reference"),
+            amount=_decimal_or_none(body.get("total_amount")),
         )
 
     def _back_urls(self) -> dict:

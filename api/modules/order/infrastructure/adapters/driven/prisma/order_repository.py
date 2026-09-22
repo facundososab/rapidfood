@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional
 
 from prisma import enums
+from prisma.errors import UniqueViolationError
 from shared.infrastructure.prisma.db import db
 
 from modules.order.application.ports.driven.order_repository import (
@@ -10,6 +11,7 @@ from modules.order.application.ports.driven.order_repository import (
 )
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order import Order
+from modules.order.domain.errors.order_errors import DuplicateActiveOrderError
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
 from modules.order.domain.models.order_line_removed_ingredient import OrderLineRemovedIngredient
@@ -22,8 +24,15 @@ from decimal import Decimal
 
 class PrismaOrderRepository(OrderRepository):
     def save(self, order: Order) -> Order:
-        with db.client.tx() as tx:
-            persist_order_in_tx(tx, order)
+        try:
+            with db.client.tx() as tx:
+                persist_order_in_tx(tx, order)
+        except UniqueViolationError as exc:
+            # The only unique constraint on `order` (besides the PK) is the
+            # partial index guaranteeing ONE active order per conversation.
+            raise DuplicateActiveOrderError(
+                "Another active order already exists for this conversation"
+            ) from exc
         return order
 
     def get_by_id(self, order_id: str) -> Optional[Order]:

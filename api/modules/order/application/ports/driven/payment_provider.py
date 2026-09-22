@@ -74,5 +74,11 @@ class PaymentProviderPort(ABC):
         pass
 
     @abstractmethod
-    def get_payment(self, external_id: str) -> ProviderPayment:
+    def get_payment(self, external_id: str) -> Optional[ProviderPayment]:
+        """Fetch the authoritative provider state, or None when it is unknown.
+
+        None means "the provider does not know this id" (a non-retryable, benign
+        case, e.g. a simulated/unknown notification); a transient failure raises
+        PaymentProviderError so the caller can ask the provider to retry.
+        """
         pass

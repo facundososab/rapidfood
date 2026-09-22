@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from typing import Any, Literal, Optional
 
 from langchain_core.tools import BaseTool, tool
@@ -41,6 +42,8 @@ TECHNICAL_ERROR_MESSAGE = (
     "No pude procesar eso en este momento. ¿Podés intentar de nuevo?"
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _dump(value: Any) -> str:
     if dataclasses.is_dataclass(value):
@@ -56,7 +59,9 @@ def _run(operation) -> str:
             {"ok": False, "error": {"code": exc.code, "message": str(exc)}}
         )
     except Exception:
-        # Technical failure: no stack trace, no invented business claim.
+        # Technical failure: no stack trace to the customer, but keep the cause
+        # in the server logs so it can be diagnosed.
+        logger.exception("Agent tool failed")
         return _dump(
             {
                 "ok": False,
@@ -85,8 +90,17 @@ def _address(
     )
 
 
-def build_tools(container: Any, context: AgentExecutionContext) -> list[BaseTool]:
-    """Build the 15 agent tools bound to one trusted execution context."""
+def build_tools(
+    container: Any,
+    context: AgentExecutionContext,
+    turn_state: Optional[dict] = None,
+) -> list[BaseTool]:
+    """Build the agent tools bound to one trusted execution context.
+
+    ``turn_state`` is an optional mutable per-turn holder the adapter uses to
+    remember side effects it must validate afterwards (e.g. the REAL
+    checkout_url), so a hallucinated payment link can be caught and replaced.
+    """
 
     @tool
     def search_products(query: Optional[str] = None) -> str:
@@ -287,8 +301,15 @@ def build_tools(container: Any, context: AgentExecutionContext) -> list[BaseTool
     def create_payment_checkout() -> str:
         """Genera el link de pago del pedido actual (solo pedidos ONLINE ya
         confirmados). Usalo después de la confirmación explícita; el link lo crea
-        el backend."""
-        return _run(lambda: container.create_checkout_use_case.execute(context))
+        el backend. Copiá el checkout_url que devuelve: es el ÚNICO link válido."""
+
+        def operation():
+            result = container.create_checkout_use_case.execute(context)
+            if turn_state is not None:
+                turn_state["checkout_url"] = getattr(result, "checkout_url", None)
+            return result
+
+        return _run(operation)
 
     @tool
     def get_latest_active_order() -> str:

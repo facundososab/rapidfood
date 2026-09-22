@@ -433,3 +433,51 @@ def test_system_prompt_translates_mercado_pago_to_online():
 
     assert "Mercado Pago" in SYSTEM_PROMPT
     assert "SIEMPRE lo traducís a ONLINE" in SYSTEM_PROMPT
+
+
+def test_system_prompt_forbids_inventing_payment_urls():
+    from modules.conversation.infrastructure.adapters.driver.langchain.prompt import (
+        SYSTEM_PROMPT,
+    )
+
+    assert "NUNCA escribas una URL de pago" in SYSTEM_PROMPT
+
+
+def test_payment_link_guard_strips_a_fabricated_url_when_no_checkout_was_created():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_payment_links,
+    )
+
+    text = (
+        "¡Pedido confirmado! Link: "
+        "https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=dummy"
+    )
+
+    guarded = _guard_payment_links(text, None)
+
+    assert "dummy" not in guarded
+    assert "no pude generar el link" in guarded
+
+
+def test_payment_link_guard_normalizes_to_the_real_checkout_url():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_payment_links,
+    )
+
+    text = "Pagá acá: https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=FAKE"
+    real = "https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=REAL"
+
+    guarded = _guard_payment_links(text, real)
+
+    assert real in guarded
+    assert "FAKE" not in guarded
+
+
+def test_payment_link_guard_leaves_non_payment_urls_untouched():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_payment_links,
+    )
+
+    text = "Mirá nuestro menú en https://rapidfood.example/menu"
+
+    assert _guard_payment_links(text, None) == text

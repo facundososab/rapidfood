@@ -217,6 +217,31 @@ def test_get_payment_prefers_the_nested_transaction_status():
     assert result.amount == Decimal("1500.50")
 
 
+def test_get_payment_returns_none_when_the_provider_does_not_know_the_order():
+    session = FakeSession([FakeResponse(404, {"error": "not found"})])
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    assert provider.get_payment("UNKNOWN") is None
+
+
+def test_get_payment_returns_none_for_an_invalid_order_id():
+    # Mercado Pago answers 400 `invalid_path_param` for an unknown/simulated id.
+    session = FakeSession(
+        [FakeResponse(400, {"errors": [{"code": "invalid_path_param"}]})]
+    )
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    assert provider.get_payment("123456") is None
+
+
+def test_get_payment_raises_on_a_transient_provider_failure():
+    session = FakeSession([FakeResponse(500, {"error": "internal"})])
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    with pytest.raises(PaymentProviderError):
+        provider.get_payment("MP-1")
+
+
 def test_transport_errors_become_technical_provider_errors():
     session = FakeSession(error=RuntimeError("connection reset"))
     provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)

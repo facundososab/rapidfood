@@ -408,6 +408,22 @@ def test_unknown_attempt_raises():
         use_case.execute(_webhook_command())
 
 
+def test_unknown_provider_id_is_acknowledged_without_effects():
+    """Provider 404 (unknown/simulated id): ack, no effects, no retry storm."""
+    order = make_order()
+    use_case = HandlePaymentWebhookUseCase(
+        order_repo=FakeOrderRepo(order),
+        payment_repo=FakeAttemptRepo(),
+        payment_provider=FakeProvider(remote_payment=None),
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.processed is False
+    assert result.applied is False
+    assert result.status == "UNKNOWN"
+
+
 def _cancel_use_case(attempt, provider):
     repo = FakeAttemptRepo()
     repo.add(attempt)

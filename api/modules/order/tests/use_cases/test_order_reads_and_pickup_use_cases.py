@@ -254,6 +254,40 @@ def test_get_or_create_current_draft_creates_when_none_exists():
     assert start_draft.commands[0].business_config_id == "b-1"
 
 
+def test_get_or_create_current_draft_reuses_the_winner_after_a_race():
+    """Parallel creates: the loser gets DuplicateActiveOrderError and reuses it.
+
+    This is what keeps exactly ONE active order per conversation when two tool
+    calls are emitted in the same agent turn.
+    """
+    from modules.order.domain.errors.order_errors import DuplicateActiveOrderError
+
+    winner = _scoped(make_order(OrderState.DRAFT))
+
+    class RacyRepo(FakeOrderRepo):
+        def __init__(self):
+            super().__init__([])
+            self.list_calls = 0
+
+        def list(self, order_filter=None):
+            self.list_calls += 1
+            # 1st read: no draft yet. After losing the race: the winner exists.
+            return [] if self.list_calls == 1 else [winner]
+
+    class LosingStartDraft:
+        def execute(self, command):
+            raise DuplicateActiveOrderError("lost the race")
+
+    use_case = GetOrCreateCurrentDraftUseCase(RacyRepo(), LosingStartDraft())
+
+    result = use_case.execute(
+        GetOrCreateCurrentDraftCommand(business_config_id="b-1", conversation_id="c-1")
+    )
+
+    assert result.order_id == winner.id
+    assert result.created is False
+
+
 def test_set_pickup_clears_delivery_and_bumps_version():
     order = make_order_with_line()
     order.delivery_type = DeliveryType.DELIVERY
