@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     "modules.catalog",
     "modules.config_coupon",
     "modules.delivery",
+    "modules.business",
+    "modules.staff",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.

@@ -32,7 +32,43 @@ Opcionalmente, `api/.env` y `ui/.env` se cargan primero como override local por 
 | `RAPIDFOOD_CLIENT`                                | Fuente de datos del panel: `mock` (en memoria) u `http` (API real) | `mock`                                                      |
 | `RAPIDFOOD_API_BASE_URL`                          | Base URL de la API para el panel con `RAPIDFOOD_CLIENT=http`       | `http://localhost:8000`                                     |
 | `RAPIDFOOD_API_TOKEN`                             | Token opcional del panel hacia la API real                         | _(vacío)_                                                   |
+| `SUPABASE_URL`                                    | Proyecto Supabase (Auth GoTrue) — identidad del personal           | _(vacío)_                                                   |
+| `SUPABASE_ANON_KEY`                               | Clave pública anon del proyecto (login del panel)                 | _(vacío)_                                                   |
+| `SUPABASE_JWT_SECRET`                             | Secreto de firma HS256 de los JWT (Dashboard → Settings → API)     | _(vacío)_                                                   |
+| `SUPABASE_SERVICE_ROLE_KEY`                       | Solo para el comando `create_staff` (admin API) — nunca en el panel| _(vacío)_                                                   |
 | `BACKEND_PORT` / `UI_PORT`                        | Puertos publicados por Docker Compose                              | `8000` / `8001`                                             |
+
+## Auth del personal (Supabase)
+
+El login del restaurante (roles **ADMIN / CAJA / COCINA**) usa **Supabase Auth** como
+proveedor de identidad (email + contraseña). La API valida el JWT de cada request
+(HS256 con `SUPABASE_JWT_SECRET`); el **rol vive en la base propia** (tabla `staff`,
+Prisma) y el panel inicia sesión contra GoTrue de forma server-side.
+
+**Bootstrap del proyecto** (una vez):
+
+1. Crear el proyecto en [Supabase Dashboard](https://supabase.com/dashboard) (o vía MCP).
+2. Copiar al `.env` los valores de **Settings → API**: `Project URL` → `SUPABASE_URL`,
+   `anon public` → `SUPABASE_ANON_KEY`, `JWT Secret` → `SUPABASE_JWT_SECRET`.
+3. Aplicar la migración local: `uv run prisma migrate deploy --schema api/shared/infrastructure/prisma/schema.prisma`.
+
+**Alta de personal** — dos caminos:
+
+- **Comando** (recomendado): requiere `SUPABASE_SERVICE_ROLE_KEY` en el `.env`
+  (Settings → API → `service_role`):
+
+  ```bash
+  cd api && PYTHONPATH=. uv run python manage.py create_staff \
+      --email caja@rapidfood.local --name "Caja Uno" --role CASHIER
+  # roles: ADMIN | CASHIER | KITCHEN
+  ```
+
+- **Manual**: crear el usuario en Authentication → Users, copiar su `UUID` del perfil
+  y agregar la fila en la tabla `staff` con `supabase_auth_id`, `email`, `name`, `role`.
+
+> Los clientes finales **no se autentican**: los endpoints públicos (catálogo,
+> webhook de MercadoPago, payment links, bot de WhatsApp) quedan `AllowAny`; el resto
+> de la API exige JWT de un miembro del personal.
 
 ## Setup con Docker (recomendado)
 
