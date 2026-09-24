@@ -45,6 +45,12 @@ services:
       MERCADOPAGO_FAILURE_URL: ${MERCADOPAGO_FAILURE_URL:-}
       MERCADOPAGO_PENDING_URL: ${MERCADOPAGO_PENDING_URL:-}
       MERCADOPAGO_CURRENCY: ${MERCADOPAGO_CURRENCY:-ARS}
+      # Supabase Auth (staff login). Set in the repo-root .env; empty keeps the
+      # stack booting (health check) but JWT auth/JWKS will refuse requests.
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     # Dev: bind-mount the source so runserver auto-reloads on edits.
@@ -71,6 +77,9 @@ services:
       # RAPIDFOOD_CLIENT=mock for standalone local dev.
       RAPIDFOOD_CLIENT: http
       RAPIDFOOD_API_BASE_URL: http://backend:8000
+      # Supabase Auth (staff login for the panel).
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
     ports:
       - "${UI_PORT:-8001}:8000"
     # Dev: the whole ./ui dir is the container /app (same layout as the image).
