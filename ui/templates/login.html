@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iniciar sesión · Rapidfood</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260916m" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
+</head>
+<body class="bg-bg min-h-screen">
+  <div class="min-h-screen grid place-items-center px-4">
+    <div class="w-full max-w-sm">
+      <div class="flex flex-col items-center gap-2 mb-6">
+        <span class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary text-white text-xl font-bold">R</span>
+        <h1 class="font-display font-extrabold text-xl text-ink tracking-tight">Rapidfood</h1>
+        <p class="text-[13px] text-ink-faint">Panel de operaciones · Acceso del personal</p>
+      </div>
+
+      <div class="bg-surface border border-line rounded-2xl p-6 shadow-sm">
+        {% if error %}
+        <div class="mb-4 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-[13px] font-medium text-red-700">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}" class="flex flex-col gap-4">
+          {% csrf_token %}
+          <div class="flex flex-col gap-1.5">
+            <label for="email" class="text-[12px] font-semibold text-ink-soft">Email</label>
+            <input
+              id="email" name="email" type="email" required autocomplete="username" autofocus
+              value="{{ email|default:'' }}"
+              class="input w-full" placeholder="personal@rapidfood.local" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="password" class="text-[12px] font-semibold text-ink-soft">Contraseña</label>
+            <input
+              id="password" name="password" type="password" required autocomplete="current-password"
+              class="input w-full" placeholder="••••••••" />
+          </div>
+          <button type="submit" class="btn btn-primary w-full justify-center mt-1">Iniciar sesión</button>
+        </form>
+      </div>
+
+      <p class="text-center text-[11px] text-ink-faint mt-5">Autenticación con Supabase Auth (email + contraseña)</p>
+    </div>
+  </div>
+</body>
+</html>

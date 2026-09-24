@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    auth,
     clients,
     configuration,
     conversations,
@@ -12,6 +13,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path("login/", auth.LoginView.as_view(), name="login"),
+    path("logout/", auth.LogoutView.as_view(), name="logout"),
     path("", dashboard.index, name="dashboard"),
 
     # Orders

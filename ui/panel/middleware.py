@@ -37,3 +37,50 @@ class ApiErrorToastMiddleware:
             return None
         messages.error(request, str(exception) or "No se pudo completar la operación.")
         return redirect(request.META.get("HTTP_REFERER") or "/")
+
+
+class LoginRequiredMiddleware:
+    """Session gate: every page except login/logout/static requires a Supabase token."""
+
+    PUBLIC_PATHS = ("/login/", "/logout/", "/static/")
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        path = request.path
+        if not path.startswith(self.PUBLIC_PATHS):
+            if not request.session.get("supabase_access_token"):
+                return redirect("login")
+        return self.get_response(request)
+
+
+class ApiSessionTokenMiddleware:
+    """Forward the logged-in Supabase token to the HTTP API client.
+
+    The panel uses a singleton HTTP client (``get_client()``); this middleware
+    refreshes its Authorization header from the session on every request so the
+    API receives the operator JWT. Single-user panel: the header reflects the
+    last active session.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        self._apply_token(request.session.get("supabase_access_token"))
+        return self.get_response(request)
+
+    def _apply_token(self, token: str | None) -> None:
+        try:
+            from .services.factory import get_client
+
+            session = getattr(get_client(), "session", None)
+        except Exception:  # mock client without a requests session
+            return
+        if session is None:
+            return
+        if token:
+            session.headers["Authorization"] = f"Bearer {token}"
+        else:
+            session.headers.pop("Authorization", None)

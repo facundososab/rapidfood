@@ -31,6 +31,13 @@ RAPIDFOOD_CLIENT = os.environ.get("RAPIDFOOD_CLIENT", "mock")
 RAPIDFOOD_API_BASE_URL = os.environ.get("RAPIDFOOD_API_BASE_URL", "http://localhost:8000")
 RAPIDFOOD_API_TOKEN = os.environ.get("RAPIDFOOD_API_TOKEN", "")
 
+# --- Supabase Auth (staff login) ---------------------------------------------
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
+LOGIN_URL = "login"
+LOGOUT_REDIRECT_URL = "login"
+
 INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sessions",
@@ -44,6 +51,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "panel.middleware.ApiErrorToastMiddleware",
+    "panel.middleware.LoginRequiredMiddleware",
+    "panel.middleware.ApiSessionTokenMiddleware",
 ]
 
 # Messages are surfaced as toasts; signed cookies avoid needing a database.
