@@ -60,6 +60,13 @@ enum WeekDay {
   SUNDAY
 }
 
+// Restaurant staff roles (auth module — Supabase Auth identity, role in our DB).
+enum StaffRole {
+  ADMIN
+  CASHIER
+  KITCHEN
+}
+
 // --- Models: snake_case via @map / @@map ---
 
 model BusinessConfiguration {
@@ -72,6 +79,7 @@ model BusinessConfiguration {
   addresses     Address[]
   orders        Order[]
   deliveryPricingConfiguration DeliveryPricingConfiguration?
+  staff         Staff[]
 
   @@map("business_configuration")
 }
@@ -481,4 +489,20 @@ model DeliveryWeekdayPricingRule {
 
   @@unique([deliveryPricingConfigId, weekDay])
   @@map("delivery_weekday_pricing_rule")
+}
+
+// --- Auth module: restaurant staff -------------------------------------------
+// Identity lives in Supabase Auth (GoTrue, email+password); the role and the
+// Supabase user binding live here so authorization is always current.
+model Staff {
+  id               String               @id @default(uuid()) @map("staff_id") @db.Uuid
+  supabaseAuthId   String               @unique @map("supabase_auth_id")
+  email            String               @unique
+  name             String
+  role             StaffRole            @default(CASHIER)
+  businessConfigId String?              @map("business_config_id") @db.Uuid // nullable: bootstrap before the restaurant config exists
+  businessConfig   BusinessConfiguration? @relation(fields: [businessConfigId], references: [id], onDelete: SetNull)
+  createdAt        DateTime             @default(now()) @map("created_at")
+
+  @@map("staff")
 }
