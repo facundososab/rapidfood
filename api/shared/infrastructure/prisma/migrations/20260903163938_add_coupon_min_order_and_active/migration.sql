@@ -1,3 +1,5 @@
 -- AlterTable
-ALTER TABLE "coupon" ADD COLUMN     "is_active" BOOLEAN NOT NULL DEFAULT true,
-ADD COLUMN     "min_order_amount" DECIMAL(10,2);
+-- NOTE: this migration previously added `is_active` and `min_order_amount` to
+-- "coupon", but BOTH columns were already added by
+-- 20260821012555_add_delivery_module. Keeping the duplicates here breaks
+-- `prisma migrate deploy` from a clean DB, so this migration is now a no-op.
