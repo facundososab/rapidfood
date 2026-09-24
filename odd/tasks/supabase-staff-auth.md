@@ -50,3 +50,21 @@ outside prisma/tests (pytest-django 4.12) and conversation integration tests nee
 Follow-ups (user-owned): paste `SUPABASE_SERVICE_ROLE_KEY` from the dashboard to give
 staff via `create_staff` (or create users manually in Authentication → Users); panel
 staff CRUD is out of scope.
+
+## Timeline addendum (testing the login)
+
+- Supabase project re-created as `rapidfood-db-v2` (`htegrsxmjjdfeaokpcvj`, sa-east-1) after
+  troubleshooting (first project was paused, not broken — the failures were caused by
+  hand-inserted auth.users rows, not by the project template).
+- New Supabase projects sign access tokens with **ES256 + JWKS** (kid at
+  `<url>/auth/v1/.well-known/jwks.json`), not HS256. `SupabaseJWTAuthentication` now
+  selects the mode by token algorithm: HS256 → `SUPABASE_JWT_SECRET`; ES256/RS256 → JWKS.
+- Seed users are created through GoTrue (signup/admin shape) with `email_confirmed_at`
+  set via SQL; hand-inserting users with a partial profile breaks GoTrue login with
+  "Database error querying schema" — clone the exact GoTrue row profile.
+- Test credentials (dev only): admin@rapidfood.app / caja@rapidfood.app /
+  cocina@rapidfood.app, password `Rapidfood123!`.
+- Pre-existing infra fixes on this branch: `docker/backend/entrypoint.sh` had CRLF line
+  endings (container: "exec /entrypoint.sh: no such file or directory"); fixed + added
+  `.gitattributes` (`*.sh text eol=lf`). `docker-compose.yml` now forwards `SUPABASE_*`
+  to backend and ui containers.
