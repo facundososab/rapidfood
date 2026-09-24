@@ -2,6 +2,7 @@ from datetime import datetime
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from rest_framework import status
 
 from composition.container import get_app_container
@@ -212,6 +213,10 @@ class UpdateOrderStatusView(APIView):
 
 
 class PaymentLinkView(APIView):
+    # Public checkout flow: the link is shared with the customer; MercadoPago
+    # redirects the payer without any JWT in our API.
+    permission_classes = [AllowAny]
+
     def post(self, request, order_id):
         serializer = CreatePaymentLinkSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -238,6 +243,10 @@ class PaymentLinkView(APIView):
 
 
 class MercadoPagoWebhookView(APIView):
+    # Public: MercadoPago delivers notifications to this endpoint without a JWT
+    # (authentication is the provider webhook signature, validated below).
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = MercadoPagoWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

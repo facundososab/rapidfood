@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,6 +12,10 @@ from modules.conversation.infrastructure.adapters.driver.rest.serializers import
 
 
 class ConversationWebhookView(APIView):
+    # Public: the WhatsApp/AI agent bridge (customer-facing) calls these
+    # endpoints without staff JWTs.
+    permission_classes = [AllowAny]
+
     container = None
 
     def post(self, request):
@@ -38,6 +43,8 @@ class ConversationWebhookView(APIView):
 
 
 class ConversationMessagesView(APIView):
+    permission_classes = [AllowAny]
+
     container = ConversationWebhookView.container
 
     def get(self, request, conversation_id: str):

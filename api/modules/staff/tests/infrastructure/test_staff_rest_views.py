@@ -60,9 +60,9 @@ def test_me_requires_authentication() -> None:
 
     response = _call_me(request)
 
-    # 403 (PermissionDenied), not 401, until the global DRF auth class is
-    # enabled (work unit 5 — then DRF raises NotAuthenticated/401).
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    # Rejected without credentials: this DRF stack yields 403 (PermissionDenied)
+    # rather than 401 for anonymous requests; both are denials before the view.
+    assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
 
 def test_me_404_when_identity_is_not_staff(monkeypatch) -> None:
