@@ -35,4 +35,18 @@ Staff authentication for the restaurant (ADMIN / CASHIER / KITCHEN) using Supaba
 
 ## Status
 
-Open. Branch: `feat/supabase-auth` (to be created).
+**Done.** Branch `feat/supabase-auth` — 9 commits (setup, prisma, auth, staff module,
+API protection, panel, create_staff command, migration fixes, docs).
+
+- Supabase project created via MCP: `rapidfood-db` (`usadpbrrhumlithcdmcf`, sa-east-1, free,
+USD 0/mes). Credentials in local `.env` (gitignored — never committed).
+- Local DB migrated clean (staff table applied). Full suite: 276 passed; the 7 failed +
+6 errors are PRE-EXISTING on `main` (verified via stash): prisma `db` fixture not visible
+outside prisma/tests (pytest-django 4.12) and conversation integration tests needing env.
+- Fixed two pre-existing migration bugs that blocked any clean `migrate deploy`
+(duplicated `is_active`/`min_order_amount` in coupon, duplicated variant column block).
+- import-linter: 10 contracts kept, 0 broken. staff+auth: 25 tests, panel: 8 tests green.
+
+Follow-ups (user-owned): paste `SUPABASE_SERVICE_ROLE_KEY` from the dashboard to give
+staff via `create_staff` (or create users manually in Authentication → Users); panel
+staff CRUD is out of scope.
