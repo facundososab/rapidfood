@@ -22,6 +22,10 @@ from modules.conversation.configuration.container import (
     build_container,
 )
 from modules.delivery.configuration.container import DeliveryContainer, get_delivery_container
+from modules.mercadopago.configuration.container import (
+    MercadoPagoContainer,
+    get_mercadopago_container,
+)
 from modules.order.configuration.container import OrderContainer
 from modules.order.infrastructure.adapters.driven.business.business_config_query_adapter import (
     BusinessConfigQueryAdapter,
@@ -80,6 +84,12 @@ def get_app_conversation_container() -> ConversationContainer:
 @lru_cache(maxsize=1)
 def get_app_delivery_container() -> DeliveryContainer:
     return get_delivery_container()
+
+
+@lru_cache(maxsize=1)
+def get_app_mercadopago_container() -> MercadoPagoContainer:
+    """Exposes the Mercado Pago wiring root so its views stay out of modules.*."""
+    return get_mercadopago_container()
 
 
 @lru_cache(maxsize=1)
