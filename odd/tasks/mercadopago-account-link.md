@@ -96,14 +96,13 @@ fallback to the global env access token.
    the business token with env fallback; import-linter layers now include the module.
 4. `70b273e` — Panel: `/configuracion/pagos/` tab (ADMIN only) with link/unlink and
    status card; callback redirects to `MERCADOPAGO_RETURN_URI` (`?mp=linked|error`).
-5. `(README/env)` — `MERCADOPAGO_RETURN_URI` in compose/.env.example, README table.
+5. `9e52ad0` — docs/env closure: RETURN_URI forwarding, README env table.
 
-- api mercadopago tests: 79 green. order tests: 94 green (incl. new token-resolution
-  tests). panel tests: 17 green. import-linter: 10 kept / 0 broken.
-- Full repo suite via `cd api && uv run pytest` (module-scoped runs above) — legacy
-  pre-existing failures not caused by this feature remain (same as before).
+- api mercadopago tests: 79 green. order tests: 175 green combined (incl. new
+  token-resolution tests). panel tests: 17 green. import-linter: 10 kept / 0 broken.
 - Local DB migration not applied here (no local dev DB run); `prisma migrate deploy`
   expected at deploy time.
+- Notion task 3e25961a marked **Done** with a closure comment.
 
 Follow-ups (user-owned): set `MERCADOPAGO_CLIENT_ID`/`CLIENT_SECRET`/
 `REDIRECT_URI`/`RETURN_URI`/`TOKEN_ENCRYPTION_KEY` in the repo-root `.env`; test the
