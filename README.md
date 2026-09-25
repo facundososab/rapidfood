@@ -36,6 +36,12 @@ Opcionalmente, `api/.env` y `ui/.env` se cargan primero como override local por 
 | `SUPABASE_ANON_KEY`                               | Clave pública anon del proyecto (login del panel)                 | _(vacío)_                                                   |
 | `SUPABASE_JWT_SECRET`                             | Secreto de firma HS256 de los JWT (Dashboard → Settings → API)     | _(vacío)_                                                   |
 | `SUPABASE_SERVICE_ROLE_KEY`                       | Solo para el comando `create_staff` (admin API) — nunca en el panel| _(vacío)_                                                   |
+| `MERCADOPAGO_ACCESS_TOKEN`                        | Access token global de pagos (fallback cuando el negocio no vinculó su cuenta) | _(vacío)_                                           |
+| `MERCADOPAGO_CLIENT_ID` / `MERCADOPAGO_CLIENT_SECRET` | Credenciales de la app de Mercado Pago (para el OAuth “Conecta tu cuenta”) | _(vacío)_                                           |
+| `MERCADOPAGO_REDIRECT_URI`                        | URL pública donde MP redirige tras autorizar (callback `/api/mercadopago/callback/`) | _(vacío)_                                           |
+| `MERCADOPAGO_RETURN_URI`                          | URL del panel a la que el callback devuelve al admin (`/configuracion/pagos/`) | _(vacío)_                                          |
+| `MERCADOPAGO_TOKEN_ENCRYPTION_KEY`                | Clave Fernet opcional para cifrar tokens guardados (si falta, derivada de `DJANGO_SECRET_KEY`) | _(vacío)_                                       |
+| `MERCADOPAGO_AUTH_BASE_URL`                       | Base URL de autorización OAuth de MP                                | `https://auth.mercadopago.com`                            |
 | `BACKEND_PORT` / `UI_PORT`                        | Puertos publicados por Docker Compose                              | `8000` / `8001`                                             |
 
 ## Auth del personal (Supabase)

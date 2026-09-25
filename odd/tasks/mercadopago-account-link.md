@@ -85,4 +85,27 @@ fallback to the global env access token.
 
 ## Status
 
-**In progress.** Branch `feat/mercadopago-link` — task 1 done/… (fill per unit).
+**Done.** Branch `feat/mercadopago-link` — 6 work-unit commits:
+
+1. `bf2cb6f` — Prisma `MercadoPagoCredential` model + migration + env vars.
+2. `67d10ca` — OAuth connect-your-account module (`mercadopago`): authorize,
+   callback, status, unlink; Fernet-encrypted tokens; composition accessor
+   (`get_app_mercadopago_container`); registered under `/api/mercadopago/`.
+3. `8f855fb` — Order uses per-business tokens: `PaymentCredentialsQuery` port,
+   adapter, `CreatePaymentLinkUseCase`/`ProcessPaymentNotificationUseCase` resolve
+   the business token with env fallback; import-linter layers now include the module.
+4. `70b273e` — Panel: `/configuracion/pagos/` tab (ADMIN only) with link/unlink and
+   status card; callback redirects to `MERCADOPAGO_RETURN_URI` (`?mp=linked|error`).
+5. `(README/env)` — `MERCADOPAGO_RETURN_URI` in compose/.env.example, README table.
+
+- api mercadopago tests: 79 green. order tests: 94 green (incl. new token-resolution
+  tests). panel tests: 17 green. import-linter: 10 kept / 0 broken.
+- Full repo suite via `cd api && uv run pytest` (module-scoped runs above) — legacy
+  pre-existing failures not caused by this feature remain (same as before).
+- Local DB migration not applied here (no local dev DB run); `prisma migrate deploy`
+  expected at deploy time.
+
+Follow-ups (user-owned): set `MERCADOPAGO_CLIENT_ID`/`CLIENT_SECRET`/
+`REDIRECT_URI`/`RETURN_URI`/`TOKEN_ENCRYPTION_KEY` in the repo-root `.env`; test the
+end-to-end OAuth redirect against a real MP app; optional refresh-token renewal
+(cron) for long-lived links.
