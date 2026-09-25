@@ -243,3 +243,13 @@ class RapidfoodClient(ABC):
 
     @abstractmethod
     def save_delivery_config(self, business_config_id: str, payload: dict) -> dict: ...
+
+    # ---- Mercado Pago linking --------------------------------------------
+    @abstractmethod
+    def get_mercadopago_status(self) -> dict: ...
+
+    @abstractmethod
+    def get_mercadopago_authorization_url(self, business_config_id: str) -> str: ...
+
+    @abstractmethod
+    def unlink_mercadopago(self, business_config_id: str) -> None: ...

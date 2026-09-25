@@ -42,6 +42,7 @@ class MercadoPagoOAuthSettings:
     client_id: str | None = None
     client_secret: str | None = None
     redirect_uri: str | None = None
+    return_uri: str | None = None
     auth_base_url: str = DEFAULT_AUTH_BASE_URL
     api_base_url: str = DEFAULT_API_BASE_URL
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
@@ -52,6 +53,7 @@ class MercadoPagoOAuthSettings:
             client_id=os.environ.get("MERCADOPAGO_CLIENT_ID") or None,
             client_secret=os.environ.get("MERCADOPAGO_CLIENT_SECRET") or None,
             redirect_uri=os.environ.get("MERCADOPAGO_REDIRECT_URI") or None,
+            return_uri=os.environ.get("MERCADOPAGO_RETURN_URI") or None,
             auth_base_url=os.environ.get("MERCADOPAGO_AUTH_BASE_URL", DEFAULT_AUTH_BASE_URL),
             api_base_url=os.environ.get("MERCADOPAGO_API_BASE_URL", DEFAULT_API_BASE_URL),
         )

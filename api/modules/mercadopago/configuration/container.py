@@ -61,6 +61,11 @@ class MercadoPagoContainer:
         )
         state_signer = state_signer if state_signer is not None else DjangoStateSigner()
 
+        # Exposed so the REST driver can read presentation-only settings (e.g.
+        # where to send the browser back after the OAuth round trip) without
+        # importing the settings dataclass itself.
+        self.settings = settings
+
         self.build_authorization_url = BuildAuthorizationUrlUseCase(
             oauth_client,
             state_signer,

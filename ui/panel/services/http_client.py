@@ -69,6 +69,9 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _post(self, path: str, payload: dict) -> object:
         resp = self.session.post(f"{self.base_url}{path}", json=payload, timeout=15)
         self._raise_if_error(resp)
+        # 204 No Content won't have a JSON body
+        if resp.status_code == 204:
+            return None
         return resp.json()
 
     def _patch(self, path: str, payload: dict) -> object:
@@ -690,3 +693,16 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     def save_delivery_config(self, business_config_id, payload):
         return self._post(f"/api/delivery/{business_config_id}/configure/", payload)
+
+    # -- Mercado Pago linking ----------------------------------------------
+    def get_mercadopago_status(self):
+        business_config_id = self.get_business_config().id
+        return self._get("/api/mercadopago/status/", business_config_id=business_config_id)
+
+    def get_mercadopago_authorization_url(self, business_config_id):
+        payload = self._post("/api/mercadopago/authorize/",
+                             {"business_config_id": business_config_id})
+        return payload["authorization_url"]
+
+    def unlink_mercadopago(self, business_config_id):
+        self._post("/api/mercadopago/unlink/", {"business_config_id": business_config_id})

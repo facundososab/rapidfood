@@ -1,11 +1,17 @@
 import json
 from decimal import Decimal
 
-from django.http import HttpResponseBadRequest
+from django.contrib import messages
+from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import redirect
 
 from .common import page
 from ..services.factory import get_client
+
+
+def _staff_role(request):
+    """Raw role from the session staff profile, or None when absent."""
+    return (request.session.get('supabase_staff') or {}).get('role')
 
 
 def index(request, tab='general'):
@@ -31,14 +37,53 @@ def index(request, tab='general'):
             ]
             business_hours_json = json.dumps(bh)
 
-    return page(request, 'configuration/index.html', {
+    context = {
         'active_section': 'configuration',
         'active_tab': tab,
         'business': business,
         'delivery': delivery,
         'delivery_json': delivery_json,
         'business_hours_json': business_hours_json,
-    })
+        'is_mercadopago_admin': _staff_role(request) == 'ADMIN',
+    }
+
+    if tab == 'payments':
+        context['mercadopago_status'] = client.get_mercadopago_status()
+
+    return page(request, 'configuration/index.html', context)
+
+
+def mercadopago_link(request):
+    """Start the OAuth flow: redirect the ADMIN to Mercado Pago's authorization page."""
+    if request.method != 'POST':
+        return HttpResponseBadRequest()
+
+    if _staff_role(request) != 'ADMIN':
+        return HttpResponseForbidden()
+
+    client = get_client()
+    business_config_id = client.get_business_config().id
+    url = client.get_mercadopago_authorization_url(business_config_id)
+    if url:
+        return redirect(url)
+
+    messages.error(request, 'No se pudo iniciar la vinculación con Mercado Pago.')
+    return redirect('configuration_payments_view')
+
+
+def mercadopago_unlink(request):
+    """Disconnect the business Mercado Pago account (idempotent on the backend)."""
+    if request.method != 'POST':
+        return HttpResponseBadRequest()
+
+    if _staff_role(request) != 'ADMIN':
+        return HttpResponseForbidden()
+
+    client = get_client()
+    business_config_id = client.get_business_config().id
+    client.unlink_mercadopago(business_config_id)
+    messages.success(request, 'Cuenta de Mercado Pago desvinculada')
+    return redirect('configuration_payments_view')
 
 
 def save_general(request):

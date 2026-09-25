@@ -28,6 +28,12 @@
           <span class="shrink-0">{% include 'components/icon.html' with name='truck' %}</span>
           <span>Envíos y demanda</span>
         </a>
+        {% if is_mercadopago_admin %}
+        <a href="{% url 'configuration_payments_view' %}" class="nav-item no-underline {% if active_tab == 'payments' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='credit-card' %}</span>
+          <span>Mercado Pago</span>
+        </a>
+        {% endif %}
         <button type="button" class="nav-item opacity-50 cursor-not-allowed" disabled>
           <span class="shrink-0">{% include 'components/icon.html' with name='percent' %}</span>
           <span>Impuestos</span>
@@ -367,6 +373,46 @@
         </button>
       </div>
     </form>
+  </div>
+  {% endif %}
+  {% if active_tab == 'payments' %}
+  <div>
+    <div class="card overflow-hidden">
+      <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+        <span class="card-icon">{% include 'components/icon.html' with name='credit-card' %}</span>
+        <div>
+          <h2 class="font-display font-bold text-[16px]">Mercado Pago</h2>
+          <p class="text-[13px] text-ink-muted mt-1">Vinculá la cuenta de Mercado Pago de tu negocio para cobrar online.</p>
+        </div>
+      </div>
+      <div class="p-6">
+        {% if not is_mercadopago_admin %}
+        <p class="text-[14px] text-ink-muted">Solo administradores pueden gestionar la vinculación con Mercado Pago.</p>
+        {% elif mercadopago_status and mercadopago_status.linked %}
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <span class="badge bg-success-soft text-success">Cuenta vinculada</span>
+          {% if mercadopago_status.live_mode %}
+          <span class="badge bg-primary-soft text-primary">Producción</span>
+          {% else %}
+          <span class="badge bg-warning-soft text-warning">Pruebas</span>
+          {% endif %}
+        </div>
+        {% if mercadopago_status.user_id %}
+        <p class="text-[13px] text-ink-muted mb-4">ID de usuario: <span class="font-mono">{{ mercadopago_status.user_id }}</span></p>
+        {% endif %}
+        <form method="post" action="{% url 'configuration_mercadopago_unlink' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost" onclick="return confirm('¿Desvincular la cuenta de Mercado Pago?')">Desvincular</button>
+        </form>
+        {% else %}
+        <p class="text-[14px] text-ink-muted mb-4">Tu negocio todavía no tiene una cuenta de Mercado Pago vinculada.</p>
+        <form method="post" action="{% url 'configuration_mercadopago_link' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">Vincular cuenta de Mercado Pago</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
   </div>
   {% endif %}
   </div>

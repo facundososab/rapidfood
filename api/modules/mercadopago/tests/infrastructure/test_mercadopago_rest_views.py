@@ -16,10 +16,14 @@ from modules.mercadopago.domain.errors.mercadopago_errors import (
     MercadoPagoStateError,
 )
 from modules.mercadopago.infrastructure.adapters.driver.rest import views
+from modules.mercadopago.infrastructure.adapters.driven.mercadopago.mercadopago_oauth_client import (
+    MercadoPagoOAuthSettings,
+)
 from modules.mercadopago.tests.use_cases.fakes import BUSINESS_CONFIG_ID
 from shared.infrastructure.auth.supabase_jwt import SupabasePrincipal
 
 AUTHORIZATION_URL = "https://auth.mercadopago.com/authorization?state=signed-state"
+PANEL_RETURN_URI = "https://panel.example/configuracion/pagos/"
 
 
 class FakeUseCase:
@@ -42,7 +46,11 @@ class FakeContainer:
         link_error: Exception | None = None,
         link_result: LinkMercadoPagoAccountResult | None = None,
         status_result: GetLinkStatusResult | None = None,
+        return_uri: str | None = None,
     ) -> None:
+        # The real settings type keeps the driver contract honest (the view only
+        # reads return_uri); None preserves the JSON callback behaviour.
+        self.settings = MercadoPagoOAuthSettings(return_uri=return_uri)
         self.build_authorization_url = FakeUseCase(
             result=BuildAuthorizationUrlResult(authorization_url=AUTHORIZATION_URL),
             error=authorize_error,
@@ -237,6 +245,43 @@ def test_callback_returns_502_when_mercadopago_rejects_the_code(monkeypatch):
     response = views.MercadoPagoCallbackView.as_view()(request)
 
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_callback_redirects_to_the_panel_after_linking(monkeypatch):
+    container = FakeContainer(return_uri=PANEL_RETURN_URI)
+    patch_container(monkeypatch, container)
+    request = APIRequestFactory().get(
+        "/api/mercadopago/callback/",
+        {"code": "auth-code", "state": "signed-state"},
+    )
+
+    response = views.MercadoPagoCallbackView.as_view()(request)
+
+    assert response.status_code == status.HTTP_302_FOUND
+    assert response["Location"].endswith("?mp=linked")
+    assert response["Location"] == f"{PANEL_RETURN_URI.rstrip('/')}?mp=linked"
+    # The panel is the only thing the browser sees: the link itself still ran.
+    assert len(container.link_account.commands) == 1
+
+
+def test_callback_redirects_to_the_panel_when_the_state_is_invalid(monkeypatch):
+    patch_container(
+        monkeypatch,
+        FakeContainer(
+            return_uri=PANEL_RETURN_URI,
+            link_error=MercadoPagoStateError("Mercado Pago OAuth state is invalid"),
+        ),
+    )
+    request = APIRequestFactory().get(
+        "/api/mercadopago/callback/",
+        {"code": "auth-code", "state": "tampered"},
+    )
+
+    response = views.MercadoPagoCallbackView.as_view()(request)
+
+    assert response.status_code == status.HTTP_302_FOUND
+    assert response["Location"].endswith("?mp=error")
+    assert response["Location"] == f"{PANEL_RETURN_URI.rstrip('/')}?mp=error"
 
 
 def test_status_returns_the_linked_account(monkeypatch):

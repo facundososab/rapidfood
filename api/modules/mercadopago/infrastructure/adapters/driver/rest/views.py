@@ -4,10 +4,16 @@ Views only translate HTTP <-> commands and map domain errors to status codes;
 every rule lives in a use case. The wiring root is resolved from ``composition``
 (the app-level composition root), like the staff and order views do, so a driver
 adapter never imports a driven adapter directly.
+
+Mercado Pago sends the payer's browser back to the callback with no JWT and no
+panel context: when ``MERCADOPAGO_RETURN_URI`` is configured the callback answers
+with a redirect to the panel (``?mp=linked`` / ``?mp=error``) so a human sees a
+page instead of raw JSON. Without it, the JSON contract is preserved.
 """
 
 from __future__ import annotations
 
+from django.http import HttpResponseRedirect
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -36,6 +42,11 @@ from modules.mercadopago.domain.errors.mercadopago_errors import (
 
 def _error(message: str, code: int) -> Response:
     return Response({"error": message}, status=code)
+
+
+def _redirect_to_panel(return_uri: str, outcome: str) -> HttpResponseRedirect:
+    """Send the browser back to the panel with the outcome of the round trip."""
+    return HttpResponseRedirect(f"{return_uri.rstrip('/')}?mp={outcome}")
 
 
 class BusinessConfigIdSerializer(serializers.Serializer):
@@ -87,8 +98,10 @@ class MercadoPagoCallbackView(APIView):
     def get(self, request: Request) -> Response:
         serializer = OAuthCallbackSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
+        container = get_app_mercadopago_container()
+        return_uri = container.settings.return_uri
         try:
-            result = get_app_mercadopago_container().link_account.execute(
+            result = container.link_account.execute(
                 LinkMercadoPagoAccountCommand(
                     code=serializer.validated_data["code"],
                     state=serializer.validated_data["state"],
@@ -96,11 +109,17 @@ class MercadoPagoCallbackView(APIView):
                 )
             )
         except MercadoPagoStateError as error:
+            if return_uri:
+                return _redirect_to_panel(return_uri, "error")
             return _error(str(error), status.HTTP_400_BAD_REQUEST)
         except MercadoPagoOAuthError as error:
+            if return_uri:
+                return _redirect_to_panel(return_uri, "error")
             return _error(str(error), status.HTTP_502_BAD_GATEWAY)
         except MercadoPagoConfigurationError as error:
             return _error(str(error), status.HTTP_503_SERVICE_UNAVAILABLE)
+        if return_uri:
+            return _redirect_to_panel(return_uri, "linked")
         return Response(
             {
                 "linked": True,
