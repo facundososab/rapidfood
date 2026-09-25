@@ -80,6 +80,7 @@ model BusinessConfiguration {
   orders        Order[]
   deliveryPricingConfiguration DeliveryPricingConfiguration?
   staff         Staff[]
+  mercadopagoCredential MercadoPagoCredential?
 
   @@map("business_configuration")
 }
@@ -489,6 +490,21 @@ model DeliveryWeekdayPricingRule {
 
   @@unique([deliveryPricingConfigId, weekDay])
   @@map("delivery_weekday_pricing_rule")
+}
+
+model MercadoPagoCredential {
+  id               String               @id @default(uuid()) @map("mercadopago_credential_id") @db.Uuid
+  businessConfigId String               @unique @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+  accessToken      String               @map("access_token") // Fernet-encrypted at rest
+  refreshToken     String?              @map("refresh_token") // Fernet-encrypted at rest
+  userId           String?              @map("user_id")
+  publicKey        String?              @map("public_key")
+  liveMode         Boolean              @default(false) @map("live_mode")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  @@map("mercadopago_credential")
 }
 
 // --- Auth module: restaurant staff -------------------------------------------
