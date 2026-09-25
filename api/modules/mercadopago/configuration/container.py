@@ -21,6 +21,9 @@ from modules.mercadopago.application.use_cases.build_authorization_url_use_case 
 from modules.mercadopago.application.use_cases.get_link_status_use_case import (
     GetLinkStatusUseCase,
 )
+from modules.mercadopago.application.use_cases.get_mercadopago_access_token_use_case import (
+    GetMercadoPagoAccessTokenUseCase,
+)
 from modules.mercadopago.application.use_cases.link_mercadopago_account_use_case import (
     LinkMercadoPagoAccountUseCase,
 )
@@ -68,6 +71,7 @@ class MercadoPagoContainer:
             state_signer,
         )
         self.get_link_status = GetLinkStatusUseCase(repository)
+        self.get_access_token = GetMercadoPagoAccessTokenUseCase(repository)
         self.unlink_account = UnlinkMercadoPagoAccountUseCase(repository)
 
 

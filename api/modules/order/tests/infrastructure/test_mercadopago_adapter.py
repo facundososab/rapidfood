@@ -204,6 +204,125 @@ def test_provider_translates_sdk_failures_without_leaking_sdk_types(sdk_result):
         )
 
 
+def make_checkout_request(access_token=None):
+    return CreateCheckoutLinkRequest(
+        order_id="order-1",
+        payment_id="payment-1",
+        amount=Decimal("1500.50"),
+        currency="ARS",
+        external_reference="order-1",
+        access_token=access_token,
+    )
+
+
+def make_preference_result():
+    return {
+        "status": 201,
+        "response": {
+            "id": "pref-123",
+            "init_point": "https://mp.example/checkout",
+            "external_reference": "order-1",
+        },
+    }
+
+
+def make_payment_result():
+    return {
+        "status": 200,
+        "response": {
+            "id": 987,
+            "status": "approved",
+            "external_reference": "order-1",
+            "preference_id": "pref-123",
+            "transaction_amount": 1500.5,
+        },
+    }
+
+
+def test_create_checkout_link_builds_a_per_business_sdk_from_the_request_token():
+    default_sdk = FakeSDK(preference_result=make_preference_result())
+    built_tokens = []
+    business_sdk = FakeSDK(preference_result=make_preference_result())
+
+    def sdk_factory(access_token):
+        built_tokens.append(access_token)
+        return business_sdk
+
+    provider = MercadoPagoPaymentProvider(
+        settings=make_settings(access_token="APP_USR-platform-token"),
+        sdk=default_sdk,
+        sdk_factory=sdk_factory,
+    )
+
+    result = provider.create_checkout_link(
+        make_checkout_request(access_token="APP_USR-business-token")
+    )
+
+    assert result.preference_id == "pref-123"
+    assert built_tokens == ["APP_USR-business-token"]
+    assert len(business_sdk.preference_resource.created_payloads) == 1
+    assert default_sdk.preference_resource.created_payloads == []
+
+
+def test_create_checkout_link_reuses_the_default_sdk_for_the_platform_token():
+    default_sdk = FakeSDK(preference_result=make_preference_result())
+
+    def sdk_factory(access_token):
+        raise AssertionError("the factory must not be called for the platform token")
+
+    provider = MercadoPagoPaymentProvider(
+        settings=make_settings(access_token="APP_USR-platform-token"),
+        sdk=default_sdk,
+        sdk_factory=sdk_factory,
+    )
+
+    provider.create_checkout_link(
+        make_checkout_request(access_token="APP_USR-platform-token")
+    )
+
+    assert len(default_sdk.preference_resource.created_payloads) == 1
+
+
+def test_get_payment_builds_a_per_business_sdk_from_the_argument_token():
+    default_sdk = FakeSDK(payment_result=make_payment_result())
+    built_tokens = []
+    business_sdk = FakeSDK(payment_result=make_payment_result())
+
+    def sdk_factory(access_token):
+        built_tokens.append(access_token)
+        return business_sdk
+
+    provider = MercadoPagoPaymentProvider(
+        settings=make_settings(access_token="APP_USR-platform-token"),
+        sdk=default_sdk,
+        sdk_factory=sdk_factory,
+    )
+
+    result = provider.get_payment("987", access_token="APP_USR-business-token")
+
+    assert result.status == PaymentStatus.APPROVED
+    assert built_tokens == ["APP_USR-business-token"]
+    assert business_sdk.payment_resource.requested_ids == ["987"]
+    assert default_sdk.payment_resource.requested_ids == []
+
+
+def test_get_payment_without_token_keeps_using_the_default_sdk():
+    default_sdk = FakeSDK(payment_result=make_payment_result())
+
+    def sdk_factory(access_token):
+        raise AssertionError("the factory must not be called without a business token")
+
+    provider = MercadoPagoPaymentProvider(
+        settings=make_settings(access_token="APP_USR-platform-token"),
+        sdk=default_sdk,
+        sdk_factory=sdk_factory,
+    )
+
+    provider.get_payment("987")
+
+    assert default_sdk.payment_resource.requested_ids == ["987"]
+
+
 def test_signature_validation_uses_mercadopago_hmac_manifest():
     secret = "webhook-secret"
     data_id = "ABC123"

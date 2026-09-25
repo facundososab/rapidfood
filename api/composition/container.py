@@ -45,6 +45,9 @@ from modules.order.infrastructure.adapters.driven.coupon.coupon_query_adapter im
 from modules.order.infrastructure.adapters.driven.delivery.delivery_quote_adapter import (
     DeliveryQuoteAdapter,
 )
+from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_credentials_query_adapter import (
+    MercadoPagoCredentialsQueryAdapter,
+)
 from modules.staff.configuration.container import get_staff_container
 
 
@@ -100,6 +103,7 @@ def get_app_container() -> OrderContainer:
     business = get_app_business_container()
     coupon = get_app_coupon_container()
     delivery = get_app_delivery_container()
+    mercadopago = get_app_mercadopago_container()
 
     return OrderContainer(
         catalog_query=CatalogProductQuery(catalog.product_query),
@@ -108,4 +112,7 @@ def get_app_container() -> OrderContainer:
         coupon_query=CouponQueryAdapter(coupon.validate_coupon),
         coupon_consume=CouponConsumeAdapter(coupon.consume_coupon),
         delivery_quote=DeliveryQuoteAdapter(delivery.calculate_delivery_quote),
+        credentials_query=MercadoPagoCredentialsQueryAdapter(
+            mercadopago.get_access_token
+        ),
     )

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from modules.order.application.ports.driven.payment_provider import (
     CreateCheckoutLinkRequest,
@@ -19,13 +19,34 @@ from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_status
 
 
 class MercadoPagoPaymentProvider(PaymentProvider):
-    def __init__(self, settings: MercadoPagoSettings, sdk: Optional[Any] = None):
+    def __init__(
+        self,
+        settings: MercadoPagoSettings,
+        sdk: Optional[Any] = None,
+        sdk_factory: Optional[Callable[[str], Any]] = None,
+    ):
         self.settings = settings
         if sdk is None:
             import mercadopago
 
             sdk = mercadopago.SDK(settings.access_token)
         self.sdk = sdk
+        if sdk_factory is None:
+
+            def _default_sdk_factory(access_token: str) -> Any:
+                import mercadopago
+
+                return mercadopago.SDK(access_token)
+
+            sdk_factory = _default_sdk_factory
+
+        self.sdk_factory = sdk_factory
+
+    def _sdk_for_token(self, access_token: Optional[str]) -> Any:
+        """Reuse the default SDK unless a per-business token is provided."""
+        if not access_token or access_token == self.settings.access_token:
+            return self.sdk
+        return self.sdk_factory(access_token)
 
     def create_checkout_link(
         self, request: CreateCheckoutLinkRequest
@@ -47,7 +68,8 @@ class MercadoPagoPaymentProvider(PaymentProvider):
         if back_urls:
             payload["back_urls"] = back_urls
 
-        result = self._call(lambda: self.sdk.preference().create(payload))
+        sdk = self._sdk_for_token(request.access_token)
+        result = self._call(lambda: sdk.preference().create(payload))
         response = self._successful_response(result, expected_status=201)
         preference_id = response.get("id")
         checkout_url = response.get("init_point")
@@ -61,8 +83,11 @@ class MercadoPagoPaymentProvider(PaymentProvider):
             ),
         )
 
-    def get_payment(self, external_id: str) -> ProviderPayment:
-        result = self._call(lambda: self.sdk.payment().get(external_id))
+    def get_payment(
+        self, external_id: str, access_token: Optional[str] = None
+    ) -> ProviderPayment:
+        sdk = self._sdk_for_token(access_token)
+        result = self._call(lambda: sdk.payment().get(external_id))
         response = self._successful_response(result, expected_status=200)
         return ProviderPayment(
             external_id=str(response["id"]),

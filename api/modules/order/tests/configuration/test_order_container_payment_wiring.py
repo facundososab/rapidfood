@@ -45,3 +45,19 @@ def test_order_container_wires_payment_dependencies_explicitly(monkeypatch):
         container.process_payment_notification_use_case.payment_provider
         is container.payment_provider
     )
+
+
+def test_order_container_propagates_the_credentials_query(monkeypatch):
+    monkeypatch.setenv("MERCADOPAGO_ACCESS_TOKEN", "test-token")
+    credentials_query = object()
+
+    container = OrderContainer(
+        prisma_client=object(), credentials_query=credentials_query
+    )
+
+    assert container.credentials_query is credentials_query
+    assert container.create_payment_link_use_case.credentials_query is credentials_query
+    assert (
+        container.process_payment_notification_use_case.credentials_query
+        is credentials_query
+    )

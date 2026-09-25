@@ -13,6 +13,7 @@ from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment import Payment
 from modules.order.domain.models.payment_method import PaymentMethod
 from modules.order.domain.models.payment_status import PaymentStatus
+from modules.order.tests.use_cases.fakes import FakePaymentCredentialsQuery
 
 
 class FakeOrderRepository:
@@ -73,6 +74,7 @@ def make_order(
     status=OrderState.PENDING,
     payment_type=PaymentMethod.ONLINE,
     total_amount=Decimal("1500.00"),
+    business_config_id=None,
 ):
     return Order(
         id="order-1",
@@ -81,14 +83,16 @@ def make_order(
         discount=Decimal("0"),
         payment_type=payment_type,
         total_amount=total_amount,
+        business_config_id=business_config_id,
     )
 
 
-def make_use_case(order):
+def make_use_case(order, credentials_query=None, reject_create=True):
     return CreatePaymentLinkUseCase(
         order_repo=FakeOrderRepository(order),
-        payment_repo=FakePaymentRepository(),
-        payment_provider=FakePaymentProvider(),
+        payment_repo=FakePaymentRepository(reject_create=reject_create),
+        payment_provider=FakePaymentProvider(reject_create=reject_create),
+        credentials_query=credentials_query,
     )
 
 
@@ -147,3 +151,54 @@ def test_payable_order_creates_pending_payment_and_persists_provider_link():
     assert saved_payment.preference_id == "pref-1"
     assert saved_payment.checkout_url == "https://pay.example/checkout"
     assert saved_payment.external_id == "external-1"
+
+
+def test_passes_the_business_linked_token_to_the_provider():
+    credentials_query = FakePaymentCredentialsQuery({"biz-1": "APP_USR-biz-1"})
+    use_case = make_use_case(
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+        reject_create=False,
+    )
+
+    use_case.execute(CreatePaymentLinkCommand(order_id="order-1"))
+
+    assert credentials_query.requested == ["biz-1"]
+    request = use_case.payment_provider.requests[0]
+    assert request.access_token == "APP_USR-biz-1"
+
+
+def test_order_without_business_config_creates_link_without_token():
+    credentials_query = FakePaymentCredentialsQuery({"biz-1": "APP_USR-biz-1"})
+    use_case = make_use_case(
+        make_order(business_config_id=None),
+        credentials_query=credentials_query,
+        reject_create=False,
+    )
+
+    use_case.execute(CreatePaymentLinkCommand(order_id="order-1"))
+
+    assert credentials_query.requested == []
+    assert use_case.payment_provider.requests[0].access_token is None
+
+
+def test_unlinked_business_creates_link_without_token():
+    credentials_query = FakePaymentCredentialsQuery()
+    use_case = make_use_case(
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+        reject_create=False,
+    )
+
+    use_case.execute(CreatePaymentLinkCommand(order_id="order-1"))
+
+    assert credentials_query.requested == ["biz-1"]
+    assert use_case.payment_provider.requests[0].access_token is None
+
+
+def test_absent_credentials_query_keeps_the_global_token_fallback():
+    use_case = make_use_case(make_order(business_config_id="biz-1"), reject_create=False)
+
+    use_case.execute(CreatePaymentLinkCommand(order_id="order-1"))
+
+    assert use_case.payment_provider.requests[0].access_token is None

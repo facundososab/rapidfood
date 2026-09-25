@@ -13,6 +13,7 @@ from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment import Payment
 from modules.order.domain.models.payment_status import PaymentStatus
+from modules.order.tests.use_cases.fakes import FakePaymentCredentialsQuery
 
 
 class FakeOrderRepository:
@@ -73,23 +74,26 @@ class FakePaymentProvider:
         self.remote_payment = remote_payment
         self.events = events
         self.requests = []
+        self.access_tokens = []
 
     def create_checkout_link(self, request):
         raise AssertionError("notification processing must not create checkout links")
 
-    def get_payment(self, external_id):
+    def get_payment(self, external_id, access_token=None):
         self.events.append("provider.get_payment")
         self.requests.append(external_id)
+        self.access_tokens.append(access_token)
         return self.remote_payment
 
 
-def make_order(status=OrderState.PENDING):
+def make_order(status=OrderState.PENDING, business_config_id=None):
     return Order(
         id="order-1",
         status=status,
         subtotal=Decimal("1500.00"),
         discount=Decimal("0"),
         total_amount=Decimal("1500.00"),
+        business_config_id=business_config_id,
     )
 
 
@@ -116,7 +120,7 @@ def make_command(data_id="mp-1"):
     )
 
 
-def make_use_case(remote_payment, local_payment, order):
+def make_use_case(remote_payment, local_payment, order, credentials_query=None):
     events = []
     payment_repo = FakePaymentRepository(local_payment, events)
     order_repo = FakeOrderRepository(order, events)
@@ -126,6 +130,7 @@ def make_use_case(remote_payment, local_payment, order):
             order_repo=order_repo,
             payment_repo=payment_repo,
             payment_provider=provider,
+            credentials_query=credentials_query,
         ),
         payment_repo,
         order_repo,
@@ -155,6 +160,128 @@ def test_fetches_authoritative_provider_payment_before_local_mutation():
     assert result.status == "APPROVED"
     assert result.order_status == "PAID"
     assert result.processed is True
+
+
+def test_resolves_the_business_token_from_the_local_payment_before_lookup():
+    remote = ProviderPayment(
+        external_id="mp-1",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    credentials_query = FakePaymentCredentialsQuery({"biz-1": "APP_USR-biz-1"})
+    use_case, _, _, provider, _ = make_use_case(
+        remote,
+        make_payment(),
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+    )
+
+    result = use_case.execute(make_command())
+
+    assert credentials_query.requested == ["biz-1"]
+    assert provider.access_tokens == ["APP_USR-biz-1"]
+    assert result.order_status == "PAID"
+
+
+def test_falls_back_to_the_global_token_when_the_business_is_unlinked():
+    remote = ProviderPayment(
+        external_id="mp-1",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    credentials_query = FakePaymentCredentialsQuery()
+    use_case, _, _, provider, _ = make_use_case(
+        remote,
+        make_payment(),
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+    )
+
+    use_case.execute(make_command())
+
+    assert provider.access_tokens == [None]
+
+
+def test_falls_back_to_the_global_token_when_local_payment_is_unknown():
+    remote = ProviderPayment(
+        external_id="mp-new",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    credentials_query = FakePaymentCredentialsQuery({"biz-1": "APP_USR-biz-1"})
+    use_case, _, _, provider, _ = make_use_case(
+        remote,
+        make_payment(),
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+    )
+
+    result = use_case.execute(make_command(data_id="mp-new"))
+
+    assert credentials_query.requested == []
+    assert provider.access_tokens == [None]
+    assert result.order_status == "PAID"
+
+
+def test_falls_back_to_the_global_token_when_the_order_has_no_business_config():
+    remote = ProviderPayment(
+        external_id="mp-1",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    credentials_query = FakePaymentCredentialsQuery({"biz-1": "APP_USR-biz-1"})
+    use_case, _, _, provider, _ = make_use_case(
+        remote,
+        make_payment(),
+        make_order(business_config_id=None),
+        credentials_query=credentials_query,
+    )
+
+    use_case.execute(make_command())
+
+    assert credentials_query.requested == []
+    assert provider.access_tokens == [None]
+
+
+def test_falls_back_to_the_global_token_when_the_credential_lookup_fails():
+    remote = ProviderPayment(
+        external_id="mp-1",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    credentials_query = FakePaymentCredentialsQuery(error=RuntimeError("linkage down"))
+    use_case, _, _, provider, _ = make_use_case(
+        remote,
+        make_payment(),
+        make_order(business_config_id="biz-1"),
+        credentials_query=credentials_query,
+    )
+
+    result = use_case.execute(make_command())
+
+    assert provider.access_tokens == [None]
+    assert result.order_status == "PAID"
+
+
+def test_absent_credentials_query_calls_the_provider_without_token():
+    remote = ProviderPayment(
+        external_id="mp-1",
+        status=PaymentStatus.APPROVED,
+        preference_id="pref-1",
+        external_reference="order-1",
+    )
+    use_case, _, _, provider, _ = make_use_case(
+        remote, make_payment(), make_order(business_config_id="biz-1")
+    )
+
+    use_case.execute(make_command())
+
+    assert provider.access_tokens == [None]
 
 
 @pytest.mark.parametrize(

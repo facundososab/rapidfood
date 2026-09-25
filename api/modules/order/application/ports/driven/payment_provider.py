@@ -13,6 +13,7 @@ class CreateCheckoutLinkRequest:
     amount: Decimal
     currency: str
     external_reference: str
+    access_token: Optional[str] = None
 
 
 @dataclass
@@ -40,5 +41,7 @@ class PaymentProvider(ABC):
         pass
 
     @abstractmethod
-    def get_payment(self, external_id: str) -> ProviderPayment:
+    def get_payment(
+        self, external_id: str, access_token: Optional[str] = None
+    ) -> ProviderPayment:
         pass

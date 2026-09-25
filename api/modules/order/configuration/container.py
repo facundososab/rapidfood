@@ -63,6 +63,7 @@ class OrderContainer:
         coupon_consume: Optional[Any] = None,
         delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
+        credentials_query: Optional[Any] = None,
     ):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
@@ -75,6 +76,7 @@ class OrderContainer:
         self.coupon_query = coupon_query if coupon_query is not None else FakeCouponQuery()
         self.coupon_consume = coupon_consume
         self.delivery_quote = delivery_quote
+        self.credentials_query = credentials_query
         self.catalog_query = catalog_query if catalog_query is not None else FakeCatalogQuery()
         
         # Use Cases
@@ -126,11 +128,13 @@ class OrderContainer:
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             currency=self.mercadopago_settings.currency,
+            credentials_query=self.credentials_query,
         )
         self.process_payment_notification_use_case = ProcessPaymentNotificationUseCase(
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
+            credentials_query=self.credentials_query,
         )
 
 _container: OrderContainer | None = None

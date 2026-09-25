@@ -48,7 +48,7 @@ include_external_packages = true
 name = "Hexagonal layers inside each app"
 type = "layers"
 containers = [
-  "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon", "modules.delivery",
+  "modules.client", "modules.conversation", "modules.order", "modules.catalog", "modules.config_coupon", "modules.delivery", "modules.mercadopago",
 ]
 layers = [
   "(infrastructure.adapters.driver)",   # DRF views/serializers (highest)
