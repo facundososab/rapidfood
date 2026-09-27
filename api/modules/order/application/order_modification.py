@@ -31,9 +31,17 @@ class ModificationReadiness:
 
 
 def _is_reopenable(order: Order, attempts: PaymentAttemptQueryPort) -> bool:
+    """A pending order can be reopened while it is still unpaid.
+
+    The normal case is an ONLINE order awaiting payment. A PENDING order with an
+    unspecified payment method (legacy/manual, or an agent order confirmed before
+    the method was captured) is also unpaid, so it is reopened instead of forcing
+    a brand-new order. A CASH order is accepted by the business and stays closed
+    (RN-006b).
+    """
     return (
         order.status is OrderState.PENDING
-        and order.payment_type is PaymentMethod.ONLINE
+        and order.payment_type in (None, PaymentMethod.ONLINE)
         and not attempts.has_current_approved(order.id, order.version)
     )
 

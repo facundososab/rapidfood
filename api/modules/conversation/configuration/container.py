@@ -21,6 +21,9 @@ from modules.conversation.application.ports.driven.delivery_service import (
 from modules.conversation.application.ports.driven.order_service import (
     OrderServicePort,
 )
+from modules.conversation.application.ports.driven.outbound_message import (
+    OutboundMessagePort,
+)
 from modules.conversation.application.use_cases.add_message import AddMessageUseCase
 from modules.conversation.application.use_cases.catalog_queries import (
     GetProductDetailForConversationUseCase,
@@ -36,6 +39,9 @@ from modules.conversation.application.use_cases.handle_incoming_message import (
     HandleIncomingMessageUseCase,
 )
 from modules.conversation.application.use_cases.list_messages import ListMessagesUseCase
+from modules.conversation.application.use_cases.notify_order_paid import (
+    NotifyOrderPaidUseCase,
+)
 from modules.conversation.application.use_cases.order_mutations import (
     AddItemToConversationOrderUseCase,
     ApplyCouponForConversationOrderUseCase,
@@ -66,6 +72,9 @@ from modules.conversation.application.use_cases.resolve_conversation_for_channel
     ResolveConversationForChannelUseCase,
 )
 from modules.conversation.infrastructure.adapters.driven.clock import SystemClock
+from modules.conversation.infrastructure.adapters.driven.outbound.dev_outbound_message_adapter import (
+    DevOutboundMessageAdapter,
+)
 from modules.conversation.infrastructure.adapters.driven.intent.deterministic_intent_detector import (
     DeterministicIntentDetector,
 )
@@ -112,6 +121,7 @@ class ConversationContainer:
     cancel_order_use_case: Optional[CancelConversationOrderUseCase] = None
     get_latest_active_order_use_case: Optional[GetLatestActiveOrderForConversationUseCase] = None
     create_checkout_use_case: Optional[CreateCheckoutForConversationOrderUseCase] = None
+    notify_order_paid_use_case: Optional[NotifyOrderPaidUseCase] = None
 
 
 def build_container(
@@ -123,6 +133,7 @@ def build_container(
     conversation_repository=None,
     message_repository=None,
     agent_runner_factory: Optional[Callable[["ConversationContainer"], AgentRunnerPort]] = None,
+    outbound_message: Optional[OutboundMessagePort] = None,
 ) -> ConversationContainer:
     """Build the conversation module wiring.
 
@@ -135,6 +146,11 @@ def build_container(
     message_repository = message_repository or PrismaMessageRepository()
     clock = SystemClock()
     intent_detector = DeterministicIntentDetector()
+    # Default outbound channel: dev adapter (logs + persists). A real sender
+    # (WhatsApp Cloud API) is injected by the composition root later.
+    outbound_message = outbound_message or DevOutboundMessageAdapter(
+        message_repository, clock
+    )
 
     container = ConversationContainer(
         resolve_conversation_use_case=ResolveConversationForChannelUseCase(
@@ -219,6 +235,9 @@ def build_container(
         container.cancel_order_use_case = CancelConversationOrderUseCase(order_service)
         container.create_checkout_use_case = CreateCheckoutForConversationOrderUseCase(
             order_service
+        )
+        container.notify_order_paid_use_case = NotifyOrderPaidUseCase(
+            order_service, conversation_repository, outbound_message
         )
 
     return container

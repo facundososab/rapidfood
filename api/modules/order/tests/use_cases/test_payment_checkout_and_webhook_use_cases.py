@@ -424,6 +424,66 @@ def test_unknown_provider_id_is_acknowledged_without_effects():
     assert result.status == "UNKNOWN"
 
 
+class FakeNotifier:
+    def __init__(self, error=None):
+        self.calls = []
+        self._error = error
+
+    def notify_order_paid(self, *, conversation_id, order_id):
+        self.calls.append((conversation_id, order_id))
+        if self._error:
+            raise self._error
+
+
+def _paid_use_case(order, attempt, notifier):
+    attempt_repo = FakeAttemptRepo()
+    attempt_repo.add(attempt)
+    return HandlePaymentWebhookUseCase(
+        order_repo=FakeOrderRepo(order),
+        payment_repo=attempt_repo,
+        payment_provider=FakeProvider(
+            remote_payment=ProviderPayment(
+                external_id="MP-1",
+                status=PaymentStatus.APPROVED,
+                amount=Decimal("1000"),
+            )
+        ),
+        paid_notifier=notifier,
+    )
+
+
+def test_paid_order_triggers_the_customer_notification_post_commit():
+    notifier = FakeNotifier()
+    use_case = _paid_use_case(make_order(), _current_attempt(), notifier)
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True
+    assert notifier.calls == [("c-1", "o-1")]
+
+
+def test_an_unapplied_notification_does_not_notify():
+    notifier = FakeNotifier()
+    # Wrong amount: the order stays PENDING and nobody is notified.
+    use_case = _paid_use_case(
+        make_order(total=Decimal("2000")), _current_attempt(), notifier
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is False
+    assert notifier.calls == []
+
+
+def test_a_notification_failure_never_breaks_the_webhook():
+    notifier = FakeNotifier(error=RuntimeError("whatsapp down"))
+    use_case = _paid_use_case(make_order(), _current_attempt(), notifier)
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True  # the order is still paid
+
+
 def _cancel_use_case(attempt, provider):
     repo = FakeAttemptRepo()
     repo.add(attempt)

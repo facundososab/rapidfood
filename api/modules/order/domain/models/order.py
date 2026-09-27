@@ -91,11 +91,13 @@ class Order:
         self.version += 1
 
     def reopen_for_modification(self, has_current_approved_payment: bool = False) -> None:
-        """Explicitly reopen a pending ONLINE order so it can be modified.
+        """Explicitly reopen an unpaid pending order so it can be modified.
 
-        Keeps the invariant ``modifiable <=> status == DRAFT``. Only valid for
-        an online order awaiting payment: once a payment for the current version
-        is approved the snapshot is final and a new order is required.
+        Keeps the invariant ``modifiable <=> status == DRAFT``. Valid for an order
+        awaiting payment: ONLINE, or with an unspecified method (legacy/manual or
+        an agent order confirmed before the method was captured). Once a payment
+        for the current version is approved the snapshot is final and a new order
+        is required.
 
         Clears ``confirmed_at`` because the previous confirmation no longer
         describes the new snapshot.
@@ -104,9 +106,9 @@ class Order:
             raise OrderStateError(
                 f"Cannot reopen an order in state {self.status.value}"
             )
-        if self.payment_type is not PaymentMethod.ONLINE:
+        if self.payment_type not in (None, PaymentMethod.ONLINE):
             raise OrderStateError(
-                "Only ONLINE orders awaiting payment can be reopened for modification"
+                "Only unpaid orders awaiting payment can be reopened for modification"
             )
         if has_current_approved_payment:
             raise OrderStateError(

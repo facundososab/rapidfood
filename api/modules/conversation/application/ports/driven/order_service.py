@@ -42,6 +42,8 @@ class OrderLineDTO:
     quantity: int
     unit_price: Optional[str]
     subtotal: str
+    product_name: Optional[str] = None
+    variant_name: Optional[str] = None
     modifiers: Tuple[OrderLineModifierDTO, ...] = field(default_factory=tuple)
     removed_ingredients: Tuple[OrderLineRemovedIngredientDTO, ...] = field(
         default_factory=tuple

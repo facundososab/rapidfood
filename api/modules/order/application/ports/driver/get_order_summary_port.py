@@ -10,6 +10,10 @@ class OrderSummaryLineDTO:
     quantity: int
     unit_price: Optional[str]
     subtotal: str
+    # Human-readable labels (resolved from the catalog when available); used by
+    # the customer-facing confirmation message.
+    product_name: Optional[str] = None
+    variant_name: Optional[str] = None
     modifiers: List[dict] = field(default_factory=list)
     removed_ingredients: List[dict] = field(default_factory=list)
 

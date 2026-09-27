@@ -269,6 +269,16 @@ def test_maps_mercadopago_statuses_to_domain_statuses():
     assert map_mercadopago_status("action_required") == PaymentStatus.PENDING
 
 
+def test_orders_api_settled_payment_is_approved():
+    """The Orders API settles a paid order as ``processed`` (detail ``accredited``).
+
+    Mapping that to FAILED (fail-closed) used to leave every paid order in
+    PENDING, so a confirmed webhook never marked the order as PAID.
+    """
+    assert map_mercadopago_status("processed") == PaymentStatus.APPROVED
+    assert map_mercadopago_status("accredited") == PaymentStatus.APPROVED
+
+
 def test_unknown_mercadopago_status_fails_closed():
     assert map_mercadopago_status("mystery") == PaymentStatus.FAILED
 
@@ -285,6 +295,17 @@ def test_settings_loads_env_and_orders_api_base(monkeypatch):
     assert settings.currency == "ARS"
     assert settings.api_base_url == "https://api.mercadopago.com"
     assert settings.webhook_secret is None
+    assert settings.validate_webhook_signature is False
+
+
+def test_webhook_signature_validation_can_be_disabled_via_env(monkeypatch):
+    monkeypatch.setenv("MERCADOPAGO_ACCESS_TOKEN", "env-token")
+    monkeypatch.setenv("MERCADOPAGO_WEBHOOK_SECRET", "s3cr3t")
+    monkeypatch.setenv("MERCADOPAGO_VALIDATE_WEBHOOK_SIGNATURE", "false")
+
+    settings = MercadoPagoSettings.from_env()
+
+    assert settings.webhook_secret == "s3cr3t"
     assert settings.validate_webhook_signature is False
 
 
@@ -321,4 +342,24 @@ def test_signature_validation_rejects_invalid_signature():
         x_request_id="req-1",
         x_signature="ts=1700000000,v1=invalid",
         secret="webhook-secret",
+    )
+
+
+def test_signature_validation_omits_id_when_absent_like_the_sdk():
+    import hashlib
+    import hmac
+
+    from modules.order.infrastructure.adapters.driver.rest.mercadopago_signature import (
+        validate_mercadopago_signature,
+    )
+
+    secret = "webhook-secret"
+    manifest = "request-id:req-1;ts:1700000000;"
+    digest = hmac.new(secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+
+    assert validate_mercadopago_signature(
+        data_id="",
+        x_request_id="req-1",
+        x_signature=f"ts=1700000000,v1={digest}",
+        secret=secret,
     )

@@ -7,10 +7,12 @@ persistence is created for the summary.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Optional
 
 from modules.order.application.ports.driven.business_config_query import (
     BusinessConfigQueryPort,
 )
+from modules.order.application.ports.driven.catalog_query import CatalogQuery
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.application.ports.driver.get_order_summary_port import (
     GetOrderSummaryPort,
@@ -26,9 +28,11 @@ class GetOrderSummaryUseCase(GetOrderSummaryPort):
         self,
         order_repo: OrderRepository,
         config_query: BusinessConfigQueryPort,
+        catalog_query: Optional[CatalogQuery] = None,
     ) -> None:
         self._order_repo = order_repo
         self._config_query = config_query
+        self._catalog_query = catalog_query
 
     def execute(self, order_id: str) -> OrderSummaryDTO:
         order = self._order_repo.get_by_id(order_id)
@@ -41,37 +45,7 @@ class GetOrderSummaryUseCase(GetOrderSummaryPort):
             order_id=order.id,
             status=order.status.value,
             version=order.version,
-            lines=[
-                OrderSummaryLineDTO(
-                    line_id=line.id,
-                    product_variant_id=line.product_variant_id,
-                    quantity=line.quantity,
-                    unit_price=(
-                        str(line.unit_price) if line.unit_price is not None else None
-                    ),
-                    subtotal=str(line.subtotal),
-                    modifiers=[
-                        {
-                            "id": m.id,
-                            "modifier_option_id": m.modifier_option_id,
-                            "name": m.option_name_snapshot,
-                            "price_delta": (
-                                str(m.price_delta) if m.price_delta is not None else None
-                            ),
-                        }
-                        for m in line.modifiers
-                    ],
-                    removed_ingredients=[
-                        {
-                            "id": r.id,
-                            "ingredient_id": r.ingredient_id,
-                            "name": r.ingredient_name_snapshot,
-                        }
-                        for r in line.removed_ingredients
-                    ],
-                )
-                for line in order.lines
-            ],
+            lines=[self._line_dto(line) for line in order.lines],
             subtotal=str(order.subtotal),
             discount=str(order.discount),
             shipping_cost=(
@@ -103,6 +77,47 @@ class GetOrderSummaryUseCase(GetOrderSummaryPort):
             client_id=order.client_id,
             client_name=order.client_name,
             missing_requirements=missing,
+        )
+
+    def _line_dto(self, line) -> OrderSummaryLineDTO:
+        product_name = variant_name = None
+        if self._catalog_query is not None:
+            try:
+                context = self._catalog_query.get_variant_context(
+                    line.product_variant_id
+                )
+            except Exception:
+                context = None
+            if context is not None:
+                product_name = context.product_name
+                variant_name = context.variant_name
+        return OrderSummaryLineDTO(
+            line_id=line.id,
+            product_variant_id=line.product_variant_id,
+            quantity=line.quantity,
+            unit_price=str(line.unit_price) if line.unit_price is not None else None,
+            subtotal=str(line.subtotal),
+            product_name=product_name,
+            variant_name=variant_name,
+            modifiers=[
+                {
+                    "id": m.id,
+                    "modifier_option_id": m.modifier_option_id,
+                    "name": m.option_name_snapshot,
+                    "price_delta": (
+                        str(m.price_delta) if m.price_delta is not None else None
+                    ),
+                }
+                for m in line.modifiers
+            ],
+            removed_ingredients=[
+                {
+                    "id": r.id,
+                    "ingredient_id": r.ingredient_id,
+                    "name": r.ingredient_name_snapshot,
+                }
+                for r in line.removed_ingredients
+            ],
         )
 
     def _missing_requirements(self, order) -> list[str]:

@@ -13,9 +13,11 @@ from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
 from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_state import OrderState
+from modules.order.domain.models.payment_method import PaymentMethod
 from modules.order.domain.errors.order_errors import (
     ModifierValidationError,
     OrderClientRequiredError,
+    PaymentTypeRequiredError,
 )
 
 
@@ -26,6 +28,7 @@ def make_order_with_line(modifier_option_ids=None, client_name="Cliente Test"):
         subtotal=Decimal("0"),
         discount=Decimal("0"),
         client_name=client_name,  # orders must be attributable to a client
+        payment_type=PaymentMethod.ONLINE,  # RN-004: payment method is required
     )
     modifiers = []
     if modifier_option_ids:
@@ -87,6 +90,30 @@ def test_confirm_requires_a_client():
     )
     with pytest.raises(OrderClientRequiredError):
         uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+
+def test_confirm_requires_a_payment_type():
+    """RN-004/RN-023: confirming without a payment method must be rejected.
+
+    Otherwise an agent order lands in PENDING with a NULL payment type, a state
+    modification_readiness treats as closed (forcing a new order to pay).
+    """
+    order = make_order_with_line()
+    order.payment_type = None
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("12500")),
+    )
+    with pytest.raises(PaymentTypeRequiredError):
+        uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+    # The order stays a DRAFT: it is not closed, just not confirmable yet.
+    assert order.status is OrderState.DRAFT
+    mock_repo.save.assert_not_called()
 
 
 def test_confirm_freezes_prices():

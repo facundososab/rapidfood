@@ -109,6 +109,7 @@ class OrderContainer:
         coupon_consume: Optional[Any] = None,
         delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
+        paid_notifier: Optional[Any] = None,
     ):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
@@ -177,6 +178,7 @@ class OrderContainer:
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
+            paid_notifier=paid_notifier,
         )
         self.cancel_superseded_checkout_use_case = CancelSupersededCheckoutUseCase(
             payment_repo=self.payment_repository,
@@ -231,7 +233,7 @@ class OrderContainer:
             self.order_repository
         )
         self.get_order_summary_use_case = GetOrderSummaryUseCase(
-            self.order_repository, self.config_query
+            self.order_repository, self.config_query, self.catalog_query
         )
         self.get_or_create_current_draft_use_case = GetOrCreateCurrentDraftUseCase(
             self.order_repository, self.start_draft_order_use_case

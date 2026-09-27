@@ -9,8 +9,13 @@ an old checkout failed and it still got paid.
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
+from typing import Optional
 
+from modules.order.application.ports.driven.order_paid_notifier import (
+    OrderPaidNotifierPort,
+)
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.application.ports.driven.payment_provider import PaymentProviderPort
 from modules.order.application.ports.driven.payment_repository import (
@@ -32,16 +37,21 @@ from modules.order.domain.models.payment_status import PaymentStatus
 from modules.order.domain.services.state_transitions import can_transition
 
 
+logger = logging.getLogger(__name__)
+
+
 class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
     def __init__(
         self,
         order_repo: OrderRepository,
         payment_repo: PaymentAttemptRepository,
         payment_provider: PaymentProviderPort,
+        paid_notifier: Optional[OrderPaidNotifierPort] = None,
     ) -> None:
         self._order_repo = order_repo
         self._payment_repo = payment_repo
         self._payment_provider = payment_provider
+        self._paid_notifier = paid_notifier
 
     def execute(self, command: HandlePaymentWebhookCommand) -> HandlePaymentWebhookResult:
         remote = self._payment_provider.get_payment(command.data_id)
@@ -82,6 +92,9 @@ class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
                 self._order_repo.save(order)
                 applied = True
 
+        if applied:
+            self._notify_paid(order)
+
         return HandlePaymentWebhookResult(
             payment_attempt_id=attempt.id,
             status=attempt.status.value,
@@ -90,6 +103,19 @@ class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
             processed=True,
             applied=applied,
         )
+
+    def _notify_paid(self, order) -> None:
+        """Best-effort, POST-COMMIT customer notification; never breaks the webhook."""
+        if self._paid_notifier is None or not order.conversation_id:
+            return
+        try:
+            self._paid_notifier.notify_order_paid(
+                conversation_id=order.conversation_id, order_id=order.id
+            )
+        except Exception:
+            logger.exception(
+                "Order paid notification failed (order=%s)", order.id
+            )
 
     @staticmethod
     def _pays_current_order(

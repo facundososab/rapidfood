@@ -56,7 +56,9 @@ def _candidate_manifests(
     if data_id and data_id.lower() != data_id:
         ids.append(data_id)
     for candidate in ids:
-        parts = [f"id:{candidate}"]
+        # Mercado Pago omits the ``id`` pair when there is no data.id (matching
+        # the official SDK manifest builder); every other pair keeps the order.
+        parts = [f"id:{candidate}"] if candidate else []
         if x_request_id:
             parts.append(f"request-id:{x_request_id}")
         parts.append(f"ts:{timestamp}")

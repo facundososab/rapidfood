@@ -30,7 +30,7 @@ class FakeUseCase:
 
 
 class FakeContainer:
-    def __init__(self, webhook_secret=None):
+    def __init__(self, webhook_secret=None, validate_signature=None):
         self.create_payment_checkout_use_case = FakeUseCase(
             CreatePaymentCheckoutResult(
                 order_id=ORDER_ID,
@@ -59,8 +59,16 @@ class FakeContainer:
                 already_cancelled=False,
             )
         )
+        validate = (
+            bool(webhook_secret) if validate_signature is None else validate_signature
+        )
         self.mercadopago_settings = type(
-            "MercadoPagoSettingsStub", (), {"webhook_secret": webhook_secret}
+            "MercadoPagoSettingsStub",
+            (),
+            {
+                "webhook_secret": webhook_secret,
+                "validate_webhook_signature": validate,
+            },
         )()
 
 
@@ -164,6 +172,60 @@ def test_webhook_endpoint_rejects_invalid_signature_before_use_case(monkeypatch)
     response = MercadoPagoWebhookView.as_view()(request)
 
     assert response.status_code == 403
+    assert container.handle_payment_webhook_use_case.commands == []
+
+
+def test_webhook_skips_signature_when_validation_is_disabled(monkeypatch):
+    """An explicit validate_webhook_signature=False bypasses the HMAC check."""
+    container = FakeContainer(webhook_secret="secret", validate_signature=False)
+    patch_container(monkeypatch, container)
+
+    request = APIRequestFactory().post(
+        "/payments/mercadopago/webhook/",
+        {"type": "order", "data": {"id": "mp-1"}},
+        format="json",
+        HTTP_X_REQUEST_ID="request-1",
+        HTTP_X_SIGNATURE="ts=123,v1=bad",
+    )
+
+    response = MercadoPagoWebhookView.as_view()(request)
+
+    assert response.status_code == 200
+    assert len(container.handle_payment_webhook_use_case.commands) == 1
+
+
+def test_webhook_validates_signature_with_the_query_data_id(monkeypatch):
+    """MP signs the manifest with ``data.id`` from the query string, not the body."""
+    container = FakeContainer(webhook_secret="secret")
+    patch_container(monkeypatch, container)
+    data_id = "ORD01JYH1Z1YJN4HZ8J3Q0RB3YP6D"
+
+    request = APIRequestFactory().post(
+        "/payments/mercadopago/webhook/",
+        {"type": "order"},
+        format="json",
+        QUERY_STRING=f"data.id={data_id}&type=order",
+        HTTP_X_REQUEST_ID="request-1",
+        HTTP_X_SIGNATURE=sign(data_id, "request-1", "123", "secret"),
+    )
+
+    response = MercadoPagoWebhookView.as_view()(request)
+
+    assert response.status_code == 200
+    assert container.handle_payment_webhook_use_case.commands[0].data_id == data_id
+
+
+def test_webhook_requires_a_data_id(monkeypatch):
+    container = FakeContainer(webhook_secret=None)
+    patch_container(monkeypatch, container)
+
+    request = APIRequestFactory().post(
+        "/payments/mercadopago/webhook/", {"type": "order"}, format="json"
+    )
+
+    response = MercadoPagoWebhookView.as_view()(request)
+
+    assert response.status_code == 400
     assert container.handle_payment_webhook_use_case.commands == []
 
 

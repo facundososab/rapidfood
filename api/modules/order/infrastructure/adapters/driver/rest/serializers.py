@@ -84,10 +84,7 @@ class CreatePaymentLinkSerializer(serializers.Serializer):
 class MercadoPagoWebhookSerializer(serializers.Serializer):
     type = serializers.CharField(required=False, allow_blank=True, default="payment")
     topic = serializers.CharField(required=False, allow_blank=True)
-    data = serializers.DictField(required=True)
-
-    def validate(self, attrs):
-        data_id = attrs.get("data", {}).get("id")
-        if not data_id:
-            raise serializers.ValidationError({"data": "data.id is required"})
-        return attrs
+    # The notified resource id is signed from the QUERY string (`?data.id=...`).
+    # The body usually carries it too, but not every Mercado Pago topic sends it,
+    # so it is optional here and resolved (query first) in the view.
+    data = serializers.DictField(required=False, default=dict)

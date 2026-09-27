@@ -213,6 +213,8 @@ class OrderServiceAdapter(OrderServicePort):
                     quantity=line.quantity,
                     unit_price=line.unit_price,
                     subtotal=line.subtotal,
+                    product_name=getattr(line, "product_name", None),
+                    variant_name=getattr(line, "variant_name", None),
                     modifiers=tuple(
                         OrderLineModifierDTO(
                             id=m["id"], name=m["name"], price_delta=m.get("price_delta")

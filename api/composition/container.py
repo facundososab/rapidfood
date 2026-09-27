@@ -38,6 +38,9 @@ from modules.conversation.infrastructure.adapters.driven.delivery_service_adapte
 from modules.conversation.infrastructure.adapters.driven.order_service_adapter import (
     OrderServiceAdapter,
 )
+from modules.conversation.application.ports.driver.notify_order_paid_port import (
+    NotifyOrderPaidCommand,
+)
 from modules.delivery.configuration.container import DeliveryContainer, get_delivery_container
 from modules.order.configuration.container import OrderContainer
 from modules.order.infrastructure.adapters.driven.business.business_config_query_adapter import (
@@ -257,4 +260,22 @@ def get_app_container() -> OrderContainer:
         coupon_query=CouponQueryAdapter(coupon.validate_coupon),
         coupon_consume=CouponConsumeAdapter(coupon.consume_coupon),
         delivery_quote=DeliveryQuoteAdapter(delivery.calculate_delivery_quote),
+        paid_notifier=_OrderPaidNotifier(),
     )
+
+
+class _OrderPaidNotifier:
+    """Adapts a paid order to the conversation module's notification use case.
+
+    Resolved LAZILY (at notification time): the order container is built before
+    the conversation container (which depends on order), so wiring it eagerly
+    would create a build cycle. Best-effort: the caller already guards failures.
+    """
+
+    def notify_order_paid(self, *, conversation_id: str, order_id: str) -> None:
+        use_case = get_app_conversation_container().notify_order_paid_use_case
+        if use_case is None:
+            return
+        use_case.execute(
+            NotifyOrderPaidCommand(conversation_id=conversation_id, order_id=order_id)
+        )

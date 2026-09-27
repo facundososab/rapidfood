@@ -30,6 +30,19 @@ def test_pending_online_without_approved_is_reopenable():
     assert readiness.requires_new_order is False
 
 
+def test_pending_without_payment_method_is_reopenable():
+    """An unpaid PENDING order with no method is not "closed": it reopens.
+
+    This is the state a premature confirmation used to leave behind, which
+    forced a brand-new order just to choose how to pay.
+    """
+    order = make_order(OrderState.PENDING, None)
+    readiness = modification_readiness(order, FakeAttempts())
+    assert readiness.editable is True
+    assert readiness.requires_reopen is True
+    assert readiness.requires_new_order is False
+
+
 def test_pending_online_with_approved_requires_new_order():
     order = make_order(OrderState.PENDING, PaymentMethod.ONLINE)
     readiness = modification_readiness(order, FakeAttempts(has_approved=True))
@@ -79,6 +92,16 @@ def test_prepare_reopens_and_returns_superseded_attempt_ids():
     assert order.confirmed_at is None
     assert attempts.superseded == [("o-1", 0, NOW)]
     assert superseded == ["attempt-1"]
+
+
+def test_prepare_reopens_pending_without_payment_method():
+    order = make_order(OrderState.PENDING, None)
+    order.confirmed_at = datetime(2026, 9, 16, tzinfo=timezone.utc)
+
+    prepare_order_for_modification(order, FakeAttempts(), NOW)
+
+    assert order.status is OrderState.DRAFT
+    assert order.confirmed_at is None
 
 
 def test_prepare_rejects_cash_pending_without_touching_the_order():

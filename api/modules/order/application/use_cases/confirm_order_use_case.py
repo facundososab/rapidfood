@@ -21,6 +21,7 @@ from modules.order.domain.errors.order_errors import (
     IngredientNotRemovableError,
     ModifierValidationError,
     OrderClientRequiredError,
+    PaymentTypeRequiredError,
 )
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order_state import OrderState
@@ -62,6 +63,13 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
         # Every order must be attributable to a client (linked id or a typed name).
         if not (order.client_id or (order.client_name or "").strip()):
             raise OrderClientRequiredError("El pedido debe tener un cliente.")
+
+        # RN-004/RN-023: the payment method is part of the snapshot the customer
+        # confirms. Confirming without it used to leave an agent order in PENDING
+        # with a NULL payment type, a state modification_readiness treats as closed
+        # (forcing a brand-new order just to choose how to pay).
+        if order.payment_type is None:
+            raise PaymentTypeRequiredError("El pedido necesita una forma de pago.")
 
         # Business availability check
         config = self.config_query.get_config()

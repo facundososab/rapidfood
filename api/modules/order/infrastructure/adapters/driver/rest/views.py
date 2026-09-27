@@ -291,10 +291,29 @@ class MercadoPagoWebhookView(APIView):
         serializer = MercadoPagoWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        data_id = str(serializer.validated_data["data"]["id"])
+        # Mercado Pago signs the ``x-signature`` manifest with the ``data.id``
+        # taken from the QUERY string (``?data.id=...``): that is exactly the
+        # value the official SDK signature validators receive. The body carries
+        # the same id for most topics, so fall back to it when the query param is
+        # absent instead of rejecting a legitimate notification.
+        data_id = request.query_params.get("data.id") or str(
+            (serializer.validated_data.get("data") or {}).get("id") or ""
+        )
+        if not data_id:
+            return Response(
+                {"error": "data.id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         container = get_app_container()
         settings = getattr(container, "mercadopago_settings", None)
-        secret = getattr(settings, "webhook_secret", None)
+        # Respect the explicit switch: an unset secret or an explicit
+        # ``validate_webhook_signature=False`` skips the HMAC check.
+        secret = None
+        if settings is not None and getattr(
+            settings, "validate_webhook_signature", True
+        ):
+            secret = getattr(settings, "webhook_secret", None)
         if not validate_mercadopago_signature(
             data_id=data_id,
             x_request_id=request.headers.get("x-request-id", ""),
@@ -515,7 +534,7 @@ class RemoveLineView(APIView):
         )
         container = get_app_container()
         try:
-            response = container.remove_line_use_case.execute(command)
+            response = container.remove_line_use_case.remove_line(command)
             return Response(
                 {
                     "order_id": response.order_id,
@@ -614,7 +633,7 @@ class CurrentDraftView(APIView):
                 conversation_id=conversation_id,
             )
         )
-        if not result.found:
+        if not result.found or result.order is None:
             return Response({"found": False})
 
         return Response(
