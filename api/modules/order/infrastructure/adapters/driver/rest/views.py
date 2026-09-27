@@ -1,4 +1,6 @@
 from datetime import datetime
+import dataclasses
+import logging
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +8,18 @@ from rest_framework import status
 
 from composition.container import get_app_container
 from modules.order.application.ports.driver.start_draft_order_ports import StartDraftOrderCommand
+from modules.order.application.ports.driver.get_current_order_port import (
+    GetCurrentOrderQuery,
+)
+from modules.order.application.ports.driver.get_latest_active_order_port import (
+    GetLatestActiveOrderQuery,
+)
+from modules.order.application.ports.driver.get_or_create_current_draft_port import (
+    GetOrCreateCurrentDraftCommand,
+)
+from modules.order.application.ports.driver.set_pickup_for_order_port import (
+    SetPickupForOrderCommand,
+)
 from modules.order.application.ports.driver.add_line_port import AddLineCommand
 from modules.order.application.ports.driver.update_line_quantity_port import UpdateLineQuantityCommand
 from modules.order.application.ports.driver.remove_line_port import RemoveLineCommand
@@ -13,27 +27,40 @@ from modules.order.application.ports.driver.configure_order_ports import SetDeli
 from modules.order.application.ports.driver.confirm_order_ports import ConfirmOrderCommand
 from modules.order.application.ports.driver.apply_coupon_ports import ApplyCouponCommand
 from modules.order.application.ports.driver.cancel_order_ports import CancelOrderCommand
+from modules.order.application.ports.driver.set_client_for_order_port import (
+    SetClientForOrderCommand,
+)
+from modules.order.application.ports.driver.set_payment_type_port import (
+    SetPaymentTypeCommand,
+)
 from modules.order.application.ports.driver.advance_state_ports import AdvanceStateCommand
 from modules.order.application.ports.driver.list_orders_ports import ListOrdersQuery
 from modules.order.application.ports.driver.update_order_status_ports import (
     UpdateOrderStatusCommand,
 )
 from modules.order.application.ports.driver.payment_ports import (
-    CreatePaymentLinkCommand,
-    ProcessPaymentNotificationCommand,
+    CancelSupersededCheckoutCommand,
+    CreatePaymentCheckoutCommand,
+    HandlePaymentWebhookCommand,
 )
 from modules.order.application.ports.driver.list_applied_coupons_ports import (
     ListAppliedCouponsQuery,
 )
-from modules.order.domain.errors.order_errors import OrderDomainError
+from modules.order.application.ports.driven.payment_provider import (
+    PaymentProviderError,
+)
+from modules.order.domain.errors.order_errors import OrderDomainError, PaymentAttemptNotFoundError
 from modules.order.domain.models.order import Order
 from .mercadopago_signature import validate_mercadopago_signature
 from .serializers import (
     StartDraftOrderSerializer, AddLineSerializer, UpdateLineQuantitySerializer,
     SetDeliveryDetailsSerializer, ConfirmOrderSerializer, ApplyCouponSerializer,
     CancelOrderSerializer, AdvanceStateSerializer, UpdateOrderStatusSerializer,
-    CreatePaymentLinkSerializer, MercadoPagoWebhookSerializer
+    CreatePaymentLinkSerializer, MercadoPagoWebhookSerializer,
+    SetPaymentTypeSerializer, CurrentDraftSerializer, SetClientSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_dt(value) -> datetime | None:
@@ -218,8 +245,8 @@ class PaymentLinkView(APIView):
 
         container = get_app_container()
         try:
-            result = container.create_payment_link_use_case.execute(
-                CreatePaymentLinkCommand(order_id=str(order_id))
+            result = container.create_payment_checkout_use_case.execute(
+                CreatePaymentCheckoutCommand(order_id=str(order_id))
             )
         except OrderDomainError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -228,12 +255,34 @@ class PaymentLinkView(APIView):
         return Response(
             {
                 "order_id": result.order_id,
-                "payment_id": result.payment_id,
+                "payment_attempt_id": result.payment_attempt_id,
                 "provider": result.provider,
                 "checkout_url": result.checkout_url,
                 "status": result.status,
+                "order_version": result.order_version,
+                "created": result.created,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class CancelSupersededCheckoutView(APIView):
+    def post(self, request, payment_attempt_id):
+        container = get_app_container()
+        try:
+            result = container.cancel_superseded_checkout_use_case.execute(
+                CancelSupersededCheckoutCommand(
+                    payment_attempt_id=str(payment_attempt_id)
+                )
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+        return Response(
+            {
+                "payment_attempt_id": result.payment_attempt_id,
+                "cancellation_status": result.cancellation_status,
+                "already_cancelled": result.already_cancelled,
+            }
         )
 
 
@@ -242,29 +291,81 @@ class MercadoPagoWebhookView(APIView):
         serializer = MercadoPagoWebhookSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        data_id = str(serializer.validated_data["data"]["id"])
+        # Mercado Pago signs the ``x-signature`` manifest with the ``data.id``
+        # taken from the QUERY string (``?data.id=...``): that is exactly the
+        # value the official SDK signature validators receive. The body carries
+        # the same id for most topics, so fall back to it when the query param is
+        # absent instead of rejecting a legitimate notification.
+        data_id = request.query_params.get("data.id") or str(
+            (serializer.validated_data.get("data") or {}).get("id") or ""
+        )
+        if not data_id:
+            return Response(
+                {"error": "data.id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         container = get_app_container()
         settings = getattr(container, "mercadopago_settings", None)
-        secret = getattr(settings, "webhook_secret", None)
+        # Respect the explicit switch: an unset secret or an explicit
+        # ``validate_webhook_signature=False`` skips the HMAC check.
+        secret = None
+        if settings is not None and getattr(
+            settings, "validate_webhook_signature", True
+        ):
+            secret = getattr(settings, "webhook_secret", None)
         if not validate_mercadopago_signature(
             data_id=data_id,
             x_request_id=request.headers.get("x-request-id", ""),
             x_signature=request.headers.get("x-signature", ""),
             secret=secret,
         ):
+            # Diagnostics only (never the secret): shows whether MP sent the
+            # signing headers, so a secret mismatch is distinguishable from a
+            # missing-header problem.
+            logger.warning(
+                "Mercado Pago webhook rejected: data_id=%s has_request_id=%s "
+                "has_signature=%s secret_configured=%s",
+                data_id,
+                bool(request.headers.get("x-request-id")),
+                bool(request.headers.get("x-signature")),
+                bool(secret),
+            )
             return Response({"error": "Invalid signature"}, status=status.HTTP_403_FORBIDDEN)
 
-        result = container.process_payment_notification_use_case.execute(
-            ProcessPaymentNotificationCommand(
-                provider="MERCADOPAGO",
-                data_id=data_id,
-                topic=serializer.validated_data.get("topic")
-                or serializer.validated_data.get("type", "payment"),
-                raw_payload=dict(request.data),
-                headers=dict(request.headers),
+        try:
+            result = container.handle_payment_webhook_use_case.execute(
+                HandlePaymentWebhookCommand(
+                    provider="MERCADOPAGO",
+                    data_id=data_id,
+                    topic=serializer.validated_data.get("topic")
+                    or serializer.validated_data.get("type", "payment"),
+                    raw_payload=dict(request.data),
+                    headers=dict(request.headers),
+                )
             )
+        except PaymentAttemptNotFoundError:
+            return Response(
+                {"error": "Unknown payment attempt"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except PaymentProviderError:
+            # Transient provider failure: answer 503 so Mercado Pago retries.
+            logger.warning(
+                "Mercado Pago webhook: provider fetch failed for data_id=%s", data_id
+            )
+            return Response(
+                {"error": "Payment provider unavailable"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(
+            {
+                "processed": result.processed,
+                "applied": result.applied,
+                "status": result.status,
+                "order_status": result.order_status,
+                "payment_attempt_id": result.payment_attempt_id,
+            }
         )
-        return Response({"processed": result.processed, "status": result.status})
 
 
 class StartDraftOrderView(APIView):
@@ -381,6 +482,25 @@ class SetDeliveryDetailsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SetPaymentTypeView(APIView):
+    def patch(self, request, order_id):
+        serializer = SetPaymentTypeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        command = SetPaymentTypeCommand(
+            order_id=str(order_id), payment_type=serializer.validated_data["payment_type"]
+        )
+
+        container = get_app_container()
+        try:
+            response = container.set_payment_type_use_case.execute(command)
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"order_id": response.order_id, "payment_type": response.payment_type}
+        )
+
+
 class ConfirmOrderView(APIView):
     def post(self, request, order_id):
         serializer = ConfirmOrderSerializer(data=request.data)
@@ -414,7 +534,7 @@ class RemoveLineView(APIView):
         )
         container = get_app_container()
         try:
-            response = container.remove_line_use_case.execute(command)
+            response = container.remove_line_use_case.remove_line(command)
             return Response(
                 {
                     "order_id": response.order_id,
@@ -491,3 +611,154 @@ class AdvanceStateView(APIView):
             )
         except OrderDomainError as e:
             return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+
+
+class CurrentDraftView(APIView):
+    """GET -> pure read of the conversation's current order + editability.
+    POST -> idempotent get-or-create of the conversation's DRAFT."""
+
+    def get(self, request):
+        business_config_id = request.query_params.get("business_config_id")
+        conversation_id = request.query_params.get("conversation_id")
+        if not business_config_id or not conversation_id:
+            return Response(
+                {"error": "business_config_id and conversation_id are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        container = get_app_container()
+        result = container.get_current_order_use_case.execute(
+            GetCurrentOrderQuery(
+                business_config_id=business_config_id,
+                conversation_id=conversation_id,
+            )
+        )
+        if not result.found or result.order is None:
+            return Response({"found": False})
+
+        return Response(
+            {
+                "found": True,
+                "order": _order_to_dict(
+                    result.order, _client_dict(container, result.order)
+                ),
+                "editable": result.editable,
+                "requires_reopen": result.requires_reopen,
+                "requires_new_order": result.requires_new_order,
+            }
+        )
+
+    def post(self, request):
+        serializer = CurrentDraftSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = dict(serializer.validated_data)
+        if data.get("client_id"):
+            data["client_id"] = str(data["client_id"])
+
+        container = get_app_container()
+        try:
+            result = container.get_or_create_current_draft_use_case.execute(
+                GetOrCreateCurrentDraftCommand(**data)
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"order_id": result.order_id, "status": result.status, "created": result.created}
+        )
+
+
+class LatestActiveOrderView(APIView):
+    def get(self, request):
+        business_config_id = request.query_params.get("business_config_id")
+        if not business_config_id:
+            return Response(
+                {"error": "business_config_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        container = get_app_container()
+        order = container.get_latest_active_order_use_case.execute(
+            GetLatestActiveOrderQuery(
+                business_config_id=business_config_id,
+                client_id=request.query_params.get("client_id"),
+                conversation_id=request.query_params.get("conversation_id"),
+            )
+        )
+        if order is None:
+            return Response({"found": False})
+        return Response(
+            {"found": True, "order": _order_to_dict(order, _client_dict(container, order))}
+        )
+
+
+class SetPickupView(APIView):
+    def patch(self, request, order_id):
+        business_config_id = request.data.get("business_config_id") or request.query_params.get(
+            "business_config_id"
+        )
+        if not business_config_id:
+            return Response(
+                {"error": "business_config_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        container = get_app_container()
+        try:
+            result = container.set_pickup_for_order_use_case.execute(
+                SetPickupForOrderCommand(
+                    business_config_id=business_config_id,
+                    order_id=str(order_id),
+                    external_message_id=request.data.get("external_message_id")
+                    or f"http:set_pickup:{order_id}",
+                    conversation_id=request.data.get("conversation_id"),
+                )
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "order_id": result.order_id,
+                "version": result.version,
+                "replayed": result.replayed,
+            }
+        )
+
+
+class OrderSummaryView(APIView):
+    def get(self, request, order_id):
+        container = get_app_container()
+        try:
+            summary = container.get_order_summary_use_case.execute(str(order_id))
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        return Response(dataclasses.asdict(summary))
+
+
+class SetClientView(APIView):
+    """Attach the customer's name (and optional registered client) to a draft."""
+
+    def patch(self, request, order_id):
+        serializer = SetClientSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = dict(serializer.validated_data)
+        if data.get("client_id"):
+            data["client_id"] = str(data["client_id"])
+
+        container = get_app_container()
+        try:
+            response = container.set_client_for_order_use_case.execute(
+                SetClientForOrderCommand(order_id=str(order_id), **data)
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "order_id": response.order_id,
+                "client_id": response.client_id,
+                "client_name": response.client_name,
+            }
+        )

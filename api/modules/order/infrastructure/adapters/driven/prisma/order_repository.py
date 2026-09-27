@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional
 
 from prisma import enums
+from prisma.errors import UniqueViolationError
 from shared.infrastructure.prisma.db import db
 
 from modules.order.application.ports.driven.order_repository import (
@@ -10,6 +11,7 @@ from modules.order.application.ports.driven.order_repository import (
 )
 from modules.order.domain.models.delivery_type import DeliveryType
 from modules.order.domain.models.order import Order
+from modules.order.domain.errors.order_errors import DuplicateActiveOrderError
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
 from modules.order.domain.models.order_line_removed_ingredient import OrderLineRemovedIngredient
@@ -22,42 +24,41 @@ from decimal import Decimal
 
 class PrismaOrderRepository(OrderRepository):
     def save(self, order: Order) -> Order:
-        with db.client.tx() as tx:
-            tx.order.upsert(
-                where={"id": order.id},
-                data={
-                    "create": _to_prisma_data(order),
-                    "update": _to_prisma_data(order),
-                },
-            )
-            _sync_lines(tx, order)
+        try:
+            with db.client.tx() as tx:
+                persist_order_in_tx(tx, order)
+        except UniqueViolationError as exc:
+            # The only unique constraint on `order` (besides the PK) is the
+            # partial index guaranteeing ONE active order per conversation.
+            raise DuplicateActiveOrderError(
+                "Another active order already exists for this conversation"
+            ) from exc
         return order
 
     def get_by_id(self, order_id: str) -> Optional[Order]:
-        record = db.client.order.find_first(
-            where={"id": order_id},
-            include={
-                "lines": {
-                    "include": {
-                        "modifiers": True,
-                        "removedIngredients": True,
-                    }
-                }
-            },
-        )
-        if record is None:
-            return None
-        return _to_domain(record)
+        return load_order_in_tx(db.client, order_id)
 
     def list(self, filter: Optional[OrderFilter] = None) -> List[Order]:
         filter = filter or OrderFilter()
         where: dict = {}
         if filter.status is not None:
             where["status"] = enums.OrderStatus(filter.status.value)
+        if filter.status_in is not None:
+            where["status"] = {"in": [enums.OrderStatus(s.value) for s in filter.status_in]}
+        if filter.exclude_status_in is not None:
+            where["status"] = {
+                "notIn": [enums.OrderStatus(s.value) for s in filter.exclude_status_in]
+            }
         if filter.delivery_type is not None:
             where["deliveryType"] = enums.DeliveryType(filter.delivery_type.value)
         if filter.payment_type is not None:
             where["paymentType"] = enums.PaymentType(filter.payment_type.value)
+        if filter.conversation_id is not None:
+            where["conversationId"] = filter.conversation_id
+        if filter.business_config_id is not None:
+            where["businessConfigId"] = filter.business_config_id
+        if filter.client_id is not None:
+            where["clientId"] = filter.client_id
         created_at: dict = {}
         if filter.date_from is not None:
             created_at["gte"] = filter.date_from
@@ -69,16 +70,34 @@ class PrismaOrderRepository(OrderRepository):
         records = db.client.order.find_many(
             where=where,
             order={"createdAt": "desc"},
-            include={
-                "lines": {
-                    "include": {
-                        "modifiers": True,
-                        "removedIngredients": True,
-                    }
-                }
-            },
+            include=_ORDER_INCLUDE,
         )
         return [_to_domain(record) for record in records]
+
+
+_ORDER_INCLUDE = {
+    "lines": {"include": {"modifiers": True, "removedIngredients": True}}
+}
+
+
+def persist_order_in_tx(tx, order: Order) -> None:
+    """Persist an order aggregate (scalars + lines + children) inside a tx."""
+    tx.order.upsert(
+        where={"id": order.id},
+        data={
+            "create": _to_prisma_data(order),
+            "update": _to_prisma_data(order),
+        },
+    )
+    _sync_lines(tx, order)
+
+
+def load_order_in_tx(tx, order_id: str) -> Optional[Order]:
+    """Load a full order aggregate inside a tx (or from the base client)."""
+    record = tx.order.find_first(where={"id": order_id}, include=_ORDER_INCLUDE)
+    if record is None:
+        return None
+    return _to_domain(record)
 
 
 def _to_prisma_data(order: Order) -> dict:
@@ -88,6 +107,7 @@ def _to_prisma_data(order: Order) -> dict:
         "origin": enums.OrderOrigin(order.origin.value),
         "subtotal": order.subtotal,
         "discount": order.discount,
+        "version": order.version,
         "clientId": _id(order.client_id),
         "clientName": order.client_name,
         "businessConfigId": _id(order.business_config_id),
@@ -209,6 +229,7 @@ def _to_domain(record) -> Order:
         status=OrderState(_enum_value(record.status)),
         subtotal=record.subtotal,
         discount=record.discount,
+        version=record.version,
         client_id=record.clientId,
         client_name=record.clientName,
         business_config_id=record.businessConfigId,

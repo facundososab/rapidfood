@@ -38,6 +38,10 @@ class Order:
     applied_coupon_id: Optional[str] = None
     confirmed_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    # Monotonic commercial snapshot version. Bumped by every mutation that
+    # changes what the customer confirmed. A payment attempt is bound to the
+    # version it was created for.
+    version: int = 0
     lines: List[OrderLine] = field(default_factory=list)
 
     def is_draft(self) -> bool:
@@ -64,12 +68,54 @@ class Order:
             self.lines.append(line)
 
         self._recalculate_totals()
+        self._bump_version()
 
     def remove_line(self, line_id: str) -> None:
         if not self.can_be_modified():
             raise OrderStateError("Cannot remove lines from a non-draft order")
         self.lines = [l for l in self.lines if l.id != line_id]
         self._recalculate_totals()
+        self._bump_version()
+
+    def mark_modified(self) -> None:
+        """Record that the commercial snapshot changed.
+
+        Recomputes totals and bumps the version. Use cases that mutate the order
+        without going through an aggregate method MUST call this so the version
+        stays a reliable barrier for payment attempts.
+        """
+        self._recalculate_totals()
+        self._bump_version()
+
+    def _bump_version(self) -> None:
+        self.version += 1
+
+    def reopen_for_modification(self, has_current_approved_payment: bool = False) -> None:
+        """Explicitly reopen an unpaid pending order so it can be modified.
+
+        Keeps the invariant ``modifiable <=> status == DRAFT``. Valid for an order
+        awaiting payment: ONLINE, or with an unspecified method (legacy/manual or
+        an agent order confirmed before the method was captured). Once a payment
+        for the current version is approved the snapshot is final and a new order
+        is required.
+
+        Clears ``confirmed_at`` because the previous confirmation no longer
+        describes the new snapshot.
+        """
+        if self.status is not OrderState.PENDING:
+            raise OrderStateError(
+                f"Cannot reopen an order in state {self.status.value}"
+            )
+        if self.payment_type not in (None, PaymentMethod.ONLINE):
+            raise OrderStateError(
+                "Only unpaid orders awaiting payment can be reopened for modification"
+            )
+        if has_current_approved_payment:
+            raise OrderStateError(
+                "A payment for the current version was approved; the order is final"
+            )
+        self.status = OrderState.DRAFT
+        self.confirmed_at = None
 
     def _recalculate_totals(self) -> None:
         self.subtotal = sum((line.subtotal for line in self.lines), Decimal("0"))
@@ -94,12 +140,27 @@ class Order:
             self.address_id = None
             self.shipping_cost = Decimal("0")
         self._recalculate_totals()
+        self._bump_version()
 
     def confirm(self) -> None:
-        """Transition DRAFT -> PENDING and record confirmation time."""
+        """Confirm the draft and record the confirmation time.
+
+        A manual order (POS / in place) is taken and settled by the operator, so
+        it counts as accepted immediately: ``DRAFT -> CONFIRMED``. An agent order
+        still awaits settlement first: ``DRAFT -> PENDING`` (an approved online
+        payment moves it to PAID; cash acceptance moves it to CONFIRMED).
+
+        ``PAID`` is intentionally NOT used for manual orders: it means a
+        provider-verified online payment approval, which only the payment webhook
+        can assert.
+        """
         if not self.is_draft():
             raise OrderStateError(f"Cannot confirm order in state {self.status}")
         if not self.lines:
             raise OrderStateError("Cannot confirm an empty order")
-        self.status = OrderState.PENDING
+        self.status = (
+            OrderState.CONFIRMED
+            if self.origin is OrderOrigin.IN_PLACE
+            else OrderState.PENDING
+        )
         self.confirmed_at = datetime.utcnow()

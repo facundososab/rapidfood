@@ -8,14 +8,16 @@
 - RN-004: Al pasar a PENDIENTE se valida: monto minimo, productos disponibles, direccion en zona de cobertura (si es ENVIO), horario de atencion, metodo de pago seleccionado
 - RN-005: Un pedido en BORRADOR puede abandonarse y debe limpiarse despues de 24 horas sin actividad
 - RN-006: Un pedido solo puede modificarse si su estado es BORRADOR
+- RN-006b: Un pedido PENDIENTE de pago ONLINE sin pago aprobado para su version actual puede reabrirse explicitamente a BORRADOR (al modificarlo). La reapertura limpia la confirmacion (`confirmedAt`) y supersede el checkout anterior; se debe volver a confirmar. Para pago en EFECTIVO un PENDIENTE no se reabre.
 - RN-007: Un pedido puede cancelarse si su estado es PENDIENTE, CONFIRMADO o PAGADO (no si ya esta EN_PREPARACION o posterior)
-- RN-008: BORRADOR -> PENDIENTE cuando el cliente confirma
+- RN-008: BORRADOR -> PENDIENTE cuando el cliente confirma (pedido del agente)
+- RN-008b: BORRADOR -> CONFIRMADO cuando el negocio acepta un pedido MANUAL (mostrador/POS): se considera tomado y cobrado por el operador, asi sea retiro o envio, en efectivo u online. Un pedido manual NUNCA pasa por PAGADO.
 - RN-009: BORRADOR -> CANCELADO cuando el cliente abandona explicitamente
 - RN-010: PENDIENTE -> PAGADO cuando el pago online es aprobado
 - RN-011: PENDIENTE -> CONFIRMADO cuando el pago es en efectivo y el negocio acepta
 - RN-012: PENDIENTE -> CANCELADO cuando el cliente o el negocio cancela
 - RN-013: CONFIRMADO -> EN_PREPARACION cuando el negocio inicia la preparacion
-- RN-014: PAGADO -> EN_PREPARACION cuando el negocio inicia la preparacion
+- RN-014: PAGADO -> CONFIRMADO cuando el negocio acepta el pedido pagado; luego CONFIRMADO -> EN_PREPARACION
 - RN-015: EN_PREPARACION -> LISTO cuando finaliza la preparacion
 - RN-016: LISTO -> ENTREGADO si el tipo de entrega es ENVIO
 - RN-017: LISTO -> RETIRADO si el tipo de entrega es RETIRO

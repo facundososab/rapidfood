@@ -22,6 +22,7 @@ class AddMessageUseCase:
             sentiment=command.sentiment,
             status=command.status,
             created_at=self._clock.now(),
+            author=command.author,
         )
         saved = self._message_repository.add(message)
         return AddMessageResult(message=_to_message_dto(saved))
@@ -37,4 +38,5 @@ def _to_message_dto(message: Message) -> MessageDTO:
         sentiment=message.sentiment,
         status=message.status,
         created_at=message.created_at,
+        author=message.author,
     )

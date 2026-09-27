@@ -143,11 +143,6 @@ ALTER TABLE "price" ADD COLUMN     "product_variant_id" UUID;
 CREATE INDEX "discount_product_id_idx" ON "discount"("product_id");
 
 
--- AlterTable (Add Columns as Nullable)
-ALTER TABLE "discount" ADD COLUMN     "product_variant_id" UUID;
-ALTER TABLE "order_line" ADD COLUMN     "product_variant_id" UUID;
-ALTER TABLE "price" ADD COLUMN     "product_variant_id" UUID;
-
 -- CreateIndex
 CREATE INDEX "discount_product_variant_id_idx" ON "discount"("product_variant_id");
 

@@ -33,6 +33,29 @@ class SetDeliveryDetailsSerializer(serializers.Serializer):
     province = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
 
+class SetClientSerializer(serializers.Serializer):
+    client_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True, allow_null=True
+    )
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SetPaymentTypeSerializer(serializers.Serializer):
+    payment_type = serializers.ChoiceField(choices=["CASH", "ONLINE"])
+
+
+class CurrentDraftSerializer(serializers.Serializer):
+    business_config_id = serializers.CharField()
+    conversation_id = serializers.CharField()
+    client_id = serializers.UUIDField(required=False, allow_null=True)
+    client_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True, allow_null=True
+    )
+    origin = serializers.ChoiceField(
+        choices=["IN_PLACE", "AGENT"], required=False, allow_null=True
+    )
+
+
 class ConfirmOrderSerializer(serializers.Serializer):
     # No additional fields needed since the order ID comes from the URL
     pass
@@ -61,10 +84,7 @@ class CreatePaymentLinkSerializer(serializers.Serializer):
 class MercadoPagoWebhookSerializer(serializers.Serializer):
     type = serializers.CharField(required=False, allow_blank=True, default="payment")
     topic = serializers.CharField(required=False, allow_blank=True)
-    data = serializers.DictField(required=True)
-
-    def validate(self, attrs):
-        data_id = attrs.get("data", {}).get("id")
-        if not data_id:
-            raise serializers.ValidationError({"data": "data.id is required"})
-        return attrs
+    # The notified resource id is signed from the QUERY string (`?data.id=...`).
+    # The body usually carries it too, but not every Mercado Pago topic sends it,
+    # so it is optional here and resolved (query first) in the view.
+    data = serializers.DictField(required=False, default=dict)

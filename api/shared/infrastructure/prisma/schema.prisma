@@ -71,6 +71,8 @@ model BusinessConfiguration {
   businessHours BusinessHours[]
   addresses     Address[]
   orders        Order[]
+  conversations Conversation[]
+  idempotentOperations IdempotentOperation[]
   deliveryPricingConfiguration DeliveryPricingConfiguration?
 
   @@map("business_configuration")
@@ -143,11 +145,22 @@ model Conversation {
   overallSentiment String?   @map("overall_sentiment")
   lastIntent       String?   @map("last_intent")
   channel          String    @default("WHATSAPP")
+  // External channel identity (LangSmith thread, WhatsApp chat, ...). The
+  // internal `id` stays a Rapidfood UUID so the channel can be replaced
+  // without changing the domain.
+  externalThreadId String?   @map("external_thread_id")
+  // When a human takes over the conversation, the agent stops replying.
+  agentPaused      Boolean   @default(false) @map("agent_paused")
+  businessConfigId String    @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Restrict)
   clientId         String?   @map("client_id") @db.Uuid
   client           Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
   messages         Message[]
   orders           Order[]
 
+  // One external thread resolves to exactly one conversation per business+channel.
+  @@unique([businessConfigId, channel, externalThreadId])
+  @@index([businessConfigId, channel])
   @@map("conversation")
 }
 
@@ -156,6 +169,7 @@ model Message {
   conversationId String       @map("conversation_id") @db.Uuid
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String // USER | AGENT | SYSTEM - open vocab -> String
+  author         String       @default("AGENT") // CLIENT | AGENT | OPERATOR - who actually wrote it
   content        String
   detectedIntent String?      @map("detected_intent")
   sentiment      String?
@@ -173,6 +187,9 @@ model Order {
   paymentType     PaymentType?    @map("payment_type") // null until REQ-033
   status          OrderStatus     @default(DRAFT)
   origin          OrderOrigin     @default(IN_PLACE) // IN_PLACE (POS) | AGENT (WhatsApp/IA)
+  // Monotonic commercial snapshot version. Incremented on every mutation that
+  // changes what the customer confirmed; a payment checkout is bound to a version.
+  version         Int             @default(0) @map("version")
   subtotal        Decimal         @default(0) @db.Decimal(10, 2)
   discount        Decimal         @default(0) @db.Decimal(10, 2)
   shippingCost    Decimal?        @map("shipping_cost") @db.Decimal(10, 2)
@@ -310,25 +327,60 @@ model AppliedCoupon {
   @@map("applied_coupon")
 }
 
+// Payment attempt for an Order. Kept as table `payment` for migration safety,
+// but the domain treats each row as an immutable attempt bound to an
+// Order.version. Provider status and local validity are SEPARATE concepts: an
+// old attempt can be `providerStatus = APPROVED` and `supersededAt != null`
+// at the same time (race where a stale checkout still got paid).
 model Payment {
   id                String        @id @default(uuid()) @map("payment_id") @db.Uuid
   orderId           String        @map("order_id") @db.Uuid
   order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Order.version this attempt was created for. Null only for legacy rows.
+  orderVersion      Int?          @map("order_version")
   provider          String
-  externalId        String?       @unique @map("external_id")
-  preferenceId      String?       @unique @map("preference_id")
+  // Provider checkout/payment identifier (Mercado Pago Order id). Unique per provider.
+  externalId        String?       @map("external_id")
+  preferenceId      String?       @map("preference_id")
   checkoutUrl       String?       @map("checkout_url")
   externalReference String?       @map("external_reference")
   providerPayload   Json?         @map("provider_payload")
   expiresAt         DateTime?     @map("expires_at")
   status            PaymentStatus @default(PENDING)
   amount            Decimal       @db.Decimal(10, 2)
+  // Local supersede marker (independent from `status`).
+  supersededAt      DateTime?     @map("superseded_at")
+  // Remote cancellation lifecycle: NOT_REQUIRED | PENDING | CANCELLED |
+  // REMOTE_ALREADY_CANCELLED | FAILED. Retryable without repeating the mutation.
+  cancellationStatus String?      @map("cancellation_status")
+  // Stable provider idempotency keys (create and cancel are different operations).
+  createIdempotencyKey String?    @map("create_idempotency_key")
+  cancelIdempotencyKey String?    @map("cancel_idempotency_key")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
+  @@unique([provider, externalId])
   @@index([orderId])
+  @@index([orderId, orderVersion])
   @@index([externalReference])
   @@map("payment")
+}
+
+// Channel-neutral idempotency ledger for order mutations that are not naturally
+// idempotent. Claim + mutation + result persistence happen in ONE transaction.
+model IdempotentOperation {
+  id               String   @id @default(uuid()) @map("idempotent_operation_id") @db.Uuid
+  businessConfigId String   @map("business_config_id") @db.Uuid
+  businessConfig   BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Restrict)
+  idempotencyKey   String   @map("idempotency_key")
+  operationName    String   @map("operation_name")
+  status           String   @default("COMPLETED")
+  result           Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@unique([businessConfigId, idempotencyKey])
+  @@index([businessConfigId, operationName])
+  @@map("idempotent_operation")
 }
 
 // --- Catalog: variant, ingredient, and modifier models ---

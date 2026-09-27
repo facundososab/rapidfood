@@ -86,3 +86,25 @@ REST_FRAMEWORK = {
 
 # Delivery module — OpenRouteService API key (required for geocoding/routing).
 OPENROUTESERVICE_API_KEY: str = os.environ.get("OPENROUTESERVICE_API_KEY", "")
+
+# Conversation agent — LangGraph runtime. The provider is swappable behind the
+# agent runner port; `AGENT_PROVIDER` selects it explicitly ("groq" | "gemini"),
+# or "auto" infers it from the model name (gemini-* -> Gemini, otherwise Groq).
+GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
+GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
+AGENT_PROVIDER: str = os.environ.get("AGENT_PROVIDER", "auto")
+AGENT_MODEL: str = os.environ.get(
+    "AGENT_MODEL",
+    "llama-3.3-70b-versatile",
+)
+# DEV FALLBACK ONLY, and optional: the definitive multi-tenant design resolves
+# the business from the channel/runtime context. When this is empty (or "default")
+# the single existing business is resolved dynamically, which survives database
+# re-seeds (the business row id is a generated UUID).
+AGENT_BUSINESS_CONFIG_ID: str = os.environ.get("AGENT_BUSINESS_CONFIG_ID", "")
+
+# LangSmith tracing (LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT /
+# LANGSMITH_WORKSPACE_ID / LANGSMITH_ENDPOINT) is NOT copied into Django
+# settings on purpose: the LangChain/LangSmith client reads os.environ directly,
+# and the .env loader above has already populated it. Keeping a second copy here
+# would only create drift.

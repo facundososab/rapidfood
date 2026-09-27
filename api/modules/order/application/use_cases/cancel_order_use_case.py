@@ -4,10 +4,10 @@ from modules.order.application.ports.driver.cancel_order_ports import (
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.domain.errors.order_errors import OrderNotFound, OrderNotModifiableError
 from modules.order.domain.models.order_state import OrderState
-
-
-# These states allow cancellation
-_CANCELLABLE_STATES = {OrderState.DRAFT, OrderState.PENDING, OrderState.PAID}
+from modules.order.domain.services.state_transitions import (
+    CANCELLABLE_STATES,
+    is_cancellable,
+)
 
 
 class CancelOrderUseCase:
@@ -19,10 +19,14 @@ class CancelOrderUseCase:
         if not order:
             raise OrderNotFound(f"Order {command.order_id} not found")
 
-        if order.status not in _CANCELLABLE_STATES:
+        # Idempotent retry: an already-cancelled order is a successful no-op.
+        if order.status is OrderState.CANCELLED:
+            return CancelOrderResponse(order_id=order.id, status=order.status.value)
+
+        if not is_cancellable(order.status):
             raise OrderNotModifiableError(
                 f"Cannot cancel an order in state {order.status.value}. "
-                f"Cancellable states: {[s.value for s in _CANCELLABLE_STATES]}"
+                f"Cancellable states: {sorted(s.value for s in CANCELLABLE_STATES)}"
             )
 
         order.status = OrderState.CANCELLED

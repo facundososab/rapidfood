@@ -20,7 +20,7 @@ from modules.order.domain.errors.order_errors import (
 )
 
 
-def _validate_removed_ingredients(
+def validate_removed_ingredients(
     removed_ingredient_ids: List[str],
     context: VariantContext,
     line_id: str,
@@ -56,7 +56,7 @@ def _validate_removed_ingredients(
     return result
 
 
-def _validate_modifiers(
+def validate_modifiers(
     modifier_option_ids: List[str],
     context: VariantContext,
     line_id: str,
@@ -134,10 +134,10 @@ class AddLineUseCase(AddLinePort):
 
         line_id = str(uuid.uuid4())
 
-        removed_ingredients = _validate_removed_ingredients(
+        removed_ingredients = validate_removed_ingredients(
             command.removed_ingredient_ids, context, line_id
         )
-        modifiers = _validate_modifiers(
+        modifiers = validate_modifiers(
             command.modifier_option_ids, context, line_id
         )
 

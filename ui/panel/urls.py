@@ -84,6 +84,10 @@ urlpatterns = [
     # Conversations
     path("conversaciones/", conversations.index, name="conversations"),
     path("conversaciones/<str:conversation_id>/", conversations.detail, name="conversation_detail"),
+    path("conversaciones/<str:conversation_id>/cliente/", conversations.client_message, name="conversation_client_message"),
+    path("conversaciones/<str:conversation_id>/humano/", conversations.operator_message, name="conversation_operator_message"),
+    path("conversaciones/<str:conversation_id>/tomar/", conversations.takeover, name="conversation_takeover"),
+    path("conversaciones/<str:conversation_id>/devolver/", conversations.release, name="conversation_release"),
 
     # Configuration
     path("configuracion/", configuration.index, name="configuration"),

@@ -1,6 +1,6 @@
 import hashlib
 import hmac
-from typing import Optional
+from typing import Iterator, Optional
 
 
 def validate_mercadopago_signature(
@@ -10,6 +10,20 @@ def validate_mercadopago_signature(
     x_signature: str,
     secret: Optional[str],
 ) -> bool:
+    """Validate the ``x-signature`` header of a Mercado Pago notification.
+
+    The signed manifest is::
+
+        id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+
+    and the expected value is ``HMAC-SHA256(secret, manifest)`` in hex, compared
+    against the ``v1`` part of the header.
+
+    Mercado Pago's casing of ``data.id`` and the presence of ``x-request-id``
+    have varied across topics/versions, so every documented variant is accepted.
+    All variants still require a valid HMAC with the secret, so this does not
+    weaken the check — it only avoids rejecting a legitimate notification.
+    """
     if not secret:
         return True
     parts = _parse_signature(x_signature)
@@ -17,15 +31,38 @@ def validate_mercadopago_signature(
     received = parts.get("v1")
     if not timestamp or not received:
         return False
-    manifest_parts = []
-    if data_id:
-        manifest_parts.append(f"id:{data_id.lower()}")
-    if x_request_id:
-        manifest_parts.append(f"request-id:{x_request_id}")
-    manifest_parts.append(f"ts:{timestamp}")
-    manifest = ";".join(manifest_parts) + ";"
-    expected = hmac.new(secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, received)
+    for manifest in candidate_manifests(
+        data_id=data_id, x_request_id=x_request_id, timestamp=timestamp
+    ):
+        expected = hmac.new(
+            secret.encode(), manifest.encode(), hashlib.sha256
+        ).hexdigest()
+        if hmac.compare_digest(expected, received):
+            return True
+    return False
+
+
+def candidate_manifests(
+    *, data_id: str, x_request_id: str, timestamp: str
+) -> list[str]:
+    """Manifest variants tried, in order (never includes the secret)."""
+    return list(_candidate_manifests(data_id, x_request_id, timestamp))
+
+
+def _candidate_manifests(
+    data_id: str, x_request_id: str, timestamp: str
+) -> Iterator[str]:
+    ids = [data_id.lower()]
+    if data_id and data_id.lower() != data_id:
+        ids.append(data_id)
+    for candidate in ids:
+        # Mercado Pago omits the ``id`` pair when there is no data.id (matching
+        # the official SDK manifest builder); every other pair keeps the order.
+        parts = [f"id:{candidate}"] if candidate else []
+        if x_request_id:
+            parts.append(f"request-id:{x_request_id}")
+        parts.append(f"ts:{timestamp}")
+        yield ";".join(parts) + ";"
 
 
 def _parse_signature(signature: str) -> dict:
