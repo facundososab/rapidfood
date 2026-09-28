@@ -191,27 +191,49 @@ def test_middleware_flushes_session_when_refresh_is_rejected(monkeypatch):
 
     response = client.get(DASHBOARD_URL)
 
-    # The request still completes; the session is dropped so the login gate
-    # redirects on the next request instead of the page crashing.
-    assert response.status_code == 200
+    # The refresh token is dead: the middleware drops the session and answers
+    # immediately with the login redirect (no crashing page, no stale API call).
+    assert response.status_code == 302
+    assert response.url == "/login/"
     assert "supabase_access_token" not in client.session
     assert "supabase_refresh_token" not in client.session
 
-    follow_up = client.get(DASHBOARD_URL)
-    assert follow_up.status_code == 302
-    assert follow_up.url == "/login/"
 
-
-def test_middleware_leaves_session_when_no_refresh_token(monkeypatch):
+def test_middleware_redirects_to_login_when_token_expired_without_refresh(monkeypatch):
     seen = _recording_refresh(monkeypatch)
     token = _jwt(time.time() - 10)
-    client = _authenticated_client(token)  # no refresh token storable
+    client = _authenticated_client(token)  # pre-refresh session: no refresh token
 
     response = client.get(DASHBOARD_URL)
 
-    assert response.status_code == 200
+    # A stale pre-refresh session is unusable: drop it and send the user to the
+    # login form instead of crashing the dashboard with "Token expired.".
+    assert response.status_code == 302
+    assert response.url == "/login/"
     assert seen == []
-    assert client.session["supabase_access_token"] == token
+    assert "supabase_access_token" not in client.session
+
+
+def test_login_view_shows_form_for_stale_pre_refresh_session():
+    # Session created before the refresh-token fix: expired token, no refresh.
+    # The middleware clears it and answers with the login redirect, so the user
+    # lands on the login form (the dashboard never crashes).
+    client = _authenticated_client(_jwt(time.time() - 30))
+
+    response = client.get("/login/")
+
+    assert response.status_code == 302
+    assert response.url == "/login/"
+    assert "supabase_access_token" not in client.session
+
+
+def test_login_view_redirects_to_dashboard_when_token_valid_without_refresh():
+    client = _authenticated_client(_jwt(time.time() + 3600))  # still valid
+
+    response = client.get("/login/")
+
+    assert response.status_code == 302
+    assert response.url == "/"
 
 
 def test_middleware_ignores_anonymous_requests(monkeypatch):

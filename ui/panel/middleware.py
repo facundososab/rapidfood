@@ -82,32 +82,46 @@ class ApiSessionTokenMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        token = self._renew_expired_access_token(request)
-        if token is None:
-            token = request.session.get("supabase_access_token")
+        state = self._renew_expired_access_token(request)
+        if state == "stale":
+            # Token vencido y sin forma de renovarlo: la sesión no sirve.
+            request.session.flush()
+            return redirect("login")
+        token = request.session.get("supabase_access_token")
         self._apply_token(token)
         return self.get_response(request)
 
     def _renew_expired_access_token(self, request) -> str | None:
         """Renew the session's access token when needed; never raises.
 
-        Returns the fresh access token when a renewal happened, or ``None`` when
-        there was nothing to do (anonymous, still valid, no refresh token) or
-        the session was dropped.
+        Returns ``"stale"`` when the access token is expired and cannot be
+        renewed (no refresh token, or GoTrue rejects it) so the caller can
+        drop the session and send the user to login; otherwise the fresh access
+        token when a renewal happened, or ``None`` when nothing was done
+        (anonymous, still valid, transient failure).
         """
         access_token = request.session.get("supabase_access_token")
         if not access_token:
             return None  # anonymous request: nothing to renew
 
         expiry = get_token_expiry(access_token)
-        if expiry is not None and expiry - time.time() > REFRESH_MARGIN_SECONDS:
+        refresh_token = request.session.get("supabase_refresh_token")
+        expired = expiry is not None and expiry <= time.time()
+        near_expiry = (
+            expiry is not None and 0 < expiry - time.time() <= REFRESH_MARGIN_SECONDS
+        )
+        unknown = expiry is None
+
+        if not expired and not near_expiry and not unknown:
             return None  # still comfortably valid
 
-        # Expired, near expiry, or an undecodable token: try to renew.
-        refresh_token = request.session.get("supabase_refresh_token")
         if not refresh_token:
-            # No way to renew: leave the session untouched and let the API reject
-            # the stale token (the error-toast middleware surfaces it).
+            if expired:
+                # Sesión de la era previa al refresh (o token ya muerto): no hay
+                # nada que renovar; el login gate debe tomar ahora.
+                return "stale"
+            # Near expiry / undecodable but not yet expired: the token still
+            # works for a while; let it pass (no way to renew without a token).
             return None
 
         try:
@@ -115,8 +129,7 @@ class ApiSessionTokenMiddleware:
         except AuthError:
             # Refresh token expired/revoked: drop the session so the login gate
             # redirects on the next request instead of crashing the page.
-            request.session.flush()
-            return None
+            return "stale"
         except requests.RequestException:
             # Transient network/timeout failure: keep the session and let the
             # API surface the stale token rather than raising a 500 here.
