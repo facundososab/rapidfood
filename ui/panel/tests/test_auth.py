@@ -2,6 +2,9 @@
 
 Run with the UI settings: DJANGO_SETTINGS_MODULE=ui.config.settings
 """
+import base64
+import json
+
 import pytest
 from django.test import Client
 
@@ -10,13 +13,33 @@ from panel import auth as panel_auth
 PASSWORD_PAYLOAD = {"email": "admin@rapidfood.local", "password": "secret123"}
 
 
+def _b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _jwt_with_exp(exp: int) -> str:
+    """Build an unsigned JWT-shaped token with the given ``exp`` claim.
+
+    The panel base64url-decodes the payload without a signature check, so a
+    realistic token is enough here. A far-future ``exp`` keeps the token-refresh
+    middleware from attempting a renewal in these login-flow tests.
+    """
+    header = _b64url(b'{"alg":"none","typ":"JWT"}')
+    payload = _b64url(json.dumps({"exp": exp}).encode("utf-8"))
+    return f"{header}.{payload}.signature"
+
+
+ACCESS_TOKEN = _jwt_with_exp(9999999999)
+
+
 @pytest.fixture()
 def mock_login(monkeypatch):
     from panel.views import auth as auth_views
 
-    def _fake(token="signed-token", email="admin@rapidfood.local", profile=None):
+    def _fake(token=ACCESS_TOKEN, email="admin@rapidfood.local",
+              refresh_token="refresh-token", profile=None):
         def login(*args, **kwargs):
-            return token, email
+            return token, email, refresh_token
 
         monkeypatch.setattr(auth_views, "login_with_password", login)
         monkeypatch.setattr(auth_views, "fetch_staff_profile", lambda t: profile)
@@ -52,7 +75,8 @@ def test_login_post_stores_token_and_redirects(mock_login):
     assert response.status_code == 302
     assert response.url == "/"
     session = client.session
-    assert session["supabase_access_token"] == "signed-token"
+    assert session["supabase_access_token"] == ACCESS_TOKEN
+    assert session["supabase_refresh_token"] == "refresh-token"
     assert session["supabase_email"] == "admin@rapidfood.local"
     assert session["supabase_staff"]["role"] == "ADMIN"
 

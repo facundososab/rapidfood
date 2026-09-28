@@ -25,7 +25,7 @@ class LoginView(View):
             )
 
         try:
-            token, user_email = login_with_password(email, password)
+            token, user_email, refresh_token = login_with_password(email, password)
         except AuthError:
             return render(
                 request,
@@ -35,6 +35,9 @@ class LoginView(View):
 
         request.session["supabase_access_token"] = token
         request.session["supabase_email"] = user_email
+        # Kept so the middleware can renew the access token before it expires.
+        if refresh_token:
+            request.session["supabase_refresh_token"] = refresh_token
 
         # Best-effort: enrich the session with the staff profile from the API.
         profile = fetch_staff_profile(token)
