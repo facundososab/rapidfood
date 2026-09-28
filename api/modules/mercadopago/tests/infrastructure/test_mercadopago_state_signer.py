@@ -3,6 +3,9 @@ import json
 import pytest
 from django.core.signing import Signer
 
+from modules.mercadopago.application.ports.driven.mercadopago_state_signer import (
+    SignedState,
+)
 from modules.mercadopago.domain.errors.mercadopago_errors import MercadoPagoStateError
 from modules.mercadopago.infrastructure.adapters.driven.mercadopago.mercadopago_state_signer import (
     STATE_SALT,
@@ -11,6 +14,7 @@ from modules.mercadopago.infrastructure.adapters.driven.mercadopago.mercadopago_
 
 SECRET = "unit-test-django-secret"
 BUSINESS_CONFIG_ID = "11111111-1111-1111-1111-111111111111"
+CODE_VERIFIER = "pkce-verifier"
 ISSUED_AT = 1_700_000_000.0
 
 
@@ -28,18 +32,45 @@ def test_signs_and_unsigns_the_business_config_id():
     state = signer.sign(BUSINESS_CONFIG_ID)
 
     assert state != BUSINESS_CONFIG_ID
-    assert make_signer().unsign(state) == BUSINESS_CONFIG_ID
+    assert make_signer().unsign(state) == SignedState(
+        business_config_id=BUSINESS_CONFIG_ID,
+        code_verifier=None,
+    )
 
 
-def test_signed_payload_carries_the_business_id_and_timestamp():
+def test_roundtrips_the_pkce_code_verifier():
+    signer = make_signer()
+
+    state = signer.sign(BUSINESS_CONFIG_ID, code_verifier=CODE_VERIFIER)
+
+    signed = make_signer().unsign(state)
+
+    assert signed.business_config_id == BUSINESS_CONFIG_ID
+    assert signed.code_verifier == CODE_VERIFIER
+
+
+def test_signed_payload_carries_the_business_id_timestamp_and_verifier():
+    signer = make_signer(clock=lambda: ISSUED_AT)
+
+    payload = json.loads(
+        Signer(key=SECRET, salt=STATE_SALT).unsign(
+            signer.sign(BUSINESS_CONFIG_ID, code_verifier=CODE_VERIFIER)
+        )
+    )
+
+    assert payload["business_config_id"] == BUSINESS_CONFIG_ID
+    assert payload["ts"] == int(ISSUED_AT)
+    assert payload["code_verifier"] == CODE_VERIFIER
+
+
+def test_signed_payload_without_a_verifier_stores_none():
     signer = make_signer(clock=lambda: ISSUED_AT)
 
     payload = json.loads(
         Signer(key=SECRET, salt=STATE_SALT).unsign(signer.sign(BUSINESS_CONFIG_ID))
     )
 
-    assert payload["business_config_id"] == BUSINESS_CONFIG_ID
-    assert payload["ts"] == int(ISSUED_AT)
+    assert payload["code_verifier"] is None
 
 
 @pytest.mark.parametrize(
@@ -73,11 +104,14 @@ def test_rejects_a_state_with_a_tampered_payload():
 def test_accepts_a_state_inside_the_tolerance_window():
     now = {"value": ISSUED_AT}
     signer = make_signer(clock=lambda: now["value"], max_age_seconds=600)
-    state = signer.sign(BUSINESS_CONFIG_ID)
+    state = signer.sign(BUSINESS_CONFIG_ID, code_verifier=CODE_VERIFIER)
 
     now["value"] = ISSUED_AT + 599
 
-    assert signer.unsign(state) == BUSINESS_CONFIG_ID
+    assert signer.unsign(state) == SignedState(
+        business_config_id=BUSINESS_CONFIG_ID,
+        code_verifier=CODE_VERIFIER,
+    )
 
 
 def test_rejects_an_expired_state():

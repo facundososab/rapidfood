@@ -12,6 +12,9 @@ import time
 from modules.mercadopago.application.ports.driven.mercadopago_oauth_client import (
     OAuthTokenResult,
 )
+from modules.mercadopago.application.ports.driven.mercadopago_state_signer import (
+    SignedState,
+)
 from modules.mercadopago.domain.errors.mercadopago_errors import (
     MercadoPagoStateError,
 )
@@ -62,6 +65,9 @@ class FakeMercadoPagoCredentialRepository:
 class FakeMercadoPagoOAuthClient:
     """Records the OAuth calls and returns a configured token result."""
 
+    PKCE_VERIFIER = "v"
+    PKCE_CHALLENGE = "ch"
+
     def __init__(
         self,
         tokens: OAuthTokenResult | None = None,
@@ -72,16 +78,32 @@ class FakeMercadoPagoOAuthClient:
         self.authorize_error = authorize_error
         self.exchange_error = exchange_error
         self.received_states: list[str] = []
+        self.received_challenges: list[str | None] = []
+        self.received_code_verifiers: list[str | None] = []
         self.exchanged: list[tuple[str, str | None]] = []
 
-    def build_authorization_url(self, state: str) -> str:
+    def generate_pkce_pair(self) -> tuple[str, str]:
+        return (self.PKCE_VERIFIER, self.PKCE_CHALLENGE)
+
+    def build_authorization_url(
+        self,
+        state: str,
+        code_challenge: str | None = None,
+    ) -> str:
         if self.authorize_error is not None:
             raise self.authorize_error
         self.received_states.append(state)
+        self.received_challenges.append(code_challenge)
         return f"{AUTHORIZATION_BASE_URL}?state={state}"
 
-    def exchange_code(self, code: str, redirect_uri: str | None = None) -> OAuthTokenResult:
+    def exchange_code(
+        self,
+        code: str,
+        redirect_uri: str | None = None,
+        code_verifier: str | None = None,
+    ) -> OAuthTokenResult:
         self.exchanged.append((code, redirect_uri))
+        self.received_code_verifiers.append(code_verifier)
         if self.exchange_error is not None:
             raise self.exchange_error
         return self.tokens
@@ -93,23 +115,28 @@ class FakeStateSigner:
     def __init__(self, max_age_seconds: int = 600) -> None:
         self._max_age_seconds = max_age_seconds
         self._now = time.time()
-        self._issued: dict[str, tuple[str, float]] = {}
+        self._issued: dict[str, tuple[str, str | None, float]] = {}
         self.signed_business_ids: list[str] = []
+        self.signed_code_verifiers: list[str | None] = []
 
-    def sign(self, business_config_id: str) -> str:
+    def sign(self, business_config_id: str, code_verifier: str | None = None) -> str:
         token = f"signed:{business_config_id}:{int(self._now)}"
-        self._issued[token] = (business_config_id, self._now)
+        self._issued[token] = (business_config_id, code_verifier, self._now)
         self.signed_business_ids.append(business_config_id)
+        self.signed_code_verifiers.append(code_verifier)
         return token
 
-    def unsign(self, state: str) -> str:
+    def unsign(self, state: str) -> SignedState:
         entry = self._issued.get(state)
         if entry is None:
             raise MercadoPagoStateError("Mercado Pago OAuth state is invalid")
-        business_config_id, issued_at = entry
+        business_config_id, code_verifier, issued_at = entry
         if self._now - issued_at > self._max_age_seconds:
             raise MercadoPagoStateError("Mercado Pago OAuth state has expired")
-        return business_config_id
+        return SignedState(
+            business_config_id=business_config_id,
+            code_verifier=code_verifier,
+        )
 
     def advance(self, seconds: float) -> None:
         """Move the fake clock forward, aging every signed state."""

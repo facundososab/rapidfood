@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -10,6 +12,9 @@ from modules.mercadopago.application.ports.driver.get_link_status_port import (
 from modules.mercadopago.application.ports.driver.link_mercadopago_account_port import (
     LinkMercadoPagoAccountResult,
 )
+from modules.mercadopago.application.use_cases.build_authorization_url_use_case import (
+    BuildAuthorizationUrlUseCase,
+)
 from modules.mercadopago.domain.errors.mercadopago_errors import (
     MercadoPagoConfigurationError,
     MercadoPagoOAuthError,
@@ -17,13 +22,19 @@ from modules.mercadopago.domain.errors.mercadopago_errors import (
 )
 from modules.mercadopago.infrastructure.adapters.driver.rest import views
 from modules.mercadopago.infrastructure.adapters.driven.mercadopago.mercadopago_oauth_client import (
+    MercadoPagoOAuthClient,
     MercadoPagoOAuthSettings,
+    generate_pkce_challenge,
+)
+from modules.mercadopago.infrastructure.adapters.driven.mercadopago.mercadopago_state_signer import (
+    DjangoStateSigner,
 )
 from modules.mercadopago.tests.use_cases.fakes import BUSINESS_CONFIG_ID
 from shared.infrastructure.auth.supabase_jwt import SupabasePrincipal
 
 AUTHORIZATION_URL = "https://auth.mercadopago.com/authorization?state=signed-state"
 PANEL_RETURN_URI = "https://panel.example/configuracion/pagos/"
+CALLBACK_URI = "https://panel.example/api/mercadopago/callback/"
 
 
 class FakeUseCase:
@@ -79,13 +90,56 @@ class FakeContainer:
         self.unlink_account = FakeUseCase(result=None)
 
 
-def patch_container(monkeypatch, container: FakeContainer) -> None:
+class RealAuthorizeContainer:
+    """Wires the real authorize use case so the URL comes from production code."""
+
+    def __init__(self, settings: MercadoPagoOAuthSettings) -> None:
+        self.settings = settings
+        self.build_authorization_url = BuildAuthorizationUrlUseCase(
+            MercadoPagoOAuthClient(settings),
+            DjangoStateSigner(),
+        )
+
+
+def patch_container(
+    monkeypatch,
+    container: FakeContainer | RealAuthorizeContainer,
+) -> None:
     monkeypatch.setattr(views, "get_app_mercadopago_container", lambda: container)
 
 
 def authenticated(request):
     force_authenticate(request, user=SupabasePrincipal(id="auth-user-1"))
     return request
+
+
+def test_authorize_builds_a_pkce_url_without_a_client_secret(monkeypatch):
+    # The production credentials have client_id and an empty client_secret: the
+    # panel's "Vincular" button must still produce a PKCE authorization URL.
+    settings = MercadoPagoOAuthSettings(
+        client_id="1234",
+        client_secret="",
+        redirect_uri=CALLBACK_URI,
+    )
+    container = RealAuthorizeContainer(settings)
+    patch_container(monkeypatch, container)
+    request = APIRequestFactory().post(
+        "/api/mercadopago/authorize/",
+        {"business_config_id": BUSINESS_CONFIG_ID},
+        format="json",
+    )
+
+    response = views.MercadoPagoAuthorizeView.as_view()(authenticated(request))
+
+    assert response.status_code == status.HTTP_200_OK
+    query = parse_qs(urlparse(response.data["authorization_url"]).query)
+    assert query["client_id"] == ["1234"]
+    assert query["redirect_uri"] == [CALLBACK_URI]
+    assert query["code_challenge_method"] == ["S256"]
+    # The verifier sealed in the signed state is the one behind the challenge.
+    signed = DjangoStateSigner().unsign(query["state"][0])
+    assert signed.business_config_id == BUSINESS_CONFIG_ID
+    assert generate_pkce_challenge(signed.code_verifier) == query["code_challenge"][0]
 
 
 def test_authorize_returns_the_authorization_url(monkeypatch):

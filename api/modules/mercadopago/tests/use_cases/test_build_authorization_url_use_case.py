@@ -33,6 +33,17 @@ def test_builds_authorization_url_from_the_signed_state():
     )
 
 
+def test_seals_the_pkce_verifier_and_sends_the_matching_challenge():
+    oauth_client = FakeMercadoPagoOAuthClient()
+    state_signer = FakeStateSigner()
+    use_case = BuildAuthorizationUrlUseCase(oauth_client, state_signer)
+
+    use_case.execute(BuildAuthorizationUrlCommand(business_config_id=BUSINESS_CONFIG_ID))
+
+    assert state_signer.signed_code_verifiers == [oauth_client.PKCE_VERIFIER]
+    assert oauth_client.received_challenges == [oauth_client.PKCE_CHALLENGE]
+
+
 def test_propagates_missing_oauth_configuration():
     oauth_client = FakeMercadoPagoOAuthClient(
         authorize_error=MercadoPagoConfigurationError(

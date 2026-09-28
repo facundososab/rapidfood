@@ -56,6 +56,7 @@ def test_links_the_account_and_persists_the_exchanged_tokens():
     )
 
     assert oauth_client.exchanged == [("auth-code", None)]
+    assert oauth_client.received_code_verifiers == [None]
     assert len(repository.upserted) == 1
     persisted = repository.get_by_business(BUSINESS_CONFIG_ID)
     assert persisted is not None
@@ -104,6 +105,19 @@ def test_relinking_replaces_the_stored_credentials():
     assert persisted is not None
     assert persisted.access_token == "APP_USR-new"
     assert persisted.live_mode is False
+
+
+def test_exchanges_the_code_with_the_verifier_sealed_in_the_state():
+    use_case, _, oauth_client, state_signer = _use_case()
+    state = state_signer.sign(BUSINESS_CONFIG_ID, code_verifier="pkce-verifier")
+
+    result = use_case.execute(
+        LinkMercadoPagoAccountCommand(code="auth-code", state=state)
+    )
+
+    assert oauth_client.exchanged == [("auth-code", None)]
+    assert oauth_client.received_code_verifiers == ["pkce-verifier"]
+    assert result.business_config_id == BUSINESS_CONFIG_ID
 
 
 def test_rejects_a_tampered_state_before_talking_to_mercadopago():
