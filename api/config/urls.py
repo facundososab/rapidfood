@@ -16,4 +16,5 @@ urlpatterns = [
     path("api/coupons/", include("modules.config_coupon.infrastructure.adapters.driver.rest.urls")),
     path("api/delivery/", include("modules.delivery.infrastructure.adapters.driver.rest.urls")),
     path("api/business/", include("modules.business.infrastructure.adapters.driver.rest.urls")),
+    path("api/staff/", include("modules.staff.infrastructure.adapters.driver.rest.urls")),
 ]

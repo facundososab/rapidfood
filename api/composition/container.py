@@ -61,6 +61,7 @@ from modules.order.infrastructure.adapters.driven.coupon.coupon_query_adapter im
 from modules.order.infrastructure.adapters.driven.delivery.delivery_quote_adapter import (
     DeliveryQuoteAdapter,
 )
+from modules.staff.configuration.container import get_staff_container
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,12 @@ def get_app_client_container() -> ClientContainer:
 @lru_cache(maxsize=1)
 def get_app_business_container() -> BusinessContainer:
     return get_business_container()
+
+
+@lru_cache(maxsize=1)
+def get_app_staff_container() -> "StaffContainer":
+    """Exposes the staff wiring root so its views stay out of modules.*."""
+    return get_staff_container()
 
 
 @lru_cache(maxsize=1)

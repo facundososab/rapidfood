@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -38,6 +39,10 @@ class ConversationWebhookView(APIView):
     keeps working with the same persistence so nothing regresses meanwhile.
     """
 
+    # Public: the WhatsApp/AI agent bridge (customer-facing) calls this
+    # endpoint without staff JWTs.
+    permission_classes = [AllowAny]
+
     def post(self, request):
         container = get_app_conversation_container()
         serializer = WebhookSerializer(data=request.data)
@@ -62,6 +67,9 @@ class ConversationWebhookView(APIView):
 
 
 class ConversationMessagesView(APIView):
+    # Public: read-side of the customer-facing conversation bridge.
+    permission_classes = [AllowAny]
+
     def get(self, request, conversation_id: str):
         container = get_app_conversation_container()
         try:
@@ -191,6 +199,10 @@ class AgentMessageView(APIView):
     The driver resolves identity: conversation from the thread, business from the
     request/config. The model never supplies them.
     """
+
+    # Public: the WhatsApp bot bridge (customer-facing) calls this endpoint
+    # without a staff JWT.
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = AgentMessageSerializer(data=request.data)

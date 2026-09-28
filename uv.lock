@@ -1623,6 +1623,7 @@ name = "rapidfood"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "django" },
     { name = "djangorestframework" },
     { name = "langchain" },
@@ -1635,6 +1636,7 @@ dependencies = [
     { name = "openrouteservice" },
     { name = "prisma" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pyjwt" },
     { name = "requests" },
     { name = "shapely" },
 ]
@@ -1649,6 +1651,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "django", specifier = ">=5.0" },
     { name = "djangorestframework", specifier = ">=3.15" },
     { name = "langchain", specifier = ">=1.4.1" },
@@ -1661,6 +1664,7 @@ requires-dist = [
     { name = "openrouteservice", specifier = ">=2.3" },
     { name = "prisma", specifier = ">=0.15" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "pyjwt", specifier = ">=2.8" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "shapely", specifier = ">=2.0" },
 ]

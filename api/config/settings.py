@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     "modules.catalog",
     "modules.config_coupon",
     "modules.delivery",
+    "modules.business",
+    "modules.staff",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -78,9 +80,14 @@ STATIC_URL = "static/"
 MIDDLEWARE: list[str] = []
 
 REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
-    # No sessions → CSRF not enforced; token auth later if needed (design).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # Staff-only by default: every view requires a valid Supabase JWT unless it
+    # opts out with AllowAny (public: health probe, MP webhook, payment links,
+    # conversation/bot endpoints).
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "shared.infrastructure.auth.supabase_jwt.SupabaseJWTAuthentication"
+    ],
+    # No sessions → CSRF not enforced; JWT auth only.
     "UNAUTHENTICATED_USER": None,
 }
 
