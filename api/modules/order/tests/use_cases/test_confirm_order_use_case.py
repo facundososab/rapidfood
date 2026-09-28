@@ -1,6 +1,6 @@
 import pytest
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import Mock
 from modules.order.application.use_cases.confirm_order_use_case import ConfirmOrderUseCase
 from modules.order.application.ports.driver.confirm_order_ports import ConfirmOrderCommand
@@ -11,10 +11,13 @@ from modules.order.application.ports.driven.business_config_query import Busines
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_line import OrderLine
 from modules.order.domain.models.order_line_modifier import OrderLineModifier
+from modules.order.domain.models.order_origin import OrderOrigin
 from modules.order.domain.models.order_state import OrderState
+from modules.order.domain.models.payment_method import PaymentMethod
 from modules.order.domain.errors.order_errors import (
     ModifierValidationError,
     OrderClientRequiredError,
+    PaymentTypeRequiredError,
 )
 
 
@@ -25,6 +28,7 @@ def make_order_with_line(modifier_option_ids=None, client_name="Cliente Test"):
         subtotal=Decimal("0"),
         discount=Decimal("0"),
         client_name=client_name,  # orders must be attributable to a client
+        payment_type=PaymentMethod.ONLINE,  # RN-004: payment method is required
     )
     modifiers = []
     if modifier_option_ids:
@@ -88,6 +92,30 @@ def test_confirm_requires_a_client():
         uc.execute(ConfirmOrderCommand(order_id="o-1"))
 
 
+def test_confirm_requires_a_payment_type():
+    """RN-004/RN-023: confirming without a payment method must be rejected.
+
+    Otherwise an agent order lands in PENDING with a NULL payment type, a state
+    modification_readiness treats as closed (forcing a new order to pay).
+    """
+    order = make_order_with_line()
+    order.payment_type = None
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("12500")),
+    )
+    with pytest.raises(PaymentTypeRequiredError):
+        uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+    # The order stays a DRAFT: it is not closed, just not confirmable yet.
+    assert order.status is OrderState.DRAFT
+    mock_repo.save.assert_not_called()
+
+
 def test_confirm_freezes_prices():
     """
     Variant price at confirmation time (12500) replaces the draft price (11000).
@@ -147,7 +175,8 @@ def test_confirm_freezes_modifier_snapshot():
     assert order.lines[0].subtotal == Decimal("25000")
 
 
-def test_confirm_sets_confirmed_at():
+def test_confirm_sets_confirmed_at_and_confirms_a_manual_order():
+    """A manual (in place) order is settled by the operator: it confirms to CONFIRMED."""
     order = make_order_with_line()
     mock_repo = Mock()
     mock_repo.get_by_id.return_value = order
@@ -160,4 +189,59 @@ def test_confirm_sets_confirmed_at():
     uc.execute(ConfirmOrderCommand(order_id="o-1"))
 
     assert order.confirmed_at is not None
+    assert order.status.value == "CONFIRMED"
+
+
+def test_confirm_keeps_an_agent_order_pending():
+    """An agent order awaits settlement: it confirms to PENDING."""
+    order = make_order_with_line()
+    order.origin = OrderOrigin.AGENT
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("10000")),
+    )
+    uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
     assert order.status.value == "PENDING"
+
+
+def test_confirm_retry_on_an_already_confirmed_order_is_idempotent():
+    order = make_order_with_line()
+    order.status = OrderState.PENDING
+    order.confirmed_at = datetime(2026, 9, 17, tzinfo=timezone.utc)
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("10000")),
+    )
+    response = uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+    assert response.status == "PENDING"
+    assert response.confirmed_at is not None
+    # No re-freeze / no state change on the retry.
+    mock_repo.save.assert_not_called()
+
+
+def test_confirm_rejects_a_cancelled_order():
+    from modules.order.domain.errors.order_errors import OrderNotModifiableError
+
+    order = make_order_with_line()
+    order.status = OrderState.CANCELLED
+    order.confirmed_at = datetime(2026, 9, 17, tzinfo=timezone.utc)
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("10000")),
+    )
+    with pytest.raises(OrderNotModifiableError):
+        uc.execute(ConfirmOrderCommand(order_id="o-1"))

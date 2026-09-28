@@ -41,12 +41,20 @@ class PrismaProductRepository(ProductRepositoryPort):
             self,
             category_id: str | None = None,
             state: ProductState | None = None,
+            search: str | None = None,
     ) -> list[Product]:
         where: dict = {}
         if category_id is not None:
             where["categoryId"] = category_id
         if state is not None:
             where["available"] = state == ProductState.AVAILABLE
+        if search:
+            needle = search.strip()
+            if needle:
+                where["OR"] = [
+                    {"name": {"contains": needle, "mode": "insensitive"}},
+                    {"description": {"contains": needle, "mode": "insensitive"}},
+                ]
 
         records = db.client.product.find_many(where=where)
         return [self._to_domain(record) for record in records]

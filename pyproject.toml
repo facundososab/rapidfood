@@ -15,11 +15,18 @@ dependencies = [
     "mercadopago>=3.5.0",
     "PyJWT>=2.8",
     "cryptography>=42",
+    "langgraph>=1.2.11",
+    "langchain-core>=1.6.3",
+    "langsmith>=0.12.6",
+    "langchain>=1.4.1",
+    "langchain-groq>=1.1.3",
+    "langchain-google-genai>=4.4.0",
 ]
 
 [dependency-groups]
 dev = [
     "import-linter>=2.0",
+    "langgraph-cli[inmem]>=0.4.31",
     "pytest>=8.0",
     "pytest-django>=4.8",
 ]
@@ -76,7 +83,18 @@ source_modules = [
   "modules.*.application.ports",
   "modules.*.application.use_cases",
 ]
-forbidden_modules = ["django", "rest_framework", "prisma", "mercadopago"]
+forbidden_modules = [
+  "django",
+  "rest_framework",
+  "prisma",
+  "mercadopago",
+  # Agent frameworks MUST stay in infrastructure (driver adapter only).
+  "langchain",
+  "langchain_core",
+  "langchain_groq",
+  "langgraph",
+  "langsmith",
+]
 as_packages = true
 
 # --- One per app; forbids ONLY the 4 sibling apps (no self-import false positives) ---
@@ -86,14 +104,25 @@ as_packages = true
 name = "conversation consumes siblings only via application.ports"
 type = "forbidden"
 source_modules = ["modules.conversation"]
-forbidden_modules = ["modules.order", "modules.client", "modules.catalog", "modules.config_coupon"]
+forbidden_modules = [
+  "modules.order",
+  "modules.client",
+  "modules.catalog",
+  "modules.config_coupon",
+  "modules.delivery",
+  "modules.business",
+]
 as_packages = true
 unmatched_ignore_imports_alerting = "warn"
 ignore_imports = [
-  "modules.conversation.** -> modules.order.application.ports.**",
-  "modules.conversation.** -> modules.client.application.ports.**",
-  "modules.conversation.** -> modules.catalog.application.ports.**",
-  "modules.conversation.** -> modules.config_coupon.application.ports.**",
+  # Only the cross-module adapters may reach a sibling's public ports.
+  # conversation.application MUST depend exclusively on its own ports.
+  "modules.conversation.infrastructure.adapters.** -> modules.order.application.ports.**",
+  "modules.conversation.infrastructure.adapters.** -> modules.client.application.ports.**",
+  "modules.conversation.infrastructure.adapters.** -> modules.catalog.application.ports.**",
+  "modules.conversation.infrastructure.adapters.** -> modules.config_coupon.application.ports.**",
+  "modules.conversation.infrastructure.adapters.** -> modules.delivery.application.ports.**",
+  "modules.conversation.infrastructure.adapters.** -> modules.business.application.ports.**",
 ]
 
 [[tool.importlinter.contracts]]

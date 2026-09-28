@@ -13,7 +13,9 @@ class ListProductsUseCase(ListProductsPort):
         self._products = products
 
     def execute(self, query: ListProductsQuery) -> list[ProductSummary]:
-        products = self._products.list(category_id=query.category_id, state=query.state)
+        products = self._products.list(
+            category_id=query.category_id, state=query.state, search=query.search
+        )
         return [
             ProductSummary(
                 id=p.id, name=p.name, description=p.description, image_url=p.image_url,

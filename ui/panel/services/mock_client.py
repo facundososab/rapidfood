@@ -503,6 +503,43 @@ class MockRapidfoodClient(RapidfoodClient):
     def get_conversation(self, conversation_id: str) -> Optional[dtos.Conversation]:
         return next((c for c in self.db.conversations if c.id == conversation_id), None)
 
+    def _append_mock_message(self, conversation, role, content, author):
+        conversation.messages.append(
+            dtos.Message(
+                id=f"mock-{len(conversation.messages) + 1}",
+                conversationId=conversation.id,
+                role=role,
+                content=content,
+                createdAt=datetime.now(),
+                author=author,
+            )
+        )
+        return conversation
+
+    def send_client_message(self, conversation_id: str, content: str) -> Optional[dtos.Conversation]:
+        conversation = self.get_conversation(conversation_id)
+        if conversation is None:
+            return None
+        self._append_mock_message(conversation, "USER", content, "CLIENT")
+        if not conversation.agentPaused:
+            self._append_mock_message(
+                conversation, "AGENT", "(respuesta simulada del agente)", "AGENT"
+            )
+        return conversation
+
+    def send_operator_message(self, conversation_id: str, content: str) -> Optional[dtos.Conversation]:
+        conversation = self.get_conversation(conversation_id)
+        if conversation is None:
+            return None
+        return self._append_mock_message(conversation, "AGENT", content, "OPERATOR")
+
+    def set_conversation_takeover(self, conversation_id: str, paused: bool) -> Optional[dtos.Conversation]:
+        conversation = self.get_conversation(conversation_id)
+        if conversation is None:
+            return None
+        conversation.agentPaused = paused
+        return conversation
+
     # ---- Business configuration ------------------------------------------
     def get_business_config(self) -> dtos.BusinessConfiguration:
         return self.db.business

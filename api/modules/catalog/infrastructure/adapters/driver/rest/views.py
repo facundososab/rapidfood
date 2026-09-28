@@ -83,7 +83,11 @@ class ProductListCreateView(APIView):
                 else ProductState.UNAVAILABLE
             )
 
-        query = ListProductsQuery(category_id=category_id, state=state)
+        query = ListProductsQuery(
+            category_id=category_id,
+            state=state,
+            search=request.query_params.get("search") or None,
+        )
         container = get_app_catalog_container()
         results = container.list_products.execute(query)
 

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
+from modules.conversation.domain.value_objects import (
+    DetectedIntent,
+    MessageAuthor,
+    MessageRole,
+    MessageStatus,
+    Sentiment,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +27,7 @@ class AddMessageCommand:
     detected_intent: DetectedIntent | None = None
     sentiment: Sentiment | None = None
     status: MessageStatus = MessageStatus.RECEIVED
+    author: MessageAuthor | None = None
 
 
 @dataclass(frozen=True, slots=True)

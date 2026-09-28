@@ -28,7 +28,7 @@ Thumbs.db
 .claude
 .gemini
 .codex
-.github
+.github/skills
 
 #UI
 **/vendor/**
