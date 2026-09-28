@@ -38,6 +38,7 @@ from modules.order.domain.models.order_state import OrderState
 from modules.order.domain.models.payment_attempt import PaymentAttempt
 from modules.order.domain.models.payment_method import PaymentMethod
 from modules.order.domain.models.payment_status import PaymentStatus
+from modules.order.tests.use_cases.fakes import FakePaymentCredentialsQuery
 
 NOW = datetime(2026, 9, 17, tzinfo=timezone.utc)
 
@@ -112,6 +113,7 @@ class FakeProvider:
         self.remote_payment = remote_payment
         self.create_calls = []
         self.cancel_calls = []
+        self.get_payment_tokens = []
 
     def create_checkout(self, request):
         self.create_calls.append(request)
@@ -127,7 +129,8 @@ class FakeProvider:
         self.cancel_calls.append(request)
         return self.cancel_result
 
-    def get_payment(self, external_id):
+    def get_payment(self, external_id, access_token=None):
+        self.get_payment_tokens.append(access_token)
         return self.remote_payment
 
 
@@ -565,3 +568,159 @@ def test_cancel_without_remote_checkout_needs_nothing():
 
     assert result.cancellation_status == CancellationStatus.NOT_REQUIRED.value
     assert provider.cancel_calls == []
+
+
+# --- Per-business Mercado Pago credentials ---------------------------------
+
+
+def _checkout_use_case_with_credentials(order, provider, credentials_query):
+    return CreatePaymentCheckoutUseCase(
+        order_repo=FakeOrderRepo(order),
+        payment_repo=FakeAttemptRepo(),
+        payment_provider=provider,
+        credentials_query=credentials_query,
+    )
+
+
+def test_checkout_uses_the_business_token_resolved_from_credentials():
+    provider = FakeProvider()
+    credentials = FakePaymentCredentialsQuery({"b-1": "APP_USR-business-token"})
+    use_case = _checkout_use_case_with_credentials(make_order(), provider, credentials)
+
+    use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert credentials.requested == ["b-1"]
+    assert provider.create_calls[0].access_token == "APP_USR-business-token"
+
+
+def test_checkout_falls_back_to_the_default_bucket_without_a_business_id():
+    order = make_order()
+    order.business_config_id = None
+    provider = FakeProvider()
+    credentials = FakePaymentCredentialsQuery({"default": "APP_USR-default-token"})
+    use_case = _checkout_use_case_with_credentials(order, provider, credentials)
+
+    use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert credentials.requested == ["default"]
+    assert provider.create_calls[0].access_token == "APP_USR-default-token"
+
+
+def test_checkout_passes_no_token_when_the_business_is_unlinked():
+    provider = FakeProvider()
+    credentials = FakePaymentCredentialsQuery()
+    use_case = _checkout_use_case_with_credentials(make_order(), provider, credentials)
+
+    result = use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert result.created is True
+    assert credentials.requested == ["b-1"]
+    assert provider.create_calls[0].access_token is None
+
+
+def test_checkout_without_a_credentials_query_uses_the_configured_token():
+    provider = FakeProvider()
+    use_case, _, _ = _checkout_use_case(make_order(), provider)
+
+    use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert provider.create_calls[0].access_token is None
+
+
+def test_checkout_survives_a_failing_credentials_lookup():
+    provider = FakeProvider()
+    credentials = FakePaymentCredentialsQuery(error=RuntimeError("linkage down"))
+    use_case = _checkout_use_case_with_credentials(make_order(), provider, credentials)
+
+    result = use_case.execute(CreatePaymentCheckoutCommand(order_id="o-1"))
+
+    assert result.created is True
+    assert provider.create_calls[0].access_token is None
+
+
+def _approved_remote():
+    return ProviderPayment(
+        external_id="MP-1", status=PaymentStatus.APPROVED, amount=Decimal("1000")
+    )
+
+
+def _webhook_use_case_with_credentials(order, attempt, remote, credentials_query=None):
+    attempt_repo = FakeAttemptRepo()
+    attempt_repo.add(attempt)
+    provider = FakeProvider(remote_payment=remote)
+    use_case = HandlePaymentWebhookUseCase(
+        order_repo=FakeOrderRepo(order),
+        payment_repo=attempt_repo,
+        payment_provider=provider,
+        credentials_query=credentials_query,
+    )
+    return use_case, provider
+
+
+def test_webhook_fetches_the_payment_with_the_business_token():
+    credentials = FakePaymentCredentialsQuery({"b-1": "APP_USR-business-token"})
+    use_case, provider = _webhook_use_case_with_credentials(
+        make_order(), _current_attempt(), _approved_remote(), credentials
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True
+    assert credentials.requested == ["b-1"]
+    assert provider.get_payment_tokens == ["APP_USR-business-token"]
+
+
+def test_webhook_passes_no_token_when_the_business_is_unlinked():
+    credentials = FakePaymentCredentialsQuery()
+    use_case, provider = _webhook_use_case_with_credentials(
+        make_order(), _current_attempt(), _approved_remote(), credentials
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True
+    assert credentials.requested == ["b-1"]
+    assert provider.get_payment_tokens == [None]
+
+
+def test_webhook_without_a_credentials_query_fetches_without_a_token():
+    use_case, provider = _webhook_use_case_with_credentials(
+        make_order(), _current_attempt(), _approved_remote()
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True
+    assert provider.get_payment_tokens == [None]
+
+
+def test_webhook_skips_the_credentials_lookup_for_an_unknown_local_attempt():
+    credentials = FakePaymentCredentialsQuery({"b-1": "APP_USR-business-token"})
+    use_case, provider = _webhook_use_case_with_credentials(
+        make_order(), _current_attempt(), _approved_remote(), credentials
+    )
+    command = HandlePaymentWebhookCommand(
+        provider="MERCADOPAGO",
+        data_id="MP-UNSEEN",
+        topic="payment",
+        raw_payload={},
+        headers={},
+    )
+
+    result = use_case.execute(command)
+
+    assert result.applied is True
+    assert credentials.requested == []
+    assert provider.get_payment_tokens == [None]
+
+
+def test_webhook_survives_a_failing_credentials_lookup():
+    credentials = FakePaymentCredentialsQuery(error=RuntimeError("linkage down"))
+    use_case, provider = _webhook_use_case_with_credentials(
+        make_order(), _current_attempt(), _approved_remote(), credentials
+    )
+
+    result = use_case.execute(_webhook_command())
+
+    assert result.applied is True
+    assert provider.get_payment_tokens == [None]

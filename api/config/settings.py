@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "modules.delivery",
     "modules.business",
     "modules.staff",
+    "modules.mercadopago",
 ]
 
 # Placeholder only: lets Django/pytest-django run without owning Postgres.
@@ -90,6 +91,19 @@ REST_FRAMEWORK = {
     # No sessions → CSRF not enforced; JWT auth only.
     "UNAUTHENTICATED_USER": None,
 }
+
+# DRF's browsable API needs Django's template machinery to render its error
+# pages (e.g. rest_framework/api.html) when a request fails in DEBUG mode.
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,  # DRF ships its own templates inside the package
+        "OPTIONS": {
+            "context_processors": [],
+        },
+    },
+]
 
 # Delivery module — OpenRouteService API key (required for geocoding/routing).
 OPENROUTESERVICE_API_KEY: str = os.environ.get("OPENROUTESERVICE_API_KEY", "")

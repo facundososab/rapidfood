@@ -9,6 +9,11 @@ The HTTP transport is injected (``session``), so the adapter is unit-testable
 without credentials. The exact Orders API payload/response fields depend on the
 Mercado Pago account/version, so the response parsing is defensive and MUST be
 validated against live credentials before production use.
+
+The ``Authorization`` header uses the per-business ``access_token`` supplied by
+the caller when present, falling back to ``settings.access_token`` otherwise.
+Because the Orders API is per-account, a multi-tenant deployment MUST pass the
+business token, or every checkout lands on the platform account.
 """
 from __future__ import annotations
 
@@ -79,6 +84,7 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
             _ORDERS_PATH,
             json=payload,
             idempotency_key=request.idempotency_key,
+            access_token=request.access_token,
             expected=(200, 201),
         )
 
@@ -109,9 +115,14 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
         # an idempotent success. A 2xx means WE cancelled it now.
         return CancelCheckoutResult(already_cancelled=status_code in (404, 409))
 
-    def get_payment(self, external_id: str) -> Optional[ProviderPayment]:
+    def get_payment(
+        self, external_id: str, access_token: Optional[str] = None
+    ) -> Optional[ProviderPayment]:
         body, status_code = self._request_raw(
-            "GET", f"{_ORDERS_PATH}/{external_id}", expected=(200, 400, 404)
+            "GET",
+            f"{_ORDERS_PATH}/{external_id}",
+            access_token=access_token,
+            expected=(200, 400, 404),
         )
         if status_code in (400, 404):
             # Mercado Pago answers 404, or 400 `invalid_path_param`, for an id it
@@ -152,21 +163,31 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
             online["auto_return"] = "approved"
         return online
 
-    def _headers(self, idempotency_key: Optional[str]) -> dict:
+    def _headers(
+        self, idempotency_key: Optional[str] = None, access_token: Optional[str] = None
+    ) -> dict:
         headers = {
-            "Authorization": f"Bearer {self.settings.access_token}",
+            "Authorization": f"Bearer {access_token or self.settings.access_token}",
             "Content-Type": "application/json",
         }
         if idempotency_key:
             headers["X-Idempotency-Key"] = idempotency_key
         return headers
 
-    def _send(self, method: str, path: str, *, json, idempotency_key: Optional[str]):
+    def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        json,
+        idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ):
         try:
             return self._session.request(
                 method,
                 f"{self.settings.api_base_url}{path}",
-                headers=self._headers(idempotency_key),
+                headers=self._headers(idempotency_key, access_token=access_token),
                 json=json,
                 timeout=self.settings.request_timeout_seconds,
             )
@@ -180,10 +201,16 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
         *,
         json=None,
         idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
         expected=(200,),
     ) -> dict:
         body, _ = self._request_raw(
-            method, path, json=json, idempotency_key=idempotency_key, expected=expected
+            method,
+            path,
+            json=json,
+            idempotency_key=idempotency_key,
+            access_token=access_token,
+            expected=expected,
         )
         return body
 
@@ -194,9 +221,16 @@ class MercadoPagoPaymentProvider(PaymentProviderPort):
         *,
         json=None,
         idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
         expected=(200,),
     ) -> tuple[dict, int]:
-        response = self._send(method, path, json=json, idempotency_key=idempotency_key)
+        response = self._send(
+            method,
+            path,
+            json=json,
+            idempotency_key=idempotency_key,
+            access_token=access_token,
+        )
         status_code = response.status_code
         if status_code not in expected:
             # Diagnostics for dev/logs: HTTP status + provider error code/message.

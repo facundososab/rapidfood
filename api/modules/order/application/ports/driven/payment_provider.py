@@ -7,6 +7,10 @@ Two DIFFERENT operations with INDEPENDENT idempotency keys:
 Stable keys matter: if the provider creates the resource but the response is
 lost to a timeout, the retry MUST reuse the same key so a second checkout is not
 created. ``run_id``-style tracing identifiers never participate.
+
+The optional ``access_token`` is the per-business Mercado Pago credential
+resolved by the application. ``None`` means "use the globally configured
+token", so single-tenant callers and tests keep working unchanged.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -33,6 +37,7 @@ class CreateCheckoutRequest:
     currency: str
     external_reference: str
     idempotency_key: str
+    access_token: Optional[str] = None
     description: Optional[str] = None
     notification_url: Optional[str] = None
     back_urls: dict = field(default_factory=dict)
@@ -74,11 +79,16 @@ class PaymentProviderPort(ABC):
         pass
 
     @abstractmethod
-    def get_payment(self, external_id: str) -> Optional[ProviderPayment]:
+    def get_payment(
+        self, external_id: str, access_token: Optional[str] = None
+    ) -> Optional[ProviderPayment]:
         """Fetch the authoritative provider state, or None when it is unknown.
 
         None means "the provider does not know this id" (a non-retryable, benign
         case, e.g. a simulated/unknown notification); a transient failure raises
         PaymentProviderError so the caller can ask the provider to retry.
+
+        ``access_token`` is the per-business credential; ``None`` falls back to
+        the globally configured token.
         """
         pass

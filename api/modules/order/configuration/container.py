@@ -97,7 +97,9 @@ class OrderContainer:
 
     Cross-module driven ports (catalog, client, config, coupon) default to
     in-memory fakes; the app-level composition root injects the real adapters
-    via the constructor.
+    via the constructor. ``credentials_query`` is the optional per-business
+    Mercado Pago credentials port; when absent every payment flow falls back to
+    the globally configured access token.
     """
 
     def __init__(
@@ -109,6 +111,7 @@ class OrderContainer:
         coupon_consume: Optional[Any] = None,
         delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
+        credentials_query: Optional[Any] = None,
         paid_notifier: Optional[Any] = None,
     ):
         # Driven Adapters
@@ -122,6 +125,7 @@ class OrderContainer:
         self.coupon_query = coupon_query if coupon_query is not None else FakeCouponQuery()
         self.coupon_consume = coupon_consume
         self.delivery_quote = delivery_quote
+        self.credentials_query = credentials_query
         self.catalog_query = catalog_query if catalog_query is not None else FakeCatalogQuery()
         
         # Use Cases
@@ -173,12 +177,14 @@ class OrderContainer:
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             currency=self.mercadopago_settings.currency,
+            credentials_query=self.credentials_query,
         )
         self.handle_payment_webhook_use_case = HandlePaymentWebhookUseCase(
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             paid_notifier=paid_notifier,
+            credentials_query=self.credentials_query,
         )
         self.cancel_superseded_checkout_use_case = CancelSupersededCheckoutUseCase(
             payment_repo=self.payment_repository,
