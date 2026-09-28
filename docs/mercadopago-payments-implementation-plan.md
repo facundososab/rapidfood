@@ -491,3 +491,48 @@ El container actual de conversation todavía usa repositorios en memoria y no to
 - Mercado Pago Preferences API: https://www.mercadopago.com.mx/developers/es/reference/online-payments/checkout-pro-preferences/create-preference/post
 - Mercado Pago Webhooks: https://www.mercadopago.com.mx/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks
 - Mercado Pago payment notifications: https://www.mercadopago.com.br/developers/en/docs/checkout-pro-preferences/payment-notifications
+
+---
+
+# Anexo: vinculación de cuenta desde configuración (OAuth "Conecta tu cuenta")
+
+Tarea de Notion `3e25961aad4680f39125ef5d308f8df5` — implementada y verificada en
+`feat/mercadopago-link` (ver `odd/tasks/mercadopago-account-link.md`).
+
+## Qué se agregó
+
+- **Módulo hexagonal `api/modules/mercadopago/`**: dominio (credencial),
+  puertos driven (credential repo + OAuth client + state signer), casos de uso
+  (authorize URL, link, status, unlink), adapters Prisma + OAuth (requests),
+  REST `/api/mercadopago/{authorize,callback,status,unlink}/`.
+- **Modelo `MercadoPagoCredential`** (1:1 por negocio) con tokens cifrados
+  (Fernet) — `MERCADOPAGO_TOKEN_ENCRYPTION_KEY` o derivado de `DJANGO_SECRET_KEY`.
+- **Panel UI**: `/configuracion/pagos/` (solo ADMIN) con vincular/desvincular +
+  card de estado; el callback redirige al panel con `?mp=linked|error`.
+- **Los pagos usan credenciales por negocio**: `CreatePaymentLinkUseCase` y el
+  webhook resuelven el token del negocio vía `PaymentCredentialsQuery`, con
+  fallback al env global.
+- **PKCE S256**: la URL de autorización lleva `code_challenge`; el verifier viaja
+  firmado dentro del `state` (Django Signer, TTL 600s) y se reutiliza en el
+  exchange. `client_secret` se envía solo si está configurado.
+
+## Verificación end-to-end
+
+Admin vinculó la cuenta real de una app **Checkout API** (`rappidfoodAPI`) con
+credenciales de producción: authorize → página MP → código + state firmado →
+exchange con PKCE + client_secret → "Cuenta vinculada" en el panel.
+
+## Lecciones operativas (entorno Docker + panel MP)
+
+- El `Client Secret` solo aparece en el panel para apps con OAuth habilitado y de
+  tipo **Checkout API / Bricks**; Checkout Pro no lo expone. Este flujo usa la
+  app `rappidfoodAPI` (client_id 5611724643701557). Credenciales en `.env`
+  (gitignored).
+- `docker compose up` recrea el contenedor y pierde el cliente Prisma regenerado:
+  el entrypoint ahora corre `prisma generate`; si reaparece
+  `'Prisma' object has no attribute 'mercadopagocredential'`, regenerar dentro
+  del contenedor y limpiar `__pycache__`.
+- Configurar `TEMPLATES` (APP_DIRS) en el backend: DRF necesita
+  `rest_framework/api.html` para los errores de navegador del callback.
+- El redirect de la app debe apuntar a una URL pública (ngrok en desarrollo);
+  el túnel no es permanente — ver follow-ups en la feature ODD.

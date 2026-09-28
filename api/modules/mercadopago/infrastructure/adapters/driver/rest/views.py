@@ -13,6 +13,8 @@ page instead of raw JSON. Without it, the JSON contract is preserved.
 
 from __future__ import annotations
 
+import logging
+
 from django.http import HttpResponseRedirect
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
@@ -109,10 +111,16 @@ class MercadoPagoCallbackView(APIView):
                 )
             )
         except MercadoPagoStateError as error:
+            logging.getLogger(__name__).warning(
+                "MP callback state error: %s", error,
+            )
             if return_uri:
                 return _redirect_to_panel(return_uri, "error")
             return _error(str(error), status.HTTP_400_BAD_REQUEST)
         except MercadoPagoOAuthError as error:
+            logging.getLogger(__name__).warning(
+                "MP callback OAuth error: %s", error,
+            )
             if return_uri:
                 return _redirect_to_panel(return_uri, "error")
             return _error(str(error), status.HTTP_502_BAD_GATEWAY)

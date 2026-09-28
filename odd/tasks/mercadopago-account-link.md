@@ -85,7 +85,7 @@ fallback to the global env access token.
 
 ## Status
 
-**Done.** Branch `feat/mercadopago-link` — 6 work-unit commits:
+**Done.** Branch `feat/mercadopago-link` — work-unit commits:
 
 1. `bf2cb6f` — Prisma `MercadoPagoCredential` model + migration + env vars.
 2. `67d10ca` — OAuth connect-your-account module (`mercadopago`): authorize,
@@ -97,14 +97,28 @@ fallback to the global env access token.
 4. `70b273e` — Panel: `/configuracion/pagos/` tab (ADMIN only) with link/unlink and
    status card; callback redirects to `MERCADOPAGO_RETURN_URI` (`?mp=linked|error`).
 5. `9e52ad0` — docs/env closure: RETURN_URI forwarding, README env table.
+6. `e478d62` — panel session renewal (GoTrue refresh_token) — `Token expired.` crash.
+7. `2f5da18` — stale pre-refresh sessions answered with login redirect.
+8. `7f3c04a` — backend entrypoint regenerates the Prisma client (bind-mount pycache).
+9. `02b049b` — **PKCE S256 OAuth flow without a client_secret**: the authorize URL
+   carries `code_challenge`, the verifier travels sealed in the signed state and is
+   reused at exchange; `client_secret` sent only when configured.
+10. `797dd04` — DRF templates enabled (`rest_framework/api.html`) so the callback
+    returns JSON instead of `TemplateDoesNotExist` on browser errors.
+11. *(pending)* — callback OAuth/state errors logged with the reason instead of
+    silently redirecting to `?mp=error`.
 
-- api mercadopago tests: 79 green. order tests: 175 green combined (incl. new
-  token-resolution tests). panel tests: 17 green. import-linter: 10 kept / 0 broken.
-- Local DB migration not applied here (no local dev DB run); `prisma migrate deploy`
-  expected at deploy time.
-- Notion task 3e25961a marked **Done** with a closure comment.
+**Verified end-to-end (live):** an admin linked the Mercado Pago account from the
+panel against a real Checkout API application (`rappidfoodAPI`, client_id
+`5611724643701557`) with production keys, ngrok tunnel exposing the callback, and
+PKCE; the exchange succeeded with the real `client_secret` and the panel showed
+"Cuenta vinculada". Details of the environment work and the MP-dashboard
+pitfalls (Client Secret only visible on OAuth-capable integrations; Checkout Pro
+apps do not expose it) are in this file's closed appendices and the PR.
 
-Follow-ups (user-owned): set `MERCADOPAGO_CLIENT_ID`/`CLIENT_SECRET`/
-`REDIRECT_URI`/`RETURN_URI`/`TOKEN_ENCRYPTION_KEY` in the repo-root `.env`; test the
-end-to-end OAuth redirect against a real MP app; optional refresh-token renewal
-(cron) for long-lived links.
+- api mercadopago tests: 91 green. panel tests: 34 green. import-linter 10 kept / 0 broken.
+
+Follow-ups (user-owned): replace the ngrok tunnel URL with a permanent HTTPS
+host in `.env` (`MERCADOPAGO_REDIRECT_URI`/`NOTIFICATION_URL`) and re-register it
+in the MP app dashboard; wire `MERCADOPAGO_WEBHOOK_SECRET` for signature
+validation; optional refresh-token renewal for long-lived links.
