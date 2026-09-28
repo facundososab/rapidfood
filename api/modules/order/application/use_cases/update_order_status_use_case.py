@@ -6,20 +6,10 @@ from modules.order.application.ports.driver.update_order_status_ports import (
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.domain.errors.order_errors import OrderNotFound, OrderStateError
 from modules.order.domain.models.order_state import OrderState
-
-# Forward + cancellation transitions accepted by the admin panel. Cancelling a
-# terminal order (DELIVERED/PICKED_UP/CANCELLED) is not allowed.
-_ALLOWED_TRANSITIONS: dict[OrderState, set[OrderState]] = {
-    OrderState.DRAFT: {OrderState.PENDING, OrderState.CANCELLED},
-    OrderState.PENDING: {OrderState.PAID, OrderState.CANCELLED},
-    OrderState.PAID: {OrderState.CONFIRMED, OrderState.CANCELLED},
-    OrderState.CONFIRMED: {OrderState.IN_PREPARATION, OrderState.CANCELLED},
-    OrderState.IN_PREPARATION: {OrderState.READY, OrderState.CANCELLED},
-    OrderState.READY: {OrderState.DELIVERED, OrderState.PICKED_UP, OrderState.CANCELLED},
-    OrderState.DELIVERED: set(),
-    OrderState.PICKED_UP: set(),
-    OrderState.CANCELLED: set(),
-}
+from modules.order.domain.services.state_transitions import (
+    allowed_transitions,
+    can_transition,
+)
 
 
 class UpdateOrderStatusUseCase(UpdateOrderStatusPort):
@@ -39,8 +29,8 @@ class UpdateOrderStatusUseCase(UpdateOrderStatusPort):
         if target == order.status:
             return UpdateOrderStatusResponse(order_id=order.id, status=order.status.value)
 
-        allowed = _ALLOWED_TRANSITIONS.get(order.status, set())
-        if target not in allowed:
+        if not can_transition(order.status, target, order.payment_type):
+            allowed = allowed_transitions(order.status, order.payment_type)
             raise OrderStateError(
                 f"Cannot transition from {order.status.value} to {target.value}. "
                 f"Allowed: {[s.value for s in allowed]}"

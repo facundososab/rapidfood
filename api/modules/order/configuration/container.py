@@ -14,11 +14,14 @@ from modules.order.application.use_cases.list_orders_use_case import ListOrdersU
 from modules.order.application.use_cases.update_order_status_use_case import (
     UpdateOrderStatusUseCase,
 )
-from modules.order.application.use_cases.create_payment_link_use_case import (
-    CreatePaymentLinkUseCase,
+from modules.order.application.use_cases.create_payment_checkout_use_case import (
+    CreatePaymentCheckoutUseCase,
 )
-from modules.order.application.use_cases.process_payment_notification_use_case import (
-    ProcessPaymentNotificationUseCase,
+from modules.order.application.use_cases.handle_payment_webhook_use_case import (
+    HandlePaymentWebhookUseCase,
+)
+from modules.order.application.use_cases.cancel_superseded_checkout_use_case import (
+    CancelSupersededCheckoutUseCase,
 )
 from modules.order.application.ports.driven.catalog_query import CatalogQuery
 from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_payment_provider import (
@@ -39,6 +42,49 @@ from modules.order.infrastructure.adapters.driven.prisma.applied_coupon_reposito
 from modules.order.application.use_cases.list_applied_coupons_use_case import (
     ListAppliedCouponsUseCase,
 )
+from modules.order.application.use_cases.add_item_to_order_use_case import (
+    AddItemToOrderUseCase,
+)
+from modules.order.application.use_cases.update_item_in_order_use_case import (
+    UpdateItemInOrderUseCase,
+)
+from modules.order.application.use_cases.remove_item_from_order_use_case import (
+    RemoveItemFromOrderUseCase,
+)
+from modules.order.application.use_cases.set_payment_type_use_case import (
+    SetPaymentTypeUseCase,
+)
+from modules.order.application.use_cases.set_client_for_order_use_case import (
+    SetClientForOrderUseCase,
+)
+from modules.order.application.use_cases.set_delivery_for_order_use_case import (
+    SetDeliveryForOrderUseCase,
+)
+from modules.order.application.use_cases.apply_coupon_to_order_use_case import (
+    ApplyCouponToOrderUseCase,
+)
+from modules.order.application.use_cases.get_current_order_use_case import (
+    GetCurrentOrderUseCase,
+)
+from modules.order.application.use_cases.get_latest_active_order_use_case import (
+    GetLatestActiveOrderUseCase,
+)
+from modules.order.application.use_cases.get_order_summary_use_case import (
+    GetOrderSummaryUseCase,
+)
+from modules.order.application.use_cases.set_pickup_for_order_use_case import (
+    SetPickupForOrderUseCase,
+)
+from modules.order.application.use_cases.get_or_create_current_draft_use_case import (
+    GetOrCreateCurrentDraftUseCase,
+)
+from modules.order.infrastructure.adapters.driven.prisma.payment_attempt_query import (
+    PrismaPaymentAttemptQuery,
+)
+from modules.order.infrastructure.adapters.driven.clock import SystemClock
+from modules.order.infrastructure.adapters.driven.prisma.idempotent_order_mutation import (
+    PrismaIdempotentOrderMutation,
+)
 from modules.order.infrastructure.adapters.driven.fakes.fakes import (
     FakeClientQuery, FakeCatalogQuery, FakeBusinessConfigQuery, FakeCouponQuery
 )
@@ -51,7 +97,9 @@ class OrderContainer:
 
     Cross-module driven ports (catalog, client, config, coupon) default to
     in-memory fakes; the app-level composition root injects the real adapters
-    via the constructor.
+    via the constructor. ``credentials_query`` is the optional per-business
+    Mercado Pago credentials port; when absent every payment flow falls back to
+    the globally configured access token.
     """
 
     def __init__(
@@ -64,6 +112,7 @@ class OrderContainer:
         delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
         credentials_query: Optional[Any] = None,
+        paid_notifier: Optional[Any] = None,
     ):
         # Driven Adapters
         self.order_repository = PrismaOrderRepository()
@@ -123,18 +172,77 @@ class OrderContainer:
         self.update_order_status = UpdateOrderStatusUseCase(
             order_repo=self.order_repository
         )
-        self.create_payment_link_use_case = CreatePaymentLinkUseCase(
+        self.create_payment_checkout_use_case = CreatePaymentCheckoutUseCase(
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             currency=self.mercadopago_settings.currency,
             credentials_query=self.credentials_query,
         )
-        self.process_payment_notification_use_case = ProcessPaymentNotificationUseCase(
+        self.handle_payment_webhook_use_case = HandlePaymentWebhookUseCase(
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
+            paid_notifier=paid_notifier,
             credentials_query=self.credentials_query,
+        )
+        self.cancel_superseded_checkout_use_case = CancelSupersededCheckoutUseCase(
+            payment_repo=self.payment_repository,
+            payment_provider=self.payment_provider,
+        )
+
+        # Reopen-aware, idempotent mutations (agent / channel facing).
+        clock = SystemClock()
+        self.idempotent_order_mutation = PrismaIdempotentOrderMutation(db.client)
+        self.add_item_to_order_use_case = AddItemToOrderUseCase(
+            catalog_query=self.catalog_query,
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+        self.update_item_in_order_use_case = UpdateItemInOrderUseCase(
+            catalog_query=self.catalog_query,
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+        self.remove_item_from_order_use_case = RemoveItemFromOrderUseCase(
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+        self.set_payment_type_use_case = SetPaymentTypeUseCase(
+            order_repo=self.order_repository
+        )
+        self.set_client_for_order_use_case = SetClientForOrderUseCase(
+            order_repo=self.order_repository,
+            client_query=self.client_query,
+        )
+        self.set_delivery_for_order_use_case = SetDeliveryForOrderUseCase(
+            delivery_quote=self.delivery_quote,
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+        self.apply_coupon_to_order_use_case = ApplyCouponToOrderUseCase(
+            coupon_query=self.coupon_query,
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+        self.set_pickup_for_order_use_case = SetPickupForOrderUseCase(
+            executor=self.idempotent_order_mutation,
+            clock=clock,
+        )
+
+        # Reads used by the agent / panel.
+        payment_attempts = PrismaPaymentAttemptQuery(prisma_client or db.client)
+        self.get_current_order_use_case = GetCurrentOrderUseCase(
+            self.order_repository, payment_attempts
+        )
+        self.get_latest_active_order_use_case = GetLatestActiveOrderUseCase(
+            self.order_repository
+        )
+        self.get_order_summary_use_case = GetOrderSummaryUseCase(
+            self.order_repository, self.config_query, self.catalog_query
+        )
+        self.get_or_create_current_draft_use_case = GetOrCreateCurrentDraftUseCase(
+            self.order_repository, self.start_draft_order_use_case
         )
 
 _container: OrderContainer | None = None

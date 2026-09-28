@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from modules.conversation.domain.value_objects import DetectedIntent, MessageRole, MessageStatus, Sentiment
+from modules.conversation.domain.value_objects import (
+    DetectedIntent,
+    MessageAuthor,
+    MessageRole,
+    MessageStatus,
+    Sentiment,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +32,7 @@ class MessageDTO:
     sentiment: Sentiment | None = None
     status: MessageStatus = MessageStatus.RECEIVED
     created_at: datetime | None = None
+    author: MessageAuthor | None = None
 
 
 @dataclass(frozen=True, slots=True)

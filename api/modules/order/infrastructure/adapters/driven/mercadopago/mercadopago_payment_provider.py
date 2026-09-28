@@ -1,10 +1,34 @@
+"""Mercado Pago Checkout Pro adapter using the Orders API.
+
+``POST /v1/orders`` to create a checkout and ``POST /v1/orders/{id}/cancel`` to
+cancel a superseded one. Both calls carry a stable ``X-Idempotency-Key`` supplied
+by the application: a timeout retry reuses the same key so the provider does not
+create a second logical checkout.
+
+The HTTP transport is injected (``session``), so the adapter is unit-testable
+without credentials. The exact Orders API payload/response fields depend on the
+Mercado Pago account/version, so the response parsing is defensive and MUST be
+validated against live credentials before production use.
+
+The ``Authorization`` header uses the per-business ``access_token`` supplied by
+the caller when present, falling back to ``settings.access_token`` otherwise.
+Because the Orders API is per-account, a multi-tenant deployment MUST pass the
+business token, or every checkout lands on the platform account.
+"""
+from __future__ import annotations
+
+import logging
 from decimal import Decimal
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+
+import requests
 
 from modules.order.application.ports.driven.payment_provider import (
-    CreateCheckoutLinkRequest,
-    CreateCheckoutLinkResult,
-    PaymentProvider,
+    CancelCheckoutRequest,
+    CancelCheckoutResult,
+    CreateCheckoutRequest,
+    CreateCheckoutResult,
+    PaymentProviderPort,
     ProviderPayment,
 )
 from modules.order.infrastructure.adapters.driven.mercadopago.errors import (
@@ -17,84 +41,99 @@ from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_status
     map_mercadopago_status,
 )
 
+_ORDERS_PATH = "/v1/orders"
 
-class MercadoPagoPaymentProvider(PaymentProvider):
-    def __init__(
-        self,
-        settings: MercadoPagoSettings,
-        sdk: Optional[Any] = None,
-        sdk_factory: Optional[Callable[[str], Any]] = None,
-    ):
+logger = logging.getLogger(__name__)
+
+
+class MercadoPagoPaymentProvider(PaymentProviderPort):
+    def __init__(self, settings: MercadoPagoSettings, session: Optional[Any] = None):
         self.settings = settings
-        if sdk is None:
-            import mercadopago
+        self._session = session if session is not None else requests.Session()
 
-            sdk = mercadopago.SDK(settings.access_token)
-        self.sdk = sdk
-        if sdk_factory is None:
-
-            def _default_sdk_factory(access_token: str) -> Any:
-                import mercadopago
-
-                return mercadopago.SDK(access_token)
-
-            sdk_factory = _default_sdk_factory
-
-        self.sdk_factory = sdk_factory
-
-    def _sdk_for_token(self, access_token: Optional[str]) -> Any:
-        """Reuse the default SDK unless a per-business token is provided."""
-        if not access_token or access_token == self.settings.access_token:
-            return self.sdk
-        return self.sdk_factory(access_token)
-
-    def create_checkout_link(
-        self, request: CreateCheckoutLinkRequest
-    ) -> CreateCheckoutLinkResult:
-        payload = {
+    def create_checkout(self, request: CreateCheckoutRequest) -> CreateCheckoutResult:
+        amount = _amount_str(request.amount)
+        # Checkout Pro (Orders API) payload. Differences from the Checkout API
+        # (transparent) flow that MUST be respected:
+        #   - processing_mode is always "manual" for Checkout Pro;
+        #   - no `transactions` block (that is the transparent flow; sending it
+        #     without `payment_method` is rejected);
+        #   - `currency_id` lives on the account, not on the item;
+        #   - return URLs go under `config.online` (there is no root
+        #     `notification_url`; notifications are configured in the panel).
+        payload: dict[str, Any] = {
+            "type": "online",
+            "processing_mode": "manual",
+            "external_reference": request.external_reference,
+            "total_amount": amount,
             "items": [
                 {
-                    "title": f"Rapidfood order {request.order_id}",
+                    "title": request.description
+                    or f"Rapidfood order {request.order_id}",
                     "quantity": 1,
-                    "currency_id": request.currency or self.settings.currency,
-                    "unit_price": float(request.amount),
+                    "unit_price": amount,
                 }
             ],
-            "external_reference": request.external_reference,
         }
-        if self.settings.notification_url:
-            payload["notification_url"] = self.settings.notification_url
-        back_urls = self._back_urls()
-        if back_urls:
-            payload["back_urls"] = back_urls
+        config_online = self._config_online(request.back_urls or self._back_urls())
+        if config_online:
+            payload["config"] = {"online": config_online}
 
-        sdk = self._sdk_for_token(request.access_token)
-        result = self._call(lambda: sdk.preference().create(payload))
-        response = self._successful_response(result, expected_status=201)
-        preference_id = response.get("id")
-        checkout_url = response.get("init_point")
-        if not preference_id or not checkout_url:
-            raise PaymentProviderError("Mercado Pago preference response is incomplete")
-        return CreateCheckoutLinkResult(
-            preference_id=str(preference_id),
-            checkout_url=checkout_url,
+        response = self._request(
+            "POST",
+            _ORDERS_PATH,
+            json=payload,
+            idempotency_key=request.idempotency_key,
+            access_token=request.access_token,
+            expected=(200, 201),
+        )
+
+        external_id = response.get("id")
+        checkout_url = (
+            response.get("checkout_url")
+            or response.get("init_point")
+            or response.get("sandbox_init_point")
+        )
+        if not external_id or not checkout_url:
+            raise PaymentProviderError("Mercado Pago order response is incomplete")
+        return CreateCheckoutResult(
+            external_id=str(external_id),
+            checkout_url=str(checkout_url),
             external_reference=response.get(
                 "external_reference", request.external_reference
             ),
         )
 
+    def cancel_checkout(self, request: CancelCheckoutRequest) -> CancelCheckoutResult:
+        _body, status_code = self._request_raw(
+            "POST",
+            f"{_ORDERS_PATH}/{request.external_id}/cancel",
+            idempotency_key=request.idempotency_key,
+            expected=(200, 201, 204, 404, 409),
+        )
+        # 404/409 mean the checkout does not exist or was already cancelled:
+        # an idempotent success. A 2xx means WE cancelled it now.
+        return CancelCheckoutResult(already_cancelled=status_code in (404, 409))
+
     def get_payment(
         self, external_id: str, access_token: Optional[str] = None
-    ) -> ProviderPayment:
-        sdk = self._sdk_for_token(access_token)
-        result = self._call(lambda: sdk.payment().get(external_id))
-        response = self._successful_response(result, expected_status=200)
+    ) -> Optional[ProviderPayment]:
+        body, status_code = self._request_raw(
+            "GET",
+            f"{_ORDERS_PATH}/{external_id}",
+            access_token=access_token,
+            expected=(200, 400, 404),
+        )
+        if status_code in (400, 404):
+            # Mercado Pago answers 404, or 400 `invalid_path_param`, for an id it
+            # does not know (e.g. a simulated notification). Nothing to reconcile,
+            # and retrying would not help, so the webhook can acknowledge it.
+            return None
         return ProviderPayment(
-            external_id=str(response["id"]),
-            status=map_mercadopago_status(response.get("status", "")),
-            external_reference=response.get("external_reference"),
-            preference_id=response.get("preference_id"),
-            amount=self._decimal_or_none(response.get("transaction_amount")),
+            external_id=str(body.get("id", external_id)),
+            status=map_mercadopago_status(_extract_status(body)),
+            external_reference=body.get("external_reference"),
+            amount=_decimal_or_none(body.get("total_amount")),
         )
 
     def _back_urls(self) -> dict:
@@ -107,19 +146,139 @@ class MercadoPagoPaymentProvider(PaymentProvider):
             urls["pending"] = self.settings.pending_url
         return urls
 
-    def _call(self, operation):
+    @staticmethod
+    def _config_online(back_urls: dict) -> dict:
+        """Map the internal success/failure/pending back URLs to `config.online`.
+
+        `auto_return` is only valid when `success_url` is present.
+        """
+        online: dict[str, str] = {}
+        if back_urls.get("success"):
+            online["success_url"] = back_urls["success"]
+        if back_urls.get("failure"):
+            online["failure_url"] = back_urls["failure"]
+        if back_urls.get("pending"):
+            online["pending_url"] = back_urls["pending"]
+        if online.get("success_url"):
+            online["auto_return"] = "approved"
+        return online
+
+    def _headers(
+        self, idempotency_key: Optional[str] = None, access_token: Optional[str] = None
+    ) -> dict:
+        headers = {
+            "Authorization": f"Bearer {access_token or self.settings.access_token}",
+            "Content-Type": "application/json",
+        }
+        if idempotency_key:
+            headers["X-Idempotency-Key"] = idempotency_key
+        return headers
+
+    def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        json,
+        idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ):
         try:
-            return operation()
+            return self._session.request(
+                method,
+                f"{self.settings.api_base_url}{path}",
+                headers=self._headers(idempotency_key, access_token=access_token),
+                json=json,
+                timeout=self.settings.request_timeout_seconds,
+            )
         except Exception as exc:
             raise PaymentProviderError("Mercado Pago request failed") from exc
 
-    def _successful_response(self, result: dict, expected_status: int) -> dict:
-        if result.get("status") != expected_status:
-            raise PaymentProviderError("Mercado Pago request failed")
-        response = result.get("response")
-        if not isinstance(response, dict):
-            raise PaymentProviderError("Mercado Pago response is invalid")
-        return response
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json=None,
+        idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
+        expected=(200,),
+    ) -> dict:
+        body, _ = self._request_raw(
+            method,
+            path,
+            json=json,
+            idempotency_key=idempotency_key,
+            access_token=access_token,
+            expected=expected,
+        )
+        return body
 
-    def _decimal_or_none(self, value) -> Optional[Decimal]:
-        return Decimal(str(value)) if value is not None else None
+    def _request_raw(
+        self,
+        method: str,
+        path: str,
+        *,
+        json=None,
+        idempotency_key: Optional[str] = None,
+        access_token: Optional[str] = None,
+        expected=(200,),
+    ) -> tuple[dict, int]:
+        response = self._send(
+            method,
+            path,
+            json=json,
+            idempotency_key=idempotency_key,
+            access_token=access_token,
+        )
+        status_code = response.status_code
+        if status_code not in expected:
+            # Diagnostics for dev/logs: HTTP status + provider error code/message.
+            # Never a secret: the Authorization header is not logged.
+            logger.warning(
+                "Mercado Pago request failed: method=%s path=%s status=%s error=%s",
+                method,
+                path,
+                status_code,
+                _error_summary(response),
+            )
+            raise PaymentProviderError("Mercado Pago request failed")
+        try:
+            body = response.json()
+        except Exception as exc:
+            raise PaymentProviderError("Mercado Pago response is invalid") from exc
+        return (body if isinstance(body, dict) else {}), status_code
+
+
+def _error_summary(response: Any) -> str:
+    """Compact, secret-free summary of a failed Mercado Pago response."""
+    try:
+        body = response.json()
+    except Exception:
+        return "<non-json body>"
+    if isinstance(body, dict):
+        errors = body.get("errors")
+        if isinstance(errors, list) and errors:
+            return "; ".join(
+                f"{e.get('code', '?')}: {e.get('message', '')} "
+                f"{e.get('details', '')}"
+                for e in errors
+                if isinstance(e, dict)
+            )[:1000]
+    return str(body)[:1000]
+
+
+def _extract_status(response: dict) -> str:
+    transactions = response.get("transactions") or {}
+    payments = transactions.get("payments") or []
+    if payments:
+        return str(payments[0].get("status", "")).lower()
+    return str(response.get("status", "")).lower()
+
+
+def _amount_str(value: Decimal) -> str:
+    return f"{Decimal(value):.2f}"
+
+
+def _decimal_or_none(value) -> Optional[Decimal]:
+    return Decimal(str(value)) if value is not None else None

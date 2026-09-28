@@ -8,8 +8,51 @@ class OrderStateError(OrderDomainError):
     pass
 
 
+class PaymentTypeRequiredError(OrderStateError):
+    """Raised when an online checkout is requested but no payment type is set.
+
+    Known, explainable business outcome: the agent must ask the customer for the
+    payment method (and set ONLINE) before generating a checkout link.
+    """
+    pass
+
+
+class OnlinePaymentRequiredError(OrderStateError):
+    """Raised when a checkout is requested for a non-ONLINE (CASH) order."""
+    pass
+
+
+class OrderNotConfirmedError(OrderStateError):
+    """Raised when a checkout is requested for an order that is not confirmed.
+
+    Only a PENDING (confirmed) ONLINE order can create a checkout.
+    """
+    pass
+
+
+class InvalidPaymentTypeError(OrderDomainError):
+    """Raised when a payment type outside CASH | ONLINE is provided."""
+    pass
+
+
+class PaymentAttemptNotFoundError(OrderDomainError):
+    """Raised when a payment attempt referenced by id or provider id is unknown."""
+    pass
+
+
 class OrderNotFound(OrderDomainError):
     """Raised when an order is not found."""
+    pass
+
+
+class DuplicateActiveOrderError(OrderDomainError):
+    """Raised when creating an order would leave two active orders for a conversation.
+
+    A conversation can have at most ONE active order (DRAFT or PENDING),
+    enforced by a partial unique index. A parallel create that loses the race
+    hits the index and gets this error so the caller can reuse the winner
+    instead of failing.
+    """
     pass
 
 
@@ -26,6 +69,16 @@ class CouponApplicationError(OrderDomainError):
 class OrderNotModifiableError(OrderStateError):
     """Raised when an operation is invalid because the order is not modifiable."""
     pass
+
+
+class NewOrderRequiredError(OrderNotModifiableError):
+    """Raised when the current order cannot be modified and a new order is needed.
+
+    Examples: the order is paid/confirmed/cancelled/cash-pending, or a payment
+    for its current version was already approved. The previous order MUST be
+    left untouched; starting a new order is a separate, explicit flow.
+    """
+    reason = "NEW_ORDER_REQUIRED"
 
 
 class InvalidCouponError(CouponApplicationError):

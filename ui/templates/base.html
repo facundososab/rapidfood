@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Rapidfood{% endblock %} · Rapidfood</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260916m" />
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260917chat4" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   {% block head_scripts %}{% endblock %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
@@ -118,7 +118,7 @@
         </div>
       </header>
 
-      <main class="flex-1 px-4 lg:px-8 py-6">
+      <main class="flex-1 {% block main_class %}px-4 lg:px-8 py-6{% endblock %}">
         {% block breadcrumbs %}{% endblock %}
         {% block content %}{% endblock %}
       </main>

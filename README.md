@@ -43,6 +43,8 @@ Opcionalmente, `api/.env` y `ui/.env` se cargan primero como override local por 
 | `MERCADOPAGO_TOKEN_ENCRYPTION_KEY`                | Clave Fernet opcional para cifrar tokens guardados (si falta, derivada de `DJANGO_SECRET_KEY`) | _(vacío)_                                       |
 | `MERCADOPAGO_AUTH_BASE_URL`                       | Base URL de autorización OAuth de MP                                | `https://auth.mercadopago.com`                            |
 | `BACKEND_PORT` / `UI_PORT`                        | Puertos publicados por Docker Compose                              | `8000` / `8001`                                             |
+| `NGROK_AUTHTOKEN`                                 | Token del agente ngrok (requerido por el servicio `ngrok`)         | _(vacío)_                                                   |
+| `NGROK_DOMAIN`                                    | Dominio reservado que el túnel publica hacia `backend:8000`        | `hypsicephalic-decisive-lavette.ngrok-free.dev`             |
 
 ## Auth del personal (Supabase)
 
@@ -84,6 +86,7 @@ docker compose up --build
 # db      → localhost:5432 (PostgreSQL 16)
 # backend → http://127.0.0.1:8000/health/
 # ui      → http://127.0.0.1:8001/
+# proxy   → sin puerto publicado: rutea /api/ al backend y el resto al ui (entrada del túnel ngrok)
 ```
 
 En desarrollo, `docker-compose.yml` monta el código fuente en los contenedores; los cambios en
@@ -94,6 +97,37 @@ dependencias de Python o el esquema/engine de Prisma.
 - Para el stack sin UI: `docker compose up -d db backend`.
 - La UI arranca con `RAPIDFOOD_CLIENT=mock`; para consumir la API real:
   `RAPIDFOOD_CLIENT=http docker compose up --build` (ojo: los paths del `HttpRapidfoodClient` son aún un esqueleto).
+
+### Túnel ngrok (webhooks de Mercado Pago)
+
+Mercado Pago no puede alcanzar `localhost`, así que el servicio `ngrok` publica el stack en un
+dominio HTTPS reservado para recibir las notificaciones de pago.
+
+1. Reservá el dominio en el dashboard de ngrok y copiá tu authtoken.
+2. Agregá al `.env` de la raíz:
+
+   ```bash
+   NGROK_AUTHTOKEN=tu_token
+   NGROK_DOMAIN=hypsicephalic-decisive-lavette.ngrok-free.dev
+   ```
+
+3. Levantá el stack; el túnel y el reverse proxy arrancan solos:
+
+   ```bash
+   docker compose up --build
+   # proxy → entrada única: /api/ y /health/ al backend, el resto al ui
+   # ngrok → https://hypsicephalic-decisive-lavette.ngrok-free.dev (-> proxy:80)
+   ```
+
+4. En Mercado Pago → Tus integraciones → tu app → **Webhooks**, configurá:
+   - **URL:** `https://hypsicephalic-decisive-lavette.ngrok-free.dev/api/orders/payments/mercadopago/webhook/`
+   - **Evento:** solo **Order (Mercado Pago)** (topic `orders`). No marques el resto.
+   - Guardá y copiá el secret generado a `MERCADOPAGO_WEBHOOK_SECRET` del `.env`.
+
+> El dominio ngrok entra al servicio `proxy` (nginx), que rutea `/api/` y `/health/` al `backend`
+> y todo lo demás al panel `ui`. Así conviven en un único túnel el webhook y los
+> `MERCADOPAGO_SUCCESS_URL` / `FAILURE_URL` / `PENDING_URL` (que apuntan a la raíz del dominio).
+> La configuración vive en `docker/nginx/default.conf`.
 
 ## Setup sin Docker (todo local)
 

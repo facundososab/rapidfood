@@ -1,0 +1,70 @@
+{% comment %}Columna central: el hilo de mensajes y el composer.{% endcomment %}
+<section class="chat-thread">
+  <header class="chat-thread-head">
+    <span class="chat-avatar" style="background: var(--color-purple-soft)">{{ label|initials }}</span>
+    <div class="min-w-0 flex-1">
+      <div class="chat-thread-name truncate">{{ label }}</div>
+      <div class="chat-thread-sub">
+        {% if conversation.agentPaused %}
+          <span class="chat-dot" style="background: var(--color-warning)"></span> Atiende un humano · {{ conversation.channel }}
+        {% else %}
+          <span class="chat-dot"></span> En línea · {{ conversation.channel }}
+        {% endif %}
+      </div>
+    </div>
+    <button type="button" class="chat-icon-btn" title="Llamar">{% icon 'phone' 'w-4 h-4' %}</button>
+    <button type="button" class="chat-icon-btn" title="Notificaciones">{% icon 'bell' 'w-4 h-4' %}</button>
+    <button type="button" class="chat-icon-btn" title="Más">{% icon 'more-vertical' 'w-4 h-4' %}</button>
+  </header>
+
+  {% if error %}<div class="px-5 py-3 border-b border-line badge-red text-[12px]">{{ error }}</div>{% endif %}
+
+  <div class="chat-thread-body" id="messages">
+    {% for m in conversation.messages %}
+      {% ifchanged m.createdAt|date:'Y-m-d' %}<div class="chat-day"><span>{{ m.createdAt|day_label }}</span></div>{% endifchanged %}
+      <div class="chat-row {% if m.role != 'USER' %}out{% endif %}">
+        {% if m.role == 'USER' %}
+        <span class="chat-avatar" style="width:26px;height:26px;font-size:10px;background:var(--color-subtle);color:var(--color-ink-soft)">{{ label|initials }}</span>
+        {% endif %}
+        <div class="chat-bubble {% if m.role == 'USER' %}in{% else %}out{% endif %}">{% if m.role != 'USER' %}<span class="chat-author {% if m.author == 'OPERATOR' %}chat-author-human{% else %}chat-author-agent{% endif %}">{% if m.author == 'OPERATOR' %}Humano{% else %}Agente{% endif %}</span>{% endif %}<span class="chat-text">{{ m.content|chat_trim }}</span><div class="chat-stamp">
+            {{ m.createdAt|time_fmt }}
+            {% if m.role != 'USER' %}{% icon 'check-check' 'w-3 h-3' %}{% endif %}
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="text-[13px] text-ink-faint">Todavía no hay mensajes.</div>
+    {% endfor %}
+  </div>
+
+  <form class="chat-composer"
+        hx-post="{% url 'conversation_operator_message' conversation.id %}"
+        hx-target="#conversation-pane" hx-swap="outerHTML" hx-indicator="#thread-indicator">
+    <div class="chat-composer-box">
+      {% icon 'paperclip' 'w-4 h-4 text-ink-faint' %}
+      <textarea name="content" rows="1" required data-chat-composer
+                placeholder="Escribí como el negocio…"></textarea>
+      {% icon 'smile' 'w-4 h-4 text-ink-faint' %}
+      <span id="thread-indicator" class="htmx-indicator text-[11px] text-ink-muted whitespace-nowrap">Enviando…</span>
+      <button class="chat-send" type="submit" title="Enviar">{% icon 'send' 'w-4 h-4' %}</button>
+    </div>
+    <div class="chat-hint">
+      {% if conversation.agentPaused %}El agente está en pausa: solo contestás vos.{% else %}Escribís del lado del negocio; el agente sigue contestando al cliente.{% endif %}
+      Presioná Enter para enviar · Shift + Enter para una nueva línea
+    </div>
+  </form>
+</section>
+<script>
+  (function () {
+    var box = document.getElementById('messages');
+    if (box) box.scrollTop = box.scrollHeight;
+    document.querySelectorAll('[data-chat-composer]').forEach(function (area) {
+      area.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          area.closest('form').requestSubmit();
+        }
+      });
+    });
+  })();
+</script>

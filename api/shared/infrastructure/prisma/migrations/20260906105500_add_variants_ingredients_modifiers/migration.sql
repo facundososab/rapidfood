@@ -134,14 +134,14 @@ CREATE INDEX "order_line_removed_ingredient_ingredient_id_idx" ON "order_line_re
 -- CreateIndex
 CREATE UNIQUE INDEX "order_line_removed_ingredient_order_line_id_ingredient_id_key" ON "order_line_removed_ingredient"("order_line_id", "ingredient_id");
 
--- CreateIndex
-CREATE INDEX "discount_product_id_idx" ON "discount"("product_id");
-
-
 -- AlterTable (Add Columns as Nullable)
 ALTER TABLE "discount" ADD COLUMN     "product_variant_id" UUID;
 ALTER TABLE "order_line" ADD COLUMN     "product_variant_id" UUID;
 ALTER TABLE "price" ADD COLUMN     "product_variant_id" UUID;
+
+-- CreateIndex
+CREATE INDEX "discount_product_id_idx" ON "discount"("product_id");
+
 
 -- CreateIndex
 CREATE INDEX "discount_product_variant_id_idx" ON "discount"("product_variant_id");

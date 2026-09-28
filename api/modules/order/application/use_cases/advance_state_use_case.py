@@ -1,18 +1,20 @@
 from modules.order.application.ports.driver.advance_state_ports import (
-    AdvanceStateCommand, AdvanceStateResponse, _ALLOWED_TRANSITIONS
+    AdvanceStateCommand, AdvanceStateResponse
 )
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.domain.errors.order_errors import OrderNotFound, OrderStateError
 from modules.order.domain.models.order_state import OrderState
+from modules.order.domain.services.state_transitions import (
+    allowed_transitions,
+    can_transition,
+)
 
 
 class AdvanceStateUseCase:
     """
-    Advances the order through its post-confirmation lifecycle:
-    PENDING -> PAID -> CONFIRMED -> IN_PREPARATION -> READY -> DELIVERED/PICKED_UP
-    
-    The caller must provide the desired target_state. The use case validates
-    that the transition is allowed per the domain rules.
+    Advances the order through its post-confirmation lifecycle. The allowed
+    transitions are centralized in the domain (state_transitions) so this use
+    case cannot drift from the rest of the machine.
     """
 
     def __init__(self, order_repo: OrderRepository):
@@ -28,8 +30,8 @@ class AdvanceStateUseCase:
         except ValueError:
             raise OrderStateError(f"'{command.target_state}' is not a valid order state")
 
-        allowed = _ALLOWED_TRANSITIONS.get(order.status, set())
-        if target not in allowed:
+        if not can_transition(order.status, target, order.payment_type):
+            allowed = allowed_transitions(order.status, order.payment_type)
             raise OrderStateError(
                 f"Cannot transition from {order.status.value} to {target.value}. "
                 f"Allowed: {[s.value for s in allowed]}"
