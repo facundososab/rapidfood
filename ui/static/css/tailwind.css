@@ -270,4 +270,113 @@
     .chat-pane { grid-template-columns: minmax(0, 1fr); }
     .chat-details { display: none; }
   }
+
+  /* ---- Login: agent conversation column -------------------------------- */
+  .rf-dots {
+    background-image: radial-gradient(var(--color-primary-softer) 1.5px, transparent 1.5px);
+    background-size: 22px 22px;
+  }
+  .rf-glow {
+    background: radial-gradient(circle at center, #ffffff 0%, rgba(255, 255, 255, 0) 68%);
+    opacity: .75;
+  }
+
+  .rf-agent {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 18px;
+    box-shadow: 0 26px 60px -32px rgba(10, 17, 47, .45);
+    overflow: hidden;
+    animation: rf-bob 6s ease-in-out infinite;
+  }
+  .rf-agent-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid var(--color-line);
+  }
+  .rf-agent-avatar {
+    width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center;
+    border-radius: 10px; background: var(--color-primary); color: #fff;
+  }
+  .rf-agent-name { font-size: 13px; font-weight: 700; color: var(--color-ink); }
+  .rf-agent-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-ink-muted); }
+  .rf-agent-status i { width: 7px; height: 7px; border-radius: 999px; background: var(--color-success); }
+  .rf-agent-tag {
+    margin-left: auto; padding: 3px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    color: var(--color-primary); background: var(--color-primary-soft);
+  }
+
+  .rf-agent-body { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+
+  .rf-bubble {
+    max-width: 82%; padding: 9px 12px; border-radius: 14px;
+    font-size: 12.5px; line-height: 1.45;
+    opacity: 0; transform: translateY(8px);
+    animation: rf-reveal .5s cubic-bezier(.22, 1, .36, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  .rf-bubble.in { align-self: flex-start; background: var(--color-subtle); color: var(--color-ink); border-bottom-left-radius: 5px; }
+  .rf-bubble.out { align-self: flex-end; background: var(--color-primary); color: #fff; border-bottom-right-radius: 5px; }
+
+  .rf-order {
+    align-self: flex-end; width: min(240px, 88%);
+    padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 12px;
+    opacity: 0; transform: translateY(8px);
+    animation: rf-reveal .5s cubic-bezier(.22, 1, .36, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  .rf-order-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--color-ink); }
+  .rf-order-row + .rf-order-row { margin-top: 6px; }
+  .rf-order-row.muted { color: var(--color-ink-muted); }
+  .rf-order-total { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--color-line); font-weight: 700; }
+
+  .rf-typing {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
+    padding: 13px 14px; margin-bottom: 0; max-height: 44px; overflow: hidden;
+    background: var(--color-subtle);
+    border-radius: 14px; border-bottom-left-radius: 5px;
+    opacity: 0;
+    animation: rf-typing-life 1.6s cubic-bezier(.22, 1, .36, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  .rf-typing i {
+    width: 6px; height: 6px; flex-shrink: 0; border-radius: 999px;
+    background: var(--color-ink-faint); transform-origin: center;
+    animation: rf-pulse 1.1s ease-in-out infinite;
+  }
+  .rf-typing i:nth-child(2) { animation-delay: .16s; }
+  .rf-typing i:nth-child(3) { animation-delay: .32s; }
+
+  .rf-payin {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 12px; border-radius: 14px; border-bottom-left-radius: 5px;
+    font-size: 12.5px; font-weight: 600; color: #15803d; background: #dcfce7;
+    opacity: 0; transform: translateY(8px);
+    animation: rf-reveal .5s cubic-bezier(.22, 1, .36, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+}
+
+@keyframes rf-reveal {
+  to { opacity: 1; transform: none; }
+}
+@keyframes rf-typing-life {
+  0%   { opacity: 0; transform: translateY(8px); max-height: 44px; padding-top: 13px; padding-bottom: 13px; margin-bottom: 0; }
+  15%  { opacity: 1; transform: none; }
+  62%  { opacity: 1; transform: none; max-height: 44px; padding-top: 13px; padding-bottom: 13px; margin-bottom: 0; }
+  82%, 100% { opacity: 0; transform: none; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -10px; }
+}
+@keyframes rf-pulse {
+  0%, 100% { opacity: .4; transform: scale(.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes rf-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-agent { animation: none; }
+  .rf-bubble, .rf-order, .rf-payin { opacity: 1; transform: none; animation: none; }
+  .rf-typing { display: none; }
 }
