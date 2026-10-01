@@ -10,6 +10,7 @@ from .views import (
     orders,
     payments,
     products,
+    kitchen,
 )
 
 urlpatterns = [
@@ -37,6 +38,7 @@ urlpatterns = [
     path("pedidos/<str:order_id>/", orders.detail, name="order_detail"),
     path("pedidos/<str:order_id>/estado/", orders.change_status, name="order_change_status"),
     path("pedidos/<str:order_id>/cancelar/", orders.cancel, name="order_cancel"),
+    path("cocina/", kitchen.index, name="kitchen"),
 
     # Products & categories
     path("productos/", products.index, name="products"),
