@@ -7,6 +7,7 @@ from ..services.factory import get_client
 from ..services import dtos
 from ..services.client import Page
 from ..domain import pricing
+from ..domain import orders as orders_domain
 
 LIST_PAGE_SIZE = 12
 # UI-only filter groups over the real OrderStatus enum (backend rules unchanged).
@@ -103,11 +104,17 @@ def cancel(request, order_id):
         return HttpResponseBadRequest()
     get_client().cancel_order(order_id)
     return redirect("orders_listing")
-def detail(request,order_id):
-    o=required(get_client().get_order(order_id)); return page(request,'orders/detail.html',{**_ctx(request),'order':o,'flow':['PENDING','PAID','CONFIRMED','IN_PREPARATION','READY','DELIVERED']})
+
+def detail(request, order_id):
+    o=required(get_client().get_order(order_id))
+    return page(request,'orders/detail.html',{**_ctx(request),'order':o,'transitions':orders_domain.valid_transitions(o)})
+
 def change_status(request,order_id):
     if request.method!='POST': return HttpResponseBadRequest()
-    get_client().update_order_status(order_id,request.POST.get('status','PENDING')); return redirect('order_detail',order_id=order_id)
+    get_client().update_order_status(order_id,request.POST.get('status','PENDING'))
+    next_url = request.META.get('HTTP_REFERER')
+    return redirect(next_url) if next_url else redirect('order_detail',order_id=order_id)
+
 def new_order(request):
     c=get_client()
     products=[]
