@@ -6,7 +6,10 @@ from modules.order.application.ports.driver.configure_order_ports import (
 )
 from modules.order.application.ports.driven.order_repository import OrderRepository
 from modules.order.application.ports.driven.business_config_query import BusinessConfigQueryPort
-from modules.order.application.ports.driven.delivery_quote_query import DeliveryQuoteQuery
+from modules.order.application.ports.driven.delivery_quote_query import (
+    DeliveryQuoteQuery,
+    DeliveryQuoteSnapshot,
+)
 from modules.order.domain.errors.order_errors import (
     OrderNotFound,
     OrderNotModifiableError,
@@ -24,10 +27,12 @@ class ConfigureOrderUseCase(ConfigureOrderPort):
         order_repo: OrderRepository,
         config_query: BusinessConfigQueryPort,
         delivery_quote: Optional[DeliveryQuoteQuery] = None,
+        prep_time_estimator: Optional[object] = None,
     ):
         self.order_repo = order_repo
         self.config_query = config_query
         self.delivery_quote = delivery_quote
+        self.prep_time_estimator = prep_time_estimator
 
     def set_delivery_details(self, command: SetDeliveryDetailsCommand) -> SetDeliveryDetailsResponse:
         order = self.order_repo.get_by_id(command.order_id)
@@ -46,11 +51,20 @@ class ConfigureOrderUseCase(ConfigureOrderPort):
             order.business_config_id = config.business_config_id
             order.address_id = command.address_id
             order.delivery_address = destination
-            order.shipping_cost = self._quote_shipping(config, destination)
+            quote = self._quote(config, destination)
+            order.shipping_cost = quote.shipping_cost
+            order.route_duration_minutes = (
+                round(quote.estimated_duration_minutes)
+                if quote.estimated_duration_minutes is not None
+                else None
+            )
         else:
             order.address_id = None
             order.delivery_address = None
             order.shipping_cost = Decimal("0")
+            order.route_duration_minutes = None
+
+        order.estimated_time = self._estimate_time(order)
 
         # Recalculate totals with new shipping cost
         order._recalculate_totals()
@@ -63,17 +77,28 @@ class ConfigureOrderUseCase(ConfigureOrderPort):
             total_amount=str(order.total_amount)
         )
 
-    def _quote_shipping(self, config, destination: DeliveryAddress) -> Decimal:
+    def _quote(
+        self, config, destination: DeliveryAddress
+    ) -> DeliveryQuoteSnapshot:
         """Real quote when a delivery provider is wired; flat config cost otherwise."""
         if self.delivery_quote is None:
-            return config.shipping_cost
+            return DeliveryQuoteSnapshot(
+                available=True, shipping_cost=config.shipping_cost
+            )
 
         quote = self.delivery_quote.quote(config.business_config_id, destination)
         if not quote.available or quote.shipping_cost is None:
             raise DeliveryNotAvailableError(
                 "No se puede entregar en esa dirección."
             )
-        return quote.shipping_cost
+        return quote
+
+    def _estimate_time(self, order) -> Optional[int]:
+        """ETA = preparation (demand) + delivery travel time, when available."""
+        if self.prep_time_estimator is None or not order.business_config_id:
+            return order.estimated_time
+        prep = self.prep_time_estimator.estimate_minutes(order.business_config_id)
+        return prep + (order.route_duration_minutes or 0)
 
 
 def _destination_from(command: SetDeliveryDetailsCommand) -> DeliveryAddress:

@@ -30,6 +30,9 @@ class Order:
     coupon_code: Optional[str] = None
     conversation_id: Optional[str] = None
     estimated_time: Optional[int] = None
+    # Delivery travel time snapshot (route duration from the delivery quote), so
+    # the ETA can be recomputed at confirmation without repeating routing.
+    route_duration_minutes: Optional[int] = None
     delivery_type: Optional[DeliveryType] = None
     payment_type: Optional[PaymentMethod] = None
     origin: OrderOrigin = OrderOrigin.IN_PLACE

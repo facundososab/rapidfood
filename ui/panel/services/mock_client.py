@@ -615,3 +615,12 @@ class MockRapidfoodClient(RapidfoodClient):
     def save_delivery_config(self, business_config_id: str, payload: dict) -> dict:
         self._delivery_config = dict(payload)
         return self._delivery_config
+
+    def get_preparation_time_config(self, business_config_id: str) -> dict:
+        if not hasattr(self, "_prep_time_config"):
+            self._prep_time_config = {}
+        return self._prep_time_config
+
+    def save_preparation_time_config(self, business_config_id: str, payload: dict) -> dict:
+        self._prep_time_config = dict(payload)
+        return self._prep_time_config

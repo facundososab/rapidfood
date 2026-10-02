@@ -81,6 +81,7 @@ model BusinessConfiguration {
   conversations Conversation[]
   idempotentOperations IdempotentOperation[]
   deliveryPricingConfiguration DeliveryPricingConfiguration?
+  preparationTimeConfiguration PreparationTimeConfiguration?
   staff         Staff[]
 
   @@map("business_configuration")
@@ -191,6 +192,9 @@ model Message {
 model Order {
   id              String          @id @default(uuid()) @map("order_id") @db.Uuid
   estimatedTime   Int?            @map("estimated_time") // minutes (RN-025/037)
+  // Delivery travel time snapshot (route duration from the delivery quote) so the
+  // ETA can be recomputed at confirmation without repeating routing.
+  routeDurationMinutes Int?       @map("route_duration_minutes")
   deliveryType    DeliveryType?   @map("delivery_type") // null until REQ-033
   paymentType     PaymentType?    @map("payment_type") // null until REQ-033
   status          OrderStatus     @default(DRAFT)
@@ -541,6 +545,24 @@ model DeliveryWeekdayPricingRule {
 
   @@unique([deliveryPricingConfigId, weekDay])
   @@map("delivery_weekday_pricing_rule")
+}
+
+// Per-restaurant preparation-time (ETA) configuration, with its OWN demand
+// thresholds (independent from delivery pricing). 1:1 with BusinessConfiguration.
+model PreparationTimeConfiguration {
+  id                        String                @id @default(uuid()) @map("preparation_time_configuration_id") @db.Uuid
+  businessConfigId          String                @unique @map("business_config_id") @db.Uuid
+  businessConfig            BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+
+  highDemandThreshold       Int                   @map("high_demand_threshold")
+  veryHighDemandThreshold   Int                   @map("very_high_demand_threshold")
+
+  normalPrepMinutes         Int                   @map("normal_prep_minutes")
+  highDemandPrepMinutes     Int                   @map("high_demand_prep_minutes")
+  veryHighDemandPrepMinutes Int                   @map("very_high_demand_prep_minutes")
+  bufferMinutes             Int                   @map("buffer_minutes")
+
+  @@map("preparation_time_configuration")
 }
 
 // --- Auth module: restaurant staff -------------------------------------------

@@ -13,12 +13,18 @@ def index(request, tab='general'):
     business = client.get_business_config()
     delivery = None
     delivery_json = 'null'
+    prep_time = None
+    prep_time_json = 'null'
     business_hours_json = '[]'
 
     if business and business.id:
         delivery = client.get_delivery_config(business.id)
         if delivery:
             delivery_json = json.dumps(delivery) if isinstance(delivery, dict) else 'null'
+
+        prep_time = client.get_preparation_time_config(business.id)
+        if prep_time:
+            prep_time_json = json.dumps(prep_time) if isinstance(prep_time, dict) else 'null'
 
         if business.businessHours:
             bh = [
@@ -37,6 +43,8 @@ def index(request, tab='general'):
         'business': business,
         'delivery': delivery,
         'delivery_json': delivery_json,
+        'prep_time': prep_time,
+        'prep_time_json': prep_time_json,
         'business_hours_json': business_hours_json,
     })
 
@@ -143,3 +151,33 @@ def save_delivery(request):
         return HttpResponseBadRequest(str(e))
 
     return redirect('configuration_delivery_view')
+
+
+def save_preparation_time(request):
+    if request.method != 'POST':
+        return HttpResponseBadRequest()
+
+    business_id = request.POST.get("business_config_id")
+    if not business_id:
+        return HttpResponseBadRequest("Missing business_config_id")
+
+    try:
+        payload = {
+            "high_demand_threshold": int(request.POST.get("high_demand_threshold", 0)),
+            "very_high_demand_threshold": int(
+                request.POST.get("very_high_demand_threshold", 0)
+            ),
+            "normal_prep_minutes": int(request.POST.get("normal_prep_minutes", 0)),
+            "high_demand_prep_minutes": int(
+                request.POST.get("high_demand_prep_minutes", 0)
+            ),
+            "very_high_demand_prep_minutes": int(
+                request.POST.get("very_high_demand_prep_minutes", 0)
+            ),
+            "buffer_minutes": int(request.POST.get("buffer_minutes", 0)),
+        }
+        get_client().save_preparation_time_config(business_id, payload)
+    except Exception as e:
+        return HttpResponseBadRequest(str(e))
+
+    return redirect('configuration_prep_time_view')

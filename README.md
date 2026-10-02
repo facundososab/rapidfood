@@ -210,3 +210,15 @@ Reglas de arquitectura (verificadas por import-linter):
 - Las apps se comunican entre sí SOLO vía `application/ports` (nunca `adapters/`, `use_cases/`, `domain/`).
 - `domain/`, `application/ports/` y `application/use_cases/` NO importan `django`, `rest_framework` ni `prisma`.
 - Los adapters HTTP (inbound) nunca tocan adapters outbound directamente.
+
+## Documentación
+
+Guías en `docs/`:
+
+- [`docs/reglas-de-calculo.md`](docs/reglas-de-calculo.md) — cómo se calcula el **precio total**, el **costo de envío** y el **tiempo de entrega** (fórmulas, ejemplos y referencias al código).
+- [`docs/ARCHITECTURE-GUIDE.md`](docs/ARCHITECTURE-GUIDE.md) — arquitectura hexagonal y decisiones de diseño.
+- [`docs/modelo-dominio.md`](docs/modelo-dominio.md) — modelo de dominio.
+- [`docs/order-state-machine.md`](docs/order-state-machine.md) — máquina de estados del pedido.
+- [`docs/reglas-negocio.md`](docs/reglas-negocio.md) — reglas de negocio.
+- [`docs/req-funcionales.md`](docs/req-funcionales.md) — requisitos funcionales.
+- [`docs/mercadopago-payments-implementation-plan.md`](docs/mercadopago-payments-implementation-plan.md) — plan de pagos con Mercado Pago.

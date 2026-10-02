@@ -760,3 +760,16 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     def save_delivery_config(self, business_config_id, payload):
         return self._post(f"/api/delivery/{business_config_id}/configure/", payload)
+
+    def get_preparation_time_config(self, business_config_id):
+        try:
+            return self._get(
+                f"/api/orders/preparation-time/{business_config_id}/configure/"
+            )
+        except RuntimeError:
+            return None
+
+    def save_preparation_time_config(self, business_config_id, payload):
+        return self._post(
+            f"/api/orders/preparation-time/{business_config_id}/configure/", payload
+        )
