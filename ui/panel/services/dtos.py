@@ -289,6 +289,27 @@ class Conversation:
     lastMessage: Optional[str] = None
     lastAt: Optional[datetime] = None
 
+    @property
+    def displayPhone(self) -> Optional[str]:
+        """Linked client phone, else the WhatsApp thread id (which IS the phone)."""
+        if self.clientPhone:
+            return self.clientPhone
+        if self.channel == "WHATSAPP" and self.externalThreadId:
+            return _format_phone(self.externalThreadId)
+        return None
+
+    @property
+    def displayName(self) -> Optional[str]:
+        """Contact label: linked client name, else the phone, else None."""
+        return self.clientName or self.displayPhone
+
+
+def _format_phone(value: str) -> str:
+    digits = (value or "").strip()
+    if not digits:
+        return ""
+    return digits if digits.startswith("+") else f"+{digits}"
+
 
 @dataclass
 class Coupon:

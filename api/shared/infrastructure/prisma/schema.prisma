@@ -82,9 +82,39 @@ model BusinessConfiguration {
   idempotentOperations IdempotentOperation[]
   deliveryPricingConfiguration DeliveryPricingConfiguration?
   preparationTimeConfiguration PreparationTimeConfiguration?
+  whatsappConfig WhatsAppConfiguration?
   staff         Staff[]
 
   @@map("business_configuration")
+}
+
+// Per-restaurant WhatsApp Cloud API credentials (1:1 with BusinessConfiguration).
+// `accessTokenEnc` / `appSecretEnc` are stored ENCRYPTED (Fernet): the secrets
+// never persist in plaintext and the REST layer never returns them. The
+// encryption key lives in the environment, not in the database.
+model WhatsAppConfiguration {
+  id                 String                @id @default(uuid()) @map("whatsapp_config_id") @db.Uuid
+  businessConfigId   String                @unique @map("business_config_id") @db.Uuid
+  businessConfig     BusinessConfiguration @relation(fields: [businessConfigId], references: [id], onDelete: Cascade)
+
+  phoneNumberId      String                @unique @map("phone_number_id")
+  wabaId             String?               @map("waba_id")
+  displayPhoneNumber String?               @map("display_phone_number")
+  verifyToken        String                @map("verify_token")
+
+  accessTokenEnc     String                @map("access_token_enc")
+  appSecretEnc       String                @map("app_secret_enc")
+
+  apiVersion         String                @default("v21.0") @map("api_version")
+  // Template fallback for the order-paid notice OUTSIDE the 24h window. Inside
+  // the window a free-form text is used instead (no template needed).
+  orderPaidTemplateName String?           @map("order_paid_template_name")
+  orderPaidTemplateLang String?           @default("es_AR") @map("order_paid_template_lang")
+  isActive           Boolean               @default(true) @map("is_active")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  @@map("whatsapp_configuration")
 }
 
 model BusinessHours {

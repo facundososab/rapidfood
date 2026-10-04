@@ -1,6 +1,8 @@
 """Login/logout views for the admin panel (Supabase Auth / GoTrue)."""
 from __future__ import annotations
 
+import time
+
 from django.shortcuts import redirect, render
 from django.views import View
 
@@ -50,16 +52,22 @@ class LoginView(View):
             )
 
         try:
-            token, user_email = login_with_password(email, password)
+            result = login_with_password(email, password)
         except AuthError as exc:
             message = _ERROR_MESSAGES.get(exc.code, _ERROR_MESSAGES["server_error"])
             return render(request, "login.html", {"email": email, "error": message})
 
-        request.session["supabase_access_token"] = token
-        request.session["supabase_email"] = user_email
+        request.session["supabase_access_token"] = result.access_token
+        request.session["supabase_email"] = result.email
+        if result.refresh_token:
+            request.session["supabase_refresh_token"] = result.refresh_token
+        if result.expires_in:
+            request.session["supabase_expires_at"] = int(time.time()) + int(
+                result.expires_in
+            )
 
         # Best-effort: enrich the session with the staff profile from the API.
-        profile = fetch_staff_profile(token)
+        profile = fetch_staff_profile(result.access_token)
         if profile:
             request.session["supabase_staff"] = profile
 
@@ -72,4 +80,7 @@ class LogoutView(View):
         return redirect("login")
 
     def get(self, request):
+        # Visiting /logout/ in the browser must actually sign out; otherwise an
+        # expired session survives and bounces back to the dashboard.
+        request.session.flush()
         return redirect("login")

@@ -8,6 +8,7 @@ the delivery mechanism belong to the adapter behind the port.
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from modules.conversation.application.ports.driven.order_service import (
     OrderSummaryDTO,
@@ -16,6 +17,12 @@ from modules.conversation.application.ports.driven.outbound_message import (
     OutboundMessage,
     OutboundMessagePort,
 )
+from modules.conversation.application.ports.driven.clock import ClockPort
+from modules.conversation.application.ports.driven.message_repository import (
+    MessageRepositoryPort,
+)
+from modules.conversation.domain.models.message import Message
+from modules.conversation.domain.value_objects import MessageRole, MessageStatus
 from modules.conversation.application.ports.driver.notify_order_paid_port import (
     NotifyOrderPaidCommand,
     NotifyOrderPaidPort,
@@ -29,11 +36,15 @@ class NotifyOrderPaidUseCase(NotifyOrderPaidPort):
         self,
         order_service: Any,
         conversation_repository: Any,
+        message_repository: MessageRepositoryPort,
         outbound_message: OutboundMessagePort,
+        clock: ClockPort,
     ) -> None:
         self._order_service = order_service
         self._conversation_repository = conversation_repository
+        self._message_repository = message_repository
         self._outbound = outbound_message
+        self._clock = clock
 
     def execute(self, command: NotifyOrderPaidCommand) -> bool:
         conversation = self._conversation_repository.get_by_id(command.conversation_id)
@@ -42,6 +53,19 @@ class NotifyOrderPaidUseCase(NotifyOrderPaidPort):
 
         summary = self._order_service.get_order_summary(command.order_id)
         content = compose_order_paid_message(summary)
+
+        # Persist here: the outbound port is send-only, so the notification would
+        # otherwise be missing from the panel thread.
+        self._message_repository.add(
+            Message(
+                message_id=str(uuid4()),
+                conversation_id=command.conversation_id,
+                role=MessageRole.AGENT,
+                content=content,
+                status=MessageStatus.PROCESSED,
+                created_at=self._clock.now(),
+            )
+        )
         self._outbound.send(
             OutboundMessage(
                 conversation_id=command.conversation_id,

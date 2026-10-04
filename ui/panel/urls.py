@@ -102,4 +102,6 @@ urlpatterns = [
     path("configuracion/direccion/crear/", configuration.create_address, name="configuration_address_create"),
     path("configuracion/direccion/<str:address_id>/eliminar/", configuration.delete_address, name="configuration_address_delete"),
     path("configuracion/envios/guardar/", configuration.save_delivery, name="configuration_delivery"),
+    path("configuracion/whatsapp/", configuration.index, {"tab": "whatsapp"}, name="configuration_whatsapp_view"),
+    path("configuracion/whatsapp/guardar/", configuration.save_whatsapp, name="configuration_whatsapp"),
 ]

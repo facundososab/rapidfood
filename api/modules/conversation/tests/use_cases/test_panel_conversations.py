@@ -24,8 +24,9 @@ class FakeClock:
 
 
 class FakeHandler:
-    def __init__(self, response="¡Dale! ¿Algo más?"):
+    def __init__(self, response="¡Dale! ¿Algo más?", paused=False):
         self.response = response
+        self.paused = paused
         self.calls = []
 
     def execute(self, command):
@@ -38,7 +39,8 @@ class FakeHandler:
             conversation_id=command.context.conversation_id,
             user_message_id="u-1",
             assistant_message_id="a-1",
-            response=self.response,
+            response="" if self.paused else self.response,
+            paused=self.paused,
         )
 
 
@@ -141,21 +143,21 @@ def test_reply_as_client_runs_the_agent_when_not_paused():
     assert context.external_message_id  # stable per ingress
 
 
-def test_reply_as_client_only_persists_the_message_when_paused():
+def test_reply_as_client_reflects_a_paused_core_result():
+    """Pause is the CORE's policy; the panel only reflects it and does not send."""
     conversations, messages, _ = _repos()
-    conversations.set_agent_paused("conv-1", True)
-    handler = FakeHandler()
+    handler = FakeHandler(paused=True)
+    sender = RecordingSender()
     use_case = ReplyAsClientForConversationUseCase(
-        conversations, messages, handler, FakeClock()
+        conversations, messages, handler, FakeClock(), send_message=sender
     )
 
     result = use_case.execute("conv-1", "hola?")
 
     assert result.paused is True
     assert result.response is None
-    assert handler.calls == []  # the agent never ran
-    assert [m.role for m in result.detail.messages] == ["USER"]
-    assert [m.author for m in result.detail.messages] == ["CLIENT"]
+    assert handler.calls  # the panel delegated to the core use case
+    assert sender.sent == []  # no reply delivered while paused
 
 
 def test_takeover_toggles_the_flag_and_returns_the_thread():
@@ -172,3 +174,37 @@ def test_detail_of_an_unknown_conversation_fails():
     conversations, messages, _ = _repos()
     with pytest.raises(ConversationNotFoundError):
         GetConversationDetailUseCase(conversations, messages).execute("missing")
+
+
+class RecordingSender:
+    def __init__(self):
+        self.sent = []
+
+    def execute(self, command):
+        self.sent.append((command.conversation_id, command.content))
+        return True
+
+
+def test_operator_message_is_delivered_to_the_channel():
+    conversations, messages, _ = _repos()
+    sender = RecordingSender()
+    use_case = AppendOperatorMessageUseCase(
+        conversations, messages, FakeClock(), send_message=sender
+    )
+
+    use_case.execute("conv-1", "Hola, soy el local")
+
+    assert sender.sent == [("conv-1", "Hola, soy el local")]
+
+
+def test_reply_as_client_delivers_the_agent_response():
+    conversations, messages, _ = _repos()
+    sender = RecordingSender()
+    use_case = ReplyAsClientForConversationUseCase(
+        conversations, messages, FakeHandler("Listo"), FakeClock(), send_message=sender
+    )
+
+    result = use_case.execute("conv-1", "quiero una pizza")
+
+    assert result.response == "Listo"
+    assert sender.sent == [("conv-1", "Listo")]

@@ -1,6 +1,7 @@
 """Adapts the client module's public ports to `ClientServicePort`."""
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from modules.client.application.ports.driver.create_client_ports import (
@@ -10,6 +11,22 @@ from modules.conversation.application.ports.driven.client_service import (
     ClientInfoDTO,
     ClientServicePort,
 )
+
+
+def _phone_candidates(phone: str) -> list[str]:
+    """Equivalent spellings of the same phone, in lookup order.
+
+    WhatsApp sends the wa_id as bare digits ("5493413531061") while a client
+    created elsewhere may be stored as "+5493413531061", "549 341 353 1061", etc.
+    Matching all of these avoids creating a duplicate client for the same person.
+    """
+    raw = (phone or "").strip()
+    digits = re.sub(r"\D", "", raw)
+    candidates: list[str] = []
+    for candidate in (raw, digits, f"+{digits}" if digits else ""):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
 
 
 class ClientServiceAdapter(ClientServicePort):
@@ -34,6 +51,16 @@ class ClientServiceAdapter(ClientServicePort):
             phone_number=found.phone_number,
         )
 
+    def _find_existing(self, phone: str):
+        for candidate in _phone_candidates(phone):
+            try:
+                found = self._find_by_phone_number(candidate)
+            except Exception:
+                found = None
+            if found is not None:
+                return found
+        return None
+
     def resolve_client(
         self, full_name: str, phone_number: Optional[str] = None
     ) -> Optional[str]:
@@ -41,10 +68,7 @@ class ClientServiceAdapter(ClientServicePort):
         if not phone or self._create_client is None:
             return None
 
-        try:
-            existing = self._find_by_phone_number(phone)
-        except Exception:
-            existing = None
+        existing = self._find_existing(phone)
         if existing is not None:
             return existing.id
 
@@ -65,8 +89,5 @@ class ClientServiceAdapter(ClientServicePort):
             return created.id
         except Exception:
             # Already created by a concurrent turn: reuse it if it exists now.
-            try:
-                existing = self._find_by_phone_number(phone)
-            except Exception:
-                existing = None
+            existing = self._find_existing(phone)
             return existing.id if existing is not None else None

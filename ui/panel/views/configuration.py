@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 
+from django.contrib import messages
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect
 
@@ -16,6 +17,7 @@ def index(request, tab='general'):
     prep_time = None
     prep_time_json = 'null'
     business_hours_json = '[]'
+    whatsapp = {'configured': False}
 
     if business and business.id:
         delivery = client.get_delivery_config(business.id)
@@ -25,6 +27,8 @@ def index(request, tab='general'):
         prep_time = client.get_preparation_time_config(business.id)
         if prep_time:
             prep_time_json = json.dumps(prep_time) if isinstance(prep_time, dict) else 'null'
+
+        whatsapp = client.get_whatsapp_config(business.id)
 
         if business.businessHours:
             bh = [
@@ -46,6 +50,7 @@ def index(request, tab='general'):
         'prep_time': prep_time,
         'prep_time_json': prep_time_json,
         'business_hours_json': business_hours_json,
+        'whatsapp': whatsapp,
     })
 
 
@@ -69,8 +74,10 @@ def save_general(request):
         if hours:
             get_client().save_business_hours(business_id, hours)
     except Exception as e:
-        return HttpResponseBadRequest(f"Error saving hours: {str(e)}")
+        messages.error(request, f"No se pudo guardar: {e}")
+        return redirect('configuration')
 
+    messages.success(request, 'Datos del negocio guardados.')
     return redirect('configuration')
 
 
@@ -101,6 +108,7 @@ def create_address(request):
     else:
         client.create_business_address(business_id, payload)
 
+    messages.success(request, 'Dirección guardada.')
     return redirect('configuration_address_view')
 
 
@@ -110,6 +118,7 @@ def delete_address(request, address_id):
 
     business_id = request.POST.get('business_config_id', 'default')
     get_client().delete_business_address(business_id, address_id)
+    messages.success(request, 'Dirección eliminada.')
     return redirect('configuration_address_view')
 
 
@@ -148,8 +157,10 @@ def save_delivery(request):
         }
         get_client().save_delivery_config(business_id, payload)
     except Exception as e:
-        return HttpResponseBadRequest(str(e))
+        messages.error(request, f"No se pudo guardar envíos: {e}")
+        return redirect('configuration_delivery_view')
 
+    messages.success(request, 'Configuración de envíos guardada.')
     return redirect('configuration_delivery_view')
 
 
@@ -178,6 +189,43 @@ def save_preparation_time(request):
         }
         get_client().save_preparation_time_config(business_id, payload)
     except Exception as e:
-        return HttpResponseBadRequest(str(e))
+        messages.error(request, f"No se pudieron guardar los tiempos: {e}")
+        return redirect('configuration_prep_time_view')
 
+    messages.success(request, 'Tiempos de preparación guardados.')
     return redirect('configuration_prep_time_view')
+
+
+def _clean(value):
+    value = (value or '').strip()
+    return value or None
+
+
+def save_whatsapp(request):
+    if request.method != 'POST':
+        return HttpResponseBadRequest()
+
+    business_id = request.POST.get("business_config_id")
+    if not business_id:
+        return HttpResponseBadRequest("Missing business_config_id")
+
+    payload = {
+        "phone_number_id": request.POST.get("phone_number_id", "").strip(),
+        "verify_token": request.POST.get("verify_token", "").strip(),
+        "access_token": _clean(request.POST.get("access_token")) or "",
+        "app_secret": _clean(request.POST.get("app_secret")) or "",
+        "api_version": _clean(request.POST.get("api_version")) or "v21.0",
+        "waba_id": _clean(request.POST.get("waba_id")),
+        "display_phone_number": _clean(request.POST.get("display_phone_number")),
+        "order_paid_template_name": _clean(request.POST.get("order_paid_template_name")),
+        "order_paid_template_lang": _clean(request.POST.get("order_paid_template_lang")) or "es_AR",
+        "is_active": request.POST.get("is_active") == "on",
+    }
+    try:
+        get_client().save_whatsapp_config(business_id, payload)
+    except Exception as e:
+        messages.error(request, f"No se pudo guardar WhatsApp: {e}")
+        return redirect('configuration_whatsapp_view')
+
+    messages.success(request, "Configuración de WhatsApp guardada.")
+    return redirect('configuration_whatsapp_view')

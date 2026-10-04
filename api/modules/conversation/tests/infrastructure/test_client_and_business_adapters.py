@@ -71,6 +71,24 @@ def test_creation_race_reuses_the_client_created_meanwhile():
     assert adapter.resolve_client("Facundo Sosa", "341353106") == "client-raced"
 
 
+def test_a_phone_with_or_without_the_plus_matches_the_same_client():
+    def find(phone):
+        return SimpleNamespace(id="client-1") if phone == "+5493413531061" else None
+
+    adapter = ClientServiceAdapter(find, Stub())
+
+    assert adapter.resolve_client("Facundo Sosa", "5493413531061") == "client-1"
+
+
+def test_separators_are_ignored_when_matching():
+    def find(phone):
+        return SimpleNamespace(id="client-1") if phone == "5493413531061" else None
+
+    adapter = ClientServiceAdapter(find, Stub())
+
+    assert adapter.resolve_client("Facundo Sosa", "549 341 353-1061") == "client-1"
+
+
 # --- business address -----------------------------------------------------
 def test_business_address_comes_from_the_first_configured_address():
     get_configuration = Stub(
