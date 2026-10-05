@@ -20,6 +20,9 @@ from modules.conversation.application.ports.driver.panel_conversation_ports impo
     ConversationMessageDTO,
     ConversationSummaryDTO,
 )
+from modules.conversation.application.ports.driver.whatsapp_messaging_ports import (
+    SendConversationMessageCommand,
+)
 from modules.conversation.application.use_cases.handle_incoming_message import (
     HandleIncomingMessageCommand,
     HandleIncomingMessageUseCase,
@@ -155,10 +158,12 @@ class AppendOperatorMessageUseCase:
         conversation_repository: ConversationRepositoryPort,
         message_repository: MessageRepositoryPort,
         clock: ClockPort,
+        send_message=None,
     ) -> None:
         self._conversation_repository = conversation_repository
         self._message_repository = message_repository
         self._clock = clock
+        self._send_message = send_message
 
     def execute(self, conversation_id: str, content: str) -> ConversationDetailDTO:
         record = self._conversation_repository.get_by_id(conversation_id)
@@ -176,6 +181,13 @@ class AppendOperatorMessageUseCase:
                 created_at=self._clock.now(),
             )
         )
+        # Deliver to the customer's channel (WhatsApp) when applicable.
+        if self._send_message is not None:
+            self._send_message.execute(
+                SendConversationMessageCommand(
+                    conversation_id=conversation_id, content=content
+                )
+            )
         messages = self._message_repository.list_by_conversation(conversation_id)
         return _detail(record, messages)
 
@@ -189,11 +201,13 @@ class ReplyAsClientForConversationUseCase:
         message_repository: MessageRepositoryPort,
         handle_incoming_message: HandleIncomingMessageUseCase,
         clock: ClockPort,
+        send_message=None,
     ) -> None:
         self._conversation_repository = conversation_repository
         self._message_repository = message_repository
         self._handle_incoming_message = handle_incoming_message
         self._clock = clock
+        self._send_message = send_message
 
     def execute(self, conversation_id: str, content: str) -> ClientReplyResultDTO:
         record = self._conversation_repository.get_by_id(conversation_id)
@@ -210,25 +224,21 @@ class ReplyAsClientForConversationUseCase:
             external_message_id=external_message_id,
         )
 
-        paused = bool(record.agent_paused)
-        response = None
-        if paused:
-            # A human owns the conversation: keep the customer message, no agent.
-            self._message_repository.add(
-                Message(
-                    message_id=external_message_id,
-                    conversation_id=conversation_id,
-                    role=MessageRole.USER,
-                    content=content,
-                    status=MessageStatus.RECEIVED,
-                    created_at=self._clock.now(),
+        # The turn policy (persist USER + human-takeover pause) lives in the core
+        # use case, shared with every channel driver.
+        result = self._handle_incoming_message.execute(
+            HandleIncomingMessageCommand(context=context, content=content)
+        )
+        paused = result.paused
+        response = result.response or None
+        # The agent's reply must reach the customer's WhatsApp, not just the panel
+        # (the message is already persisted by the handler).
+        if response and not paused and self._send_message is not None:
+            self._send_message.execute(
+                SendConversationMessageCommand(
+                    conversation_id=conversation_id, content=response
                 )
             )
-        else:
-            result = self._handle_incoming_message.execute(
-                HandleIncomingMessageCommand(context=context, content=content)
-            )
-            response = result.response
 
         messages = self._message_repository.list_by_conversation(conversation_id)
         return ClientReplyResultDTO(

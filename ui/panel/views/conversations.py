@@ -8,8 +8,8 @@ _PANE_PARTIAL = 'conversations/partials/conversation.html'
 
 
 def _label(conversation) -> str:
-    if conversation is not None and conversation.clientName:
-        return conversation.clientName
+    if conversation is not None:
+        return conversation.displayName or 'Cliente sin identificar'
     return 'Cliente sin identificar'
 
 

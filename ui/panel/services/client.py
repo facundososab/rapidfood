@@ -252,3 +252,17 @@ class RapidfoodClient(ABC):
 
     @abstractmethod
     def save_delivery_config(self, business_config_id: str, payload: dict) -> dict: ...
+
+    # ---- Preparation time (ETA) configuration ----------------------------
+    @abstractmethod
+    def get_preparation_time_config(self, business_config_id: str) -> dict: ...
+
+    @abstractmethod
+    def save_preparation_time_config(self, business_config_id: str, payload: dict) -> dict: ...
+
+    # ---- WhatsApp configuration ------------------------------------------
+    @abstractmethod
+    def get_whatsapp_config(self, business_config_id: str) -> dict: ...
+
+    @abstractmethod
+    def save_whatsapp_config(self, business_config_id: str, payload: dict) -> dict: ...

@@ -23,6 +23,7 @@ from .views import (
     SetPickupView,
     OrderSummaryView,
     SetClientView,
+    PreparationTimeConfigurationView,
 )
 
 urlpatterns = [
@@ -33,6 +34,11 @@ urlpatterns = [
     path('draft/current/', CurrentDraftView.as_view(), name='current-draft'),
     path('latest-active/', LatestActiveOrderView.as_view(), name='latest-active-order'),
     path('payments/mercadopago/webhook/', MercadoPagoWebhookView.as_view(), name='mercadopago-webhook'),
+    path(
+        'preparation-time/<str:business_config_id>/configure/',
+        PreparationTimeConfigurationView.as_view(),
+        name='preparation-time-configuration',
+    ),
     path('<uuid:order_id>/', OrderDetailView.as_view(), name='order-detail'),
     path('<uuid:order_id>/payment-link/', PaymentLinkView.as_view(), name='create-payment-link'),
     path(

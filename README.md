@@ -123,6 +123,50 @@ dominio HTTPS reservado para recibir las notificaciones de pago.
 > `MERCADOPAGO_SUCCESS_URL` / `FAILURE_URL` / `PENDING_URL` (que apuntan a la raíz del dominio).
 > La configuración vive en `docker/nginx/default.conf`.
 
+### WhatsApp Cloud API (credenciales por negocio)
+
+Cada negocio conecta su propia app de Meta. Las credenciales se cargan desde el panel
+(**Configuración → WhatsApp**) y se guardan por negocio en `whatsapp_configuration`; el
+`access token` y el `app secret` se encriptan at rest (Fernet).
+
+1. Generá la clave de encriptación y agregala al `.env` de la raíz:
+
+   ```bash
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+
+   ```bash
+   WHATSAPP_CONFIG_ENCRYPTION_KEY=la_clave_generada
+   ```
+
+2. Aplicá el schema y regenerá el cliente Prisma:
+
+   ```bash
+   cd api
+   uv run prisma migrate deploy
+   uv run prisma generate
+   ```
+
+3. En el panel, cargá `phone_number_id`, `verify_token`, `access_token` y `app secret`
+   de tu app de Meta.
+
+4. En Meta → WhatsApp → Configuration → Webhook:
+   - **Callback URL:** `https://<NGROK_DOMAIN>/api/conversation/webhook/whatsapp/`
+   - **Verify token:** el mismo que cargaste en el panel.
+   - **Campo suscrito:** `messages`.
+
+Con eso el bot responde por WhatsApp y también confirma el pago de una orden. La confirmación
+usa **texto libre dentro de la ventana de 24h**; fuera de la ventana WhatsApp exige un
+**template** (configurá su nombre e idioma en el panel como fallback).
+
+> Para desarrollar sin costo usá el **número de prueba** de Meta (no pide método de pago).
+> Los mensajes entrantes son gratis; desde el 1-oct-2026 las respuestas dentro de la ventana
+> tienen 1.000 gratis por número/mes y después se cobran.
+
+> **Guía completa paso a paso:** [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) —
+> crear la app en Meta, requisitos del número (sin WhatsApp asociado), access token
+> permanente, app secret, webhook y solución de problemas.
+
 ## Setup sin Docker (todo local)
 
 Requiere **PostgreSQL**, **uv** y **Python 3.13**. Solo difieren la instalación/gestión de
@@ -210,3 +254,16 @@ Reglas de arquitectura (verificadas por import-linter):
 - Las apps se comunican entre sí SOLO vía `application/ports` (nunca `adapters/`, `use_cases/`, `domain/`).
 - `domain/`, `application/ports/` y `application/use_cases/` NO importan `django`, `rest_framework` ni `prisma`.
 - Los adapters HTTP (inbound) nunca tocan adapters outbound directamente.
+
+## Documentación
+
+Guías en `docs/`:
+
+- [`docs/reglas-de-calculo.md`](docs/reglas-de-calculo.md) — cómo se calcula el **precio total**, el **costo de envío** y el **tiempo de entrega** (fórmulas, ejemplos y referencias al código).
+- [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) — **conectar un número de WhatsApp**: crear la app en Meta, requisitos del número, credenciales (access token, app secret, verify token), webhook y problemas comunes.
+- [`docs/ARCHITECTURE-GUIDE.md`](docs/ARCHITECTURE-GUIDE.md) — arquitectura hexagonal y decisiones de diseño.
+- [`docs/modelo-dominio.md`](docs/modelo-dominio.md) — modelo de dominio.
+- [`docs/order-state-machine.md`](docs/order-state-machine.md) — máquina de estados del pedido.
+- [`docs/reglas-negocio.md`](docs/reglas-negocio.md) — reglas de negocio.
+- [`docs/req-funcionales.md`](docs/req-funcionales.md) — requisitos funcionales.
+- [`docs/mercadopago-payments-implementation-plan.md`](docs/mercadopago-payments-implementation-plan.md) — plan de pagos con Mercado Pago.

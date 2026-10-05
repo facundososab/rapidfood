@@ -245,3 +245,27 @@ def test_confirm_rejects_a_cancelled_order():
     )
     with pytest.raises(OrderNotModifiableError):
         uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+
+def test_confirm_recomputes_the_eta_with_fresh_demand():
+    order = make_order_with_line()
+    order.business_config_id = "b-1"
+    order.route_duration_minutes = 12
+    order.estimated_time = 999  # stale value from set_delivery time
+    mock_repo = Mock()
+    mock_repo.get_by_id.return_value = order
+
+    class FakeEstimator:
+        def estimate_minutes(self, business_config_id):
+            return 25
+
+    uc = ConfirmOrderUseCase(
+        order_repo=mock_repo,
+        config_query=make_config_query(),
+        catalog_query=make_catalog_query(variant_price=Decimal("12500")),
+        prep_time_estimator=FakeEstimator(),
+    )
+
+    uc.execute(ConfirmOrderCommand(order_id="o-1"))
+
+    assert order.estimated_time == 37  # 25 (fresh prep) + 12 (route)

@@ -28,6 +28,32 @@ class FakeOutbound:
         self.sent.append(message)
 
 
+class FakeMessageRepo:
+    def __init__(self):
+        self.added = []
+
+    def add(self, message):
+        self.added.append(message)
+        return message
+
+
+class FakeClock:
+    def now(self):
+        from datetime import datetime, timezone
+
+        return datetime(2026, 10, 2, tzinfo=timezone.utc)
+
+
+def _use_case(conversation_repo, outbound, message_repo=None):
+    return NotifyOrderPaidUseCase(
+        SimpleNamespace(get_order_summary=lambda order_id: _summary()),
+        conversation_repo,
+        message_repo or FakeMessageRepo(),
+        outbound,
+        FakeClock(),
+    )
+
+
 def _summary(**overrides):
     values = dict(
         order_id="o-1",
@@ -99,9 +125,7 @@ def test_notify_sends_on_the_conversation_channel():
         )
     )
     outbound = FakeOutbound()
-    use_case = NotifyOrderPaidUseCase(
-        SimpleNamespace(get_order_summary=lambda order_id: _summary()), repo, outbound
-    )
+    use_case = _use_case(repo, outbound)
 
     sent = use_case.execute(
         NotifyOrderPaidCommand(conversation_id="c-1", order_id="o-1")
@@ -125,9 +149,7 @@ def test_notify_falls_back_to_the_external_thread_id_as_destination():
         )
     )
     outbound = FakeOutbound()
-    use_case = NotifyOrderPaidUseCase(
-        SimpleNamespace(get_order_summary=lambda order_id: _summary()), repo, outbound
-    )
+    use_case = _use_case(repo, outbound)
 
     use_case.execute(NotifyOrderPaidCommand(conversation_id="c-1", order_id="o-1"))
 
@@ -137,7 +159,7 @@ def test_notify_falls_back_to_the_external_thread_id_as_destination():
 def test_notify_is_a_noop_for_an_unknown_conversation():
     outbound = FakeOutbound()
     use_case = NotifyOrderPaidUseCase(
-        SimpleNamespace(), FakeConversationRepo(None), outbound
+        SimpleNamespace(), FakeConversationRepo(None), FakeMessageRepo(), outbound, FakeClock()
     )
 
     assert (

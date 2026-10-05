@@ -10,8 +10,16 @@ reach `__call__`, so only `process_exception` sees them.
 """
 from __future__ import annotations
 
+import time
+
 from django.contrib import messages
 from django.shortcuts import redirect
+
+from .auth import AuthError, refresh_access_token
+from .services.http_client import ApiAuthError
+
+# Refresh the session token a little before it actually expires.
+_REFRESH_SKEW_SECONDS = 30
 
 
 def _client_error_types() -> tuple[type[BaseException], ...]:
@@ -31,6 +39,12 @@ class ApiErrorToastMiddleware:
         return self.get_response(request)
 
     def process_exception(self, request, exception):
+        # The backend rejected the session token (expired/revoked): drop the stale
+        # session and send the operator to login, for ANY method. Without this a
+        # GET (dashboard) would render a 500 page.
+        if isinstance(exception, ApiAuthError):
+            request.session.flush()
+            return redirect("login")
         if request.method != "POST":
             return None
         if not isinstance(exception, self._error_types):
@@ -56,20 +70,58 @@ class LoginRequiredMiddleware:
 
 
 class ApiSessionTokenMiddleware:
-    """Forward the logged-in Supabase token to the HTTP API client.
+    """Keep the HTTP API client on a valid Supabase token.
 
-    The panel uses a singleton HTTP client (``get_client()``); this middleware
-    refreshes its Authorization header from the session on every request so the
-    API receives the operator JWT. Single-user panel: the header reflects the
-    last active session.
+    Supabase access tokens expire (~1h). Before the request reaches the view this
+    middleware refreshes it with the stored refresh token; if that is impossible
+    it clears the session and redirects to login, so an expired session degrades
+    to a re-login instead of a 500.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        if self._refresh_if_expired(request):
+            return redirect("login")
         self._apply_token(request.session.get("supabase_access_token"))
         return self.get_response(request)
+
+    def _refresh_if_expired(self, request) -> bool:
+        """Return True when the session was cleared and a re-login is required."""
+        session = request.session
+        if not session.get("supabase_access_token"):
+            return False
+
+        expires_at = session.get("supabase_expires_at")
+        if not expires_at or time.time() < (int(expires_at) - _REFRESH_SKEW_SECONDS):
+            return False
+
+        refresh_token = session.get("supabase_refresh_token")
+        if not refresh_token:
+            session.flush()
+            return True
+
+        try:
+            result = refresh_access_token(refresh_token)
+        except AuthError as exc:
+            if exc.code == "unreachable":
+                # Transient network failure: keep the session and let the API
+                # call decide (a real 401 is handled reactively).
+                return False
+            session.flush()
+            return True
+        except Exception:
+            session.flush()
+            return True
+
+        session["supabase_access_token"] = result.access_token
+        session["supabase_refresh_token"] = result.refresh_token or refresh_token
+        if result.expires_in:
+            session["supabase_expires_at"] = int(time.time()) + int(result.expires_in)
+        if result.email:
+            session["supabase_email"] = result.email
+        return False
 
     def _apply_token(self, token: str | None) -> None:
         try:
