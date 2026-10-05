@@ -46,6 +46,11 @@ class PrismaConversationRepository:
             where={"id": conversation_id}, data={"agentPaused": bool(paused)}
         )
 
+    def set_client_id(self, conversation_id: str, client_id: str) -> None:
+        self._db.conversation.update(
+            where={"id": conversation_id}, data={"clientId": client_id}
+        )
+
     def find_by_channel_identity(self, channel: str, channel_identity: str):
         # Legacy channel-identity lookup kept for the deterministic scaffold.
         row = self._db.conversation.find_first(

@@ -5,21 +5,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Iniciar sesión · Rapidfood</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260916m" />
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260929login4" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
 </head>
-<body class="bg-bg min-h-screen">
-  <div class="min-h-screen grid place-items-center px-4">
-    <div class="w-full max-w-sm">
-      <div class="flex flex-col items-center gap-2 mb-6">
-        <span class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary text-white text-xl font-bold">R</span>
-        <h1 class="font-display font-extrabold text-xl text-ink tracking-tight">Rapidfood</h1>
-        <p class="text-[13px] text-ink-faint">Panel de operaciones · Acceso del personal</p>
-      </div>
+<body class="min-h-screen bg-bg">
+  <div class="min-h-screen lg:grid lg:grid-cols-2">
 
-      <div class="bg-surface border border-line rounded-2xl p-6 shadow-sm">
+    {# ---- Left: sign-in form ---- #}
+    <div class="flex min-h-screen items-center justify-center px-5 py-12 sm:px-8">
+      <div class="w-full max-w-[380px]">
+        <div class="flex items-center gap-2.5 mb-9">
+          <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-white">R</span>
+          <div class="leading-tight">
+            <div class="font-display text-lg font-extrabold tracking-tight text-ink">Rapidfood</div>
+            <div class="-mt-0.5 text-[11px] text-ink-faint">Panel de operaciones</div>
+          </div>
+        </div>
+
+        <h1 class="font-display text-[26px] font-extrabold leading-tight tracking-tight text-ink">Iniciar sesión</h1>
+        <p class="mb-6 mt-1.5 text-[13px] text-ink-soft">Accedé con tu cuenta de personal para gestionar la operación.</p>
+
         {% if error %}
-        <div class="mb-4 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-[13px] font-medium text-red-700">{{ error }}</div>
+        <div role="alert" aria-live="assertive"
+             class="mb-5 flex items-start gap-2.5 rounded-xl border border-danger/25 bg-danger-soft px-3.5 py-3">
+          <span class="mt-0.5 shrink-0 text-danger">{% include 'components/icon.html' with name='alert-triangle' cls='w-[18px] h-[18px]' %}</span>
+          <p class="text-[13px] font-medium leading-snug text-danger">{{ error }}</p>
+        </div>
         {% endif %}
 
         <form method="post" action="{% url 'login' %}" class="flex flex-col gap-4">
@@ -29,20 +40,118 @@
             <input
               id="email" name="email" type="email" required autocomplete="username" autofocus
               value="{{ email|default:'' }}"
-              class="input w-full" placeholder="personal@rapidfood.local" />
+              class="field w-full" placeholder="personal@rapidfood.app" />
           </div>
+
           <div class="flex flex-col gap-1.5">
             <label for="password" class="text-[12px] font-semibold text-ink-soft">Contraseña</label>
-            <input
-              id="password" name="password" type="password" required autocomplete="current-password"
-              class="input w-full" placeholder="••••••••" />
+            <div class="relative">
+              <input
+                id="password" name="password" type="password" required autocomplete="current-password"
+                class="field w-full pr-11" placeholder="••••••••" />
+              <button
+                type="button" id="toggle-password"
+                aria-label="Mostrar contraseña" aria-pressed="false"
+                class="absolute inset-y-0 right-0 flex cursor-pointer items-center px-3 text-ink-faint transition-colors hover:text-ink-soft">
+                <span data-eye-show>{% include 'components/icon.html' with name='eye' cls='w-[18px] h-[18px]' %}</span>
+                <span data-eye-hide hidden>{% include 'components/icon.html' with name='eye-off' cls='w-[18px] h-[18px]' %}</span>
+              </button>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary w-full justify-center mt-1">Iniciar sesión</button>
+
+          <button type="submit" class="btn btn-primary mt-1 w-full justify-center !py-2.5">Iniciar sesión</button>
         </form>
+
+        <p class="mt-6 text-center text-[11px] text-ink-faint">Autenticación segura con Supabase Auth</p>
+      </div>
+    </div>
+
+    {# ---- Right: the management panel, with the agent as one part of it ---- #}
+    <div class="relative hidden border-l border-line bg-primary-soft lg:flex lg:flex-col lg:overflow-y-auto">
+      <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div class="rf-dots absolute inset-0 opacity-60"></div>
+        <div class="rf-glow absolute -right-24 -top-24 h-96 w-96 rounded-full"></div>
       </div>
 
-      <p class="text-center text-[11px] text-ink-faint mt-5">Autenticación con Supabase Auth (email + contraseña)</p>
+      <div class="relative z-10 mx-auto my-auto w-full max-w-lg px-10 py-12">
+        <h2 class="font-display text-[28px] font-extrabold leading-tight tracking-tight text-ink xl:text-[32px]">
+          Todo tu local,<br /><span class="text-primary">en un solo panel.</span>
+        </h2>
+        <p class="mt-2.5 max-w-md text-[13px] leading-relaxed text-ink-soft">
+          Pedidos, cocina, caja, catálogo y clientes — en tiempo real.
+        </p>
+
+        <div class="mt-5 flex flex-wrap gap-2">
+          <span class="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-soft">Pedidos</span>
+          <span class="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-soft">Cocina</span>
+          <span class="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-soft">Caja</span>
+          <span class="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-soft">Catálogo</span>
+          <span class="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-soft">Clientes</span>
+          <span class="rounded-full border border-primary/30 bg-primary-soft px-2.5 py-1 text-[11px] font-bold text-primary">Agente IA</span>
+        </div>
+
+        <p class="mt-7 flex max-w-md items-start gap-1.5 text-[13px] leading-relaxed text-ink-soft">
+          <span class="mt-0.5 shrink-0 text-primary">{% include 'components/icon.html' with name='sparkles' cls='w-[15px] h-[15px]' %}</span>
+          <span>El agente de IA responde consultas del menú, precios, envíos y horarios; toma el pedido y cobra por WhatsApp.</span>
+        </p>
+
+        {# animated conversation #}
+        <div class="rf-agent mt-6" aria-hidden="true">
+          <div class="rf-agent-head">
+            <span class="rf-agent-avatar">{% include 'components/icon.html' with name='bot' cls='w-[18px] h-[18px]' %}</span>
+            <div class="leading-tight">
+              <div class="rf-agent-name">Agente Rapidfood</div>
+              <div class="rf-agent-status"><i></i> En línea</div>
+            </div>
+            <span class="rf-agent-tag">IA</span>
+          </div>
+
+          <div class="rf-agent-body">
+            <div class="rf-bubble in" style="--d:.10s">¿Qué hamburguesas tienen? 🍔</div>
+            <div class="rf-bubble out" style="--d:.60s">Clásica $6.900, Doble $8.900 y Cheddar $9.400 😋</div>
+            <div class="rf-bubble in" style="--d:1.15s">Dale, una Doble con papas</div>
+
+            <div class="rf-typing" style="--d:1.60s"><i></i><i></i><i></i></div>
+
+            <div class="rf-order" style="--d:2.85s">
+              <div class="rf-order-row"><span>Doble × 1</span><b>$8.900</b></div>
+              <div class="rf-order-row"><span>Papas × 1</span><b>$2.500</b></div>
+              <div class="rf-order-row muted"><span>Envío</span><b>$1.200</b></div>
+              <div class="rf-order-row rf-order-total"><span>Total</span><b>$12.600</b></div>
+            </div>
+
+            <div class="rf-bubble out" style="--d:3.50s">Te paso el link de pago 💳</div>
+
+            <div class="rf-payin" style="--d:4.15s">
+              {% include 'components/icon.html' with name='check' cls='w-[14px] h-[14px]' %}
+              Pago confirmado
+            </div>
+
+            <div class="rf-bubble out" style="--d:4.80s">¡Recibido! ✅ Tu pedido sale en ~35 min 🛵 ¡Gracias por tu compra! 🍔</div>
+          </div>
+        </div>
+      </div>
     </div>
+
   </div>
+
+  <script>
+    (function () {
+      var input = document.getElementById('password');
+      var toggle = document.getElementById('toggle-password');
+      if (!input || !toggle) return;
+      var showIcon = toggle.querySelector('[data-eye-show]');
+      var hideIcon = toggle.querySelector('[data-eye-hide]');
+      toggle.addEventListener('click', function () {
+        var visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        toggle.setAttribute('aria-pressed', String(!visible));
+        toggle.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+        showIcon.hidden = !visible;
+        hideIcon.hidden = visible;
+        input.focus({ preventScroll: true });
+      });
+    })();
+  </script>
 </body>
 </html>

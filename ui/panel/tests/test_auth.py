@@ -140,3 +140,55 @@ def test_logout_clears_session(mock_login):
     assert response.status_code == 302
     assert response.url == "/login/"
     assert "supabase_access_token" not in client.session
+
+
+def test_logout_get_clears_session(mock_login):
+    """Visiting /logout/ in the browser must actually sign out."""
+    mock_login()
+    client = Client()
+    client.post("/login/", PASSWORD_PAYLOAD)
+    assert client.session.get("supabase_access_token")
+
+    response = client.get("/logout/")
+
+    assert response.status_code == 302
+    assert response.url == "/login/"
+    assert "supabase_access_token" not in client.session
+
+
+def test_auth_failure_classification():
+    """403 counts as an auth failure only for token/credential messages."""
+    from panel.services.http_client import _looks_like_auth_failure
+
+    assert _looks_like_auth_failure(401, "anything") is True
+    assert _looks_like_auth_failure(403, "Token expired.") is True
+    assert _looks_like_auth_failure(403, "Invalid token: bad signature") is True
+    assert (
+        _looks_like_auth_failure(
+            403, "You do not have permission to perform this action."
+        )
+        is False
+    )
+    assert _looks_like_auth_failure(500, "Token expired.") is False
+
+
+def test_expired_token_on_get_redirects_to_login(mock_login, monkeypatch):
+    """A 401 from the API on a GET must not render a 500; it re-logs in."""
+    from panel.services.http_client import ApiAuthError
+    from panel.views import dashboard as dashboard_views
+
+    class RaisingClient:
+        def all_orders(self):
+            raise ApiAuthError("Token expired.")
+
+    monkeypatch.setattr(dashboard_views, "get_client", lambda: RaisingClient())
+
+    mock_login()
+    client = Client()
+    client.post("/login/", PASSWORD_PAYLOAD)
+
+    response = client.get("/")
+
+    assert response.status_code == 302
+    assert response.url == "/login/"
+    assert "supabase_access_token" not in client.session

@@ -311,6 +311,29 @@ def test_set_pickup_clears_delivery_and_bumps_version():
     assert result.version == 1
 
 
+def test_set_pickup_sets_eta_to_preparation_only():
+    order = make_order_with_line()
+    executor = FakeExecutor(FakeAttempts())
+    executor.register(order)
+
+    class FakeEstimator:
+        def estimate_minutes(self, business_config_id):
+            return 25
+
+    use_case = SetPickupForOrderUseCase(
+        executor=executor, clock=FakeClock(), prep_time_estimator=FakeEstimator()
+    )
+
+    use_case.execute(
+        SetPickupForOrderCommand(
+            business_config_id="b-1", order_id="o-1", external_message_id="m-1"
+        )
+    )
+
+    assert order.estimated_time == 25
+    assert order.route_duration_minutes is None
+
+
 def test_set_pickup_reopens_pending_online():
     order = make_order_with_line(status=OrderState.PENDING, payment_type=PaymentMethod.ONLINE)
     attempts = FakeAttempts(has_approved=False)

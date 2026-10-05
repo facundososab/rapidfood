@@ -124,6 +124,22 @@ AGENT_MODEL: str = os.environ.get(
 # re-seeds (the business row id is a generated UUID).
 AGENT_BUSINESS_CONFIG_ID: str = os.environ.get("AGENT_BUSINESS_CONFIG_ID", "")
 
+# WhatsApp Cloud API. Credentials are stored PER BUSINESS in the database and
+# edited from the admin panel, so there is no token/phone id here. The only
+# setting is the Fernet key that encrypts the per-business secrets at rest.
+# Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# When empty, a key is derived from DJANGO_SECRET_KEY (dev fallback only).
+WHATSAPP_CONFIG_ENCRYPTION_KEY: str = os.environ.get(
+    "WHATSAPP_CONFIG_ENCRYPTION_KEY", ""
+)
+# Speech-to-text model for inbound WhatsApp voice notes. Reuses GEMINI_API_KEY /
+# GROQ_API_KEY. Empty = provider default (Gemini -> AGENT_MODEL, Groq -> a Whisper
+# model). Without any key, audio messages get a friendly fallback reply.
+WHATSAPP_TRANSCRIPTION_MODEL: str = os.environ.get(
+    "WHATSAPP_TRANSCRIPTION_MODEL", ""
+)
+
 # LangSmith tracing (LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT /
 # LANGSMITH_WORKSPACE_ID / LANGSMITH_ENDPOINT) is NOT copied into Django
 # settings on purpose: the LangChain/LangSmith client reads os.environ directly,

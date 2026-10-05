@@ -1,12 +1,14 @@
-"""Incoming message flow: resolve -> persist USER -> agent -> persist ASSISTANT.
+"""The single application entry point for an inbound channel turn.
 
-The conversation history is persisted in the conversation module (never in
-LangSmith). The USER message is persisted BEFORE running the agent, so a failing
-agent never loses what the customer said.
+Channel-agnostic by design: WhatsApp, LangSmith and the panel all normalize their
+inbound to (context, text) and call THIS use case. It owns the turn policy —
+idempotency and human takeover (pause) — so a channel driver can never diverge:
+persist USER -> (skip agent if a human took over) -> run agent -> persist ASSISTANT.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from modules.conversation.domain.models.agent_execution_context import (
@@ -17,6 +19,9 @@ from modules.conversation.application.ports.driven.agent_runner import (
     AgentTurn,
 )
 from modules.conversation.application.ports.driven.clock import ClockPort
+from modules.conversation.application.ports.driven.conversation_repository import (
+    ConversationRepositoryPort,
+)
 from modules.conversation.application.ports.driven.message_repository import (
     MessageRepositoryPort,
 )
@@ -53,6 +58,12 @@ class HandleIncomingMessageResult:
     user_message_id: str
     assistant_message_id: str
     response: str
+    # True when this inbound message was already processed (a channel retry): the
+    # agent did NOT run again and the caller must not re-deliver a reply.
+    already_processed: bool = False
+    # True when a human took over (agent paused): the USER message was persisted
+    # but the agent did not run. The caller must not deliver an agent reply.
+    paused: bool = False
 
 
 class HandleIncomingMessageUseCase:
@@ -61,16 +72,33 @@ class HandleIncomingMessageUseCase:
         message_repository: MessageRepositoryPort,
         agent_runner: AgentRunnerPort,
         clock: ClockPort,
+        conversation_repository: Optional[ConversationRepositoryPort] = None,
     ) -> None:
         self._message_repository = message_repository
         self._agent_runner = agent_runner
         self._clock = clock
+        self._conversation_repository = conversation_repository
 
     def execute(
         self, command: HandleIncomingMessageCommand
     ) -> HandleIncomingMessageResult:
         context = command.context
         user_message_id = message_id_for(context)
+
+        # Idempotency at the TURN level: Meta retries the webhook when we are slow
+        # to ACK. A retry carries the SAME channel message id, which maps to the
+        # same deterministic UUID. If it is already stored, do NOT run the agent
+        # again (the model is non-deterministic, so a second run produces a second,
+        # different reply) and do NOT persist a second assistant message.
+        existing = self._message_repository.find_by_id(user_message_id)
+        if existing is not None:
+            return HandleIncomingMessageResult(
+                conversation_id=context.conversation_id,
+                user_message_id=existing.message_id,
+                assistant_message_id="",
+                response="",
+                already_processed=True,
+            )
 
         user_message = self._message_repository.add(
             Message(
@@ -82,6 +110,17 @@ class HandleIncomingMessageUseCase:
                 created_at=self._clock.now(),
             )
         )
+
+        # Human takeover (single policy for EVERY channel): keep the customer
+        # message so the operator sees it, but do not run the agent.
+        if self._is_paused(context.conversation_id):
+            return HandleIncomingMessageResult(
+                conversation_id=context.conversation_id,
+                user_message_id=user_message.message_id,
+                assistant_message_id="",
+                response="",
+                paused=True,
+            )
 
         history = tuple(
             (message.role, message.content)
@@ -114,3 +153,9 @@ class HandleIncomingMessageUseCase:
             assistant_message_id=assistant_message.message_id,
             response=response,
         )
+
+    def _is_paused(self, conversation_id: str) -> bool:
+        if self._conversation_repository is None:
+            return False
+        record = self._conversation_repository.get_by_id(conversation_id)
+        return bool(record is not None and getattr(record, "agent_paused", False))

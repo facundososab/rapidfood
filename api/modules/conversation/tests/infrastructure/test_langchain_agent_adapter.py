@@ -30,6 +30,12 @@ class FakeMessageRepository:
         self.messages.append(message)
         return message
 
+    def find_by_id(self, message_id):
+        for message in self.messages:
+            if message.message_id == message_id:
+                return message
+        return None
+
     def list_by_conversation(self, conversation_id):
         return [m for m in self.messages if m.conversation_id == conversation_id]
 

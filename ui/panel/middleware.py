@@ -17,6 +17,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from .auth import AuthError, get_token_expiry, refresh_access_token
+from .services.http_client import ApiAuthError
 
 # Renew the Supabase access token once it has this little time left, so a page
 # that loads slowly (or an image/partial fetched late) never crosses the expiry
@@ -41,6 +42,12 @@ class ApiErrorToastMiddleware:
         return self.get_response(request)
 
     def process_exception(self, request, exception):
+        # The backend rejected the session token (expired/revoked): drop the stale
+        # session and send the operator to login, for ANY method. Without this a
+        # GET (dashboard) would render a 500 page.
+        if isinstance(exception, ApiAuthError):
+            request.session.flush()
+            return redirect("login")
         if request.method != "POST":
             return None
         if not isinstance(exception, self._error_types):
@@ -66,7 +73,7 @@ class LoginRequiredMiddleware:
 
 
 class ApiSessionTokenMiddleware:
-    """Forward the logged-in Supabase token to the HTTP API client.
+    """Keep the HTTP API client on a valid Supabase token.
 
     The panel uses a singleton HTTP client (``get_client()``); this middleware
     refreshes its Authorization header from the session on every request so the
@@ -126,9 +133,13 @@ class ApiSessionTokenMiddleware:
 
         try:
             new_access_token, new_refresh_token = refresh_access_token(refresh_token)
-        except AuthError:
-            # Refresh token expired/revoked: drop the session so the login gate
-            # redirects on the next request instead of crashing the page.
+        except AuthError as exc:
+            if exc.code == "unreachable":
+                # Fallo transitorio de red: conservar la sesión y dejar que la
+                # API decida (un 401 real se maneja de forma reactiva).
+                return None
+            # Refresh token expirado/revocado: descartar la sesión para que el
+            # login gate redirija en el próximo request en vez de romper la página.
             return "stale"
         except requests.RequestException:
             # Transient network/timeout failure: keep the session and let the

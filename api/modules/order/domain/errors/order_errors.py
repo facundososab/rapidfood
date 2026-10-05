@@ -35,6 +35,11 @@ class InvalidPaymentTypeError(OrderDomainError):
     pass
 
 
+class InvalidPreparationTimeConfigError(OrderDomainError):
+    """Raised when a preparation-time (ETA) configuration violates its invariants."""
+    pass
+
+
 class PaymentAttemptNotFoundError(OrderDomainError):
     """Raised when a payment attempt referenced by id or provider id is unknown."""
     pass

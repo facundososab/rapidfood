@@ -28,7 +28,44 @@ def _auth_headers(anon_key: str) -> dict[str, str]:
 
 
 class AuthError(Exception):
-    """Login failed at the Supabase side or Supabase is not configured."""
+    """Login failed at the Supabase side or Supabase is not configured.
+
+    ``code`` lets the view render a precise, non-leaky message instead of a
+    generic one: ``not_configured`` | ``invalid_credentials`` |
+    ``email_not_confirmed`` | ``rate_limited`` | ``unreachable`` |
+    ``server_error``.
+    """
+
+    def __init__(self, message: str, code: str = "server_error") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _supabase_conf() -> tuple[str, str]:
+    """Resolve the GoTrue base URL and anon key, or raise a precise AuthError."""
+    base_url = (settings.SUPABASE_URL or "").rstrip("/")
+    anon_key = settings.SUPABASE_ANON_KEY or ""
+    if not base_url or not anon_key:
+        raise AuthError(
+            "SUPABASE_URL / SUPABASE_ANON_KEY are not configured",
+            code="not_configured",
+        )
+    return base_url, anon_key
+
+
+def _failure_code(response) -> str:
+    """Map a GoTrue error response to a precise, user-safe failure code."""
+    if response.status_code == 429:
+        return "rate_limited"
+    if response.status_code in (400, 422):
+        try:
+            error_code = (response.json() or {}).get("error_code", "")
+        except ValueError:
+            error_code = ""
+        if error_code == "email_not_confirmed":
+            return "email_not_confirmed"
+        return "invalid_credentials"
+    return "server_error"
 
 
 def login_with_password(email: str, password: str) -> tuple[str, str, str]:
@@ -37,25 +74,28 @@ def login_with_password(email: str, password: str) -> tuple[str, str, str]:
     Returns ``(access_token, email, refresh_token)``. ``refresh_token`` is empty
     when GoTrue did not return one.
     """
-    base_url = (settings.SUPABASE_URL or "").rstrip("/")
-    anon_key = settings.SUPABASE_ANON_KEY or ""
-    if not base_url or not anon_key:
-        raise AuthError("SUPABASE_URL / SUPABASE_ANON_KEY are not configured")
+    base_url, anon_key = _supabase_conf()
 
-    response = requests.post(
-        f"{base_url}/auth/v1/token?grant_type=password",
-        json={"email": email, "password": password},
-        headers=_auth_headers(anon_key),
-        timeout=15,
-    )
+    try:
+        response = requests.post(
+            f"{base_url}/auth/v1/token?grant_type=password",
+            json={"email": email, "password": password},
+            headers=_auth_headers(anon_key),
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise AuthError("Supabase Auth is unreachable", code="unreachable") from exc
+
     if response.status_code != 200:
         raise AuthError(
-            f"Supabase Auth rejected the login (HTTP {response.status_code})"
+            f"Supabase Auth rejected the login (HTTP {response.status_code})",
+            code=_failure_code(response),
         )
+
     payload = response.json()
     token = payload.get("access_token")
     if not token:
-        raise AuthError("Supabase Auth returned no access token")
+        raise AuthError("Supabase Auth returned no access token", code="server_error")
     user_email = payload.get("user", {}).get("email") or email
     refresh_token = payload.get("refresh_token") or ""
     return token, user_email, refresh_token
@@ -66,32 +106,37 @@ def refresh_access_token(refresh_token: str) -> tuple[str, str]:
 
     Raises :class:`AuthError` when Supabase is not configured, when no refresh
     token is supplied, or when GoTrue rejects the refresh (expired/revoked
-    token). Transport errors (timeouts/connection failures) propagate as
-    ``requests`` exceptions so the caller can tell a rejected refresh apart from
-    a transient network problem.
+    token). A transport error is reported with ``code="unreachable"`` so the
+    caller can tell a rejected refresh apart from a transient network problem.
     """
-    base_url = (settings.SUPABASE_URL or "").rstrip("/")
-    anon_key = settings.SUPABASE_ANON_KEY or ""
-    if not base_url or not anon_key:
-        raise AuthError("SUPABASE_URL / SUPABASE_ANON_KEY are not configured")
+    base_url, anon_key = _supabase_conf()
     if not refresh_token:
-        raise AuthError("No Supabase refresh token available")
+        raise AuthError(
+            "No Supabase refresh token available", code="invalid_credentials"
+        )
 
-    response = requests.post(
-        f"{base_url}/auth/v1/token?grant_type=refresh_token",
-        json={"refresh_token": refresh_token},
-        headers=_auth_headers(anon_key),
-        timeout=15,
-    )
+    try:
+        response = requests.post(
+            f"{base_url}/auth/v1/token?grant_type=refresh_token",
+            json={"refresh_token": refresh_token},
+            headers=_auth_headers(anon_key),
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise AuthError("Supabase Auth is unreachable", code="unreachable") from exc
+
     if response.status_code != 200:
         raise AuthError(
-            f"Supabase Auth rejected the refresh (HTTP {response.status_code})"
+            f"Supabase Auth rejected the refresh (HTTP {response.status_code})",
+            code="invalid_credentials",
         )
     payload = response.json()
     access_token = payload.get("access_token")
     new_refresh_token = payload.get("refresh_token")
     if not access_token or not new_refresh_token:
-        raise AuthError("Supabase Auth returned no refreshed tokens")
+        raise AuthError(
+            "Supabase Auth returned no refreshed tokens", code="server_error"
+        )
     return access_token, new_refresh_token
 
 

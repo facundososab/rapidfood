@@ -99,8 +99,12 @@ urlpatterns = [
     path("configuracion/pagos/", configuration.index, {"tab": "payments"}, name="configuration_payments_view"),
     path("configuracion/pagos/vincular/", configuration.mercadopago_link, name="configuration_mercadopago_link"),
     path("configuracion/pagos/desvincular/", configuration.mercadopago_unlink, name="configuration_mercadopago_unlink"),
+    path("configuracion/tiempos/", configuration.index, {"tab": "prep_time"}, name="configuration_prep_time_view"),
+    path("configuracion/tiempos/guardar/", configuration.save_preparation_time, name="configuration_prep_time"),
     path("configuracion/general/", configuration.save_general, name="configuration_general"),
     path("configuracion/direccion/crear/", configuration.create_address, name="configuration_address_create"),
     path("configuracion/direccion/<str:address_id>/eliminar/", configuration.delete_address, name="configuration_address_delete"),
     path("configuracion/envios/guardar/", configuration.save_delivery, name="configuration_delivery"),
+    path("configuracion/whatsapp/", configuration.index, {"tab": "whatsapp"}, name="configuration_whatsapp_view"),
+    path("configuracion/whatsapp/guardar/", configuration.save_whatsapp, name="configuration_whatsapp"),
 ]

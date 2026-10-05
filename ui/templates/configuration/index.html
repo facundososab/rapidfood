@@ -28,6 +28,17 @@
           <span class="shrink-0">{% include 'components/icon.html' with name='truck' %}</span>
           <span>Envíos y demanda</span>
         </a>
+        <a href="{% url 'configuration_prep_time_view' %}" class="nav-item no-underline {% if active_tab == 'prep_time' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='clock' %}</span>
+          <span>Tiempos de preparación</span>
+        </a>
+
+        <p class="px-3 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Canales</p>
+        <a href="{% url 'configuration_whatsapp_view' %}" class="nav-item no-underline {% if active_tab == 'whatsapp' %}active{% endif %}">
+          <span class="shrink-0">{% include 'components/icon.html' with name='messages-square' %}</span>
+          <span>WhatsApp</span>
+        </a>
+
         {% if is_mercadopago_admin %}
         <a href="{% url 'configuration_payments_view' %}" class="nav-item no-underline {% if active_tab == 'payments' %}active{% endif %}">
           <span class="shrink-0">{% include 'components/icon.html' with name='credit-card' %}</span>
@@ -413,6 +424,170 @@
         {% endif %}
       </div>
     </div>
+  </div>
+  {% endif %}
+  {% if active_tab == 'prep_time' %}
+  <div>
+    <div class="mb-6">
+      <h1 class="font-display font-bold text-[22px]">Tiempos de preparación</h1>
+      <p class="text-[14px] text-ink-muted mt-1">
+        Definí cuánto demora la cocina según la cantidad de pedidos en curso. El tiempo estimado
+        se calcula como preparación + viaje de envío (si corresponde) + margen.
+      </p>
+    </div>
+
+    <form method="post" action="{% url 'configuration_prep_time' %}">
+      {% csrf_token %}
+      <input type="hidden" name="business_config_id" value="{{ business.id }}">
+
+      <div class="card overflow-hidden mb-6">
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='clock' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Demanda y margen</h2>
+            <p class="text-[13px] text-ink-muted mt-1">Umbrales propios, independientes de envíos.</p>
+          </div>
+        </div>
+        <div class="p-6 grid sm:grid-cols-3 gap-5">
+          <div>
+            <label class="th block mb-2">Umbral demanda alta (pedidos)</label>
+            <input name="high_demand_threshold" value="{{ prep_time.high_demand_threshold|default:'8' }}" type="number" min="0" class="field" required>
+          </div>
+          <div>
+            <label class="th block mb-2">Umbral demanda muy alta (pedidos)</label>
+            <input name="very_high_demand_threshold" value="{{ prep_time.very_high_demand_threshold|default:'15' }}" type="number" min="1" class="field" required>
+          </div>
+          <div>
+            <label class="th block mb-2">Margen fijo (min)</label>
+            <input name="buffer_minutes" value="{{ prep_time.buffer_minutes|default:'5' }}" type="number" min="0" class="field" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden mb-6">
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='clock' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Minutos de preparación</h2>
+            <p class="text-[13px] text-ink-muted mt-1">Tiempo de cocina según la demanda (sin contar el viaje).</p>
+          </div>
+        </div>
+        <div class="p-6 grid sm:grid-cols-3 gap-5">
+          <div>
+            <label class="th block mb-2">Normal (min)</label>
+            <input name="normal_prep_minutes" value="{{ prep_time.normal_prep_minutes|default:'20' }}" type="number" min="1" class="field" required>
+          </div>
+          <div>
+            <label class="th block mb-2">Demanda alta (min)</label>
+            <input name="high_demand_prep_minutes" value="{{ prep_time.high_demand_prep_minutes|default:'35' }}" type="number" min="1" class="field" required>
+          </div>
+          <div>
+            <label class="th block mb-2">Demanda muy alta (min)</label>
+            <input name="very_high_demand_prep_minutes" value="{{ prep_time.very_high_demand_prep_minutes|default:'50' }}" type="number" min="1" class="field" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="submit" class="btn btn-primary px-8">Guardar tiempos</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  {% if active_tab == 'whatsapp' %}
+  <div>
+    <div class="mb-6">
+      <h1 class="font-display font-bold text-[22px]">WhatsApp</h1>
+      <p class="text-[14px] text-ink-muted mt-1">
+        Conectá tu propia app de WhatsApp Cloud API (Meta). Las credenciales se guardan
+        por negocio y se usan tanto para responder mensajes como para confirmar pagos.
+      </p>
+    </div>
+
+    <form method="post" action="{% url 'configuration_whatsapp' %}">
+      {% csrf_token %}
+      <input type="hidden" name="business_config_id" value="{{ business.id }}">
+
+      <div class="card overflow-hidden mb-6">
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='messages-square' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Datos de Meta</h2>
+            <p class="text-[13px] text-ink-muted mt-1">Phone number ID, tokens y app secret de tu app.</p>
+          </div>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="th block mb-2">Phone number ID</label>
+            <input name="phone_number_id" value="{{ whatsapp.phone_number_id|default:'' }}" class="field" required>
+          </div>
+          <div>
+            <label class="th block mb-2">Número visible (opcional)</label>
+            <input name="display_phone_number" value="{{ whatsapp.display_phone_number|default:'' }}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">WABA ID (opcional)</label>
+            <input name="waba_id" value="{{ whatsapp.waba_id|default:'' }}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">Versión de API</label>
+            <input name="api_version" value="{{ whatsapp.api_version|default:'v21.0' }}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">Access token {% if whatsapp.has_access_token %}<span class="text-ink-faint">(cargado)</span>{% endif %}</label>
+            <input name="access_token" type="password" autocomplete="new-password" placeholder="{% if whatsapp.has_access_token %}Dejar vacío para mantener{% else %}Pegá el token{% endif %}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">App secret {% if whatsapp.has_app_secret %}<span class="text-ink-faint">(cargado)</span>{% endif %}</label>
+            <input name="app_secret" type="password" autocomplete="new-password" placeholder="{% if whatsapp.has_app_secret %}Dejar vacío para mantener{% else %}Pegá el app secret{% endif %}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">Verify token</label>
+            <input name="verify_token" value="{{ whatsapp.verify_token|default:'' }}" class="field" required>
+            <p class="text-[12px] text-ink-faint mt-1">El mismo que vas a pegar en Meta al configurar el webhook.</p>
+          </div>
+          <div class="flex items-end">
+            <label class="inline-flex items-center gap-2 text-[13px]">
+              <input type="checkbox" name="is_active" {% if whatsapp.configured and not whatsapp.is_active %}{% else %}checked{% endif %}>
+              Canal activo
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden mb-6">
+        <div class="px-6 py-5 border-b border-line flex items-center gap-3">
+          <span class="card-icon">{% include 'components/icon.html' with name='clock' %}</span>
+          <div>
+            <h2 class="font-display font-bold text-[16px]">Confirmación de pago fuera de la ventana 24h</h2>
+            <p class="text-[13px] text-ink-muted mt-1">
+              Dentro de las 24h se responde con texto libre. Fuera, WhatsApp exige un template
+              aprobado: si lo completás, se usa como fallback.
+            </p>
+          </div>
+        </div>
+        <div class="p-6 grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="th block mb-2">Nombre del template (opcional)</label>
+            <input name="order_paid_template_name" value="{{ whatsapp.order_paid_template_name|default:'' }}" class="field">
+          </div>
+          <div>
+            <label class="th block mb-2">Idioma del template</label>
+            <input name="order_paid_template_lang" value="{{ whatsapp.order_paid_template_lang|default:'es_AR' }}" class="field">
+          </div>
+        </div>
+        <div class="px-6 pb-6">
+          <p class="text-[12px] text-ink-faint">
+            Callback URL para Meta:
+            <code>{{ request.scheme }}://{{ request.get_host }}/api/conversation/webhook/whatsapp/</code>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="submit" class="btn btn-primary px-8">Guardar WhatsApp</button>
+      </div>
+    </form>
   </div>
   {% endif %}
   </div>

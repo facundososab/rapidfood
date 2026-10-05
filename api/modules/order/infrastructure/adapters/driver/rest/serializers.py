@@ -81,6 +81,18 @@ class CreatePaymentLinkSerializer(serializers.Serializer):
     pass
 
 
+class PreparationTimeConfigSerializer(serializers.Serializer):
+    """Preparation-time (ETA) configuration input. Cross-field invariants are
+    enforced by the domain model (InvalidPreparationTimeConfigError -> 400)."""
+
+    high_demand_threshold = serializers.IntegerField(min_value=0)
+    very_high_demand_threshold = serializers.IntegerField(min_value=1)
+    normal_prep_minutes = serializers.IntegerField(min_value=1)
+    high_demand_prep_minutes = serializers.IntegerField(min_value=1)
+    very_high_demand_prep_minutes = serializers.IntegerField(min_value=1)
+    buffer_minutes = serializers.IntegerField(min_value=0)
+
+
 class MercadoPagoWebhookSerializer(serializers.Serializer):
     type = serializers.CharField(required=False, allow_blank=True, default="payment")
     topic = serializers.CharField(required=False, allow_blank=True)

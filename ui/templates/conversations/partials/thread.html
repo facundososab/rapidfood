@@ -12,9 +12,6 @@
         {% endif %}
       </div>
     </div>
-    <button type="button" class="chat-icon-btn" title="Llamar">{% icon 'phone' 'w-4 h-4' %}</button>
-    <button type="button" class="chat-icon-btn" title="Notificaciones">{% icon 'bell' 'w-4 h-4' %}</button>
-    <button type="button" class="chat-icon-btn" title="Más">{% icon 'more-vertical' 'w-4 h-4' %}</button>
   </header>
 
   {% if error %}<div class="px-5 py-3 border-b border-line badge-red text-[12px]">{{ error }}</div>{% endif %}
@@ -41,10 +38,8 @@
         hx-post="{% url 'conversation_operator_message' conversation.id %}"
         hx-target="#conversation-pane" hx-swap="outerHTML" hx-indicator="#thread-indicator">
     <div class="chat-composer-box">
-      {% icon 'paperclip' 'w-4 h-4 text-ink-faint' %}
       <textarea name="content" rows="1" required data-chat-composer
                 placeholder="Escribí como el negocio…"></textarea>
-      {% icon 'smile' 'w-4 h-4 text-ink-faint' %}
       <span id="thread-indicator" class="htmx-indicator text-[11px] text-ink-muted whitespace-nowrap">Enviando…</span>
       <button class="chat-send" type="submit" title="Enviar">{% icon 'send' 'w-4 h-4' %}</button>
     </div>

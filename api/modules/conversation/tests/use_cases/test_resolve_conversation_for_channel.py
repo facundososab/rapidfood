@@ -27,6 +27,11 @@ class FakeConversationRepository:
         ] = conversation
         return conversation
 
+    def set_client_id(self, conversation_id, client_id):
+        for conversation in self.rows.values():
+            if conversation.conversation_id == conversation_id:
+                conversation.client_id = client_id
+
     def save_last_intent(self, conversation_id, last_intent):
         self.last_intent[conversation_id] = last_intent
 
@@ -91,3 +96,18 @@ def test_client_is_kept_from_the_resolution():
     result = use_case.execute(_command(client_id="client-9"))
 
     assert result.client_id == "client-9"
+
+
+def test_a_late_client_is_linked_to_an_existing_conversation():
+    repo = FakeConversationRepository()
+    use_case = ResolveConversationForChannelUseCase(repo)
+
+    first = use_case.execute(_command(client_id=None))
+    assert first.client_id is None
+
+    second = use_case.execute(_command(client_id="client-7"))
+
+    assert second.created is False
+    assert second.client_id == "client-7"
+    linked = repo.find_by_thread("biz-1", "LANGSMITH", "thread-1")
+    assert linked.client_id == "client-7"

@@ -44,6 +44,9 @@ from modules.order.application.ports.driver.payment_ports import (
     CreatePaymentCheckoutCommand,
     HandlePaymentWebhookCommand,
 )
+from modules.order.application.ports.driver.preparation_time_ports import (
+    ConfigurePreparationTimeCommand,
+)
 from modules.order.application.ports.driver.list_applied_coupons_ports import (
     ListAppliedCouponsQuery,
 )
@@ -59,6 +62,7 @@ from .serializers import (
     CancelOrderSerializer, AdvanceStateSerializer, UpdateOrderStatusSerializer,
     CreatePaymentLinkSerializer, MercadoPagoWebhookSerializer,
     SetPaymentTypeSerializer, CurrentDraftSerializer, SetClientSerializer,
+    PreparationTimeConfigSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -775,3 +779,46 @@ class SetClientView(APIView):
                 "client_name": response.client_name,
             }
         )
+
+
+class PreparationTimeConfigurationView(APIView):
+    """GET/POST /api/orders/preparation-time/<business_config_id>/configure/
+
+    Reads/updates the restaurant's preparation-time (ETA) configuration, which has
+    its OWN demand thresholds (independent from delivery pricing).
+    """
+
+    def get(self, request, business_config_id):
+        container = get_app_container()
+        result = container.get_preparation_time_configuration.execute(
+            str(business_config_id)
+        )
+        return Response(_prep_time_to_dict(result))
+
+    def post(self, request, business_config_id):
+        serializer = PreparationTimeConfigSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        container = get_app_container()
+        try:
+            result = container.configure_preparation_time.execute(
+                ConfigurePreparationTimeCommand(
+                    business_config_id=str(business_config_id),
+                    **serializer.validated_data,
+                )
+            )
+        except OrderDomainError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_prep_time_to_dict(result))
+
+
+def _prep_time_to_dict(result) -> dict:
+    return {
+        "business_config_id": result.business_config_id,
+        "high_demand_threshold": result.high_demand_threshold,
+        "very_high_demand_threshold": result.very_high_demand_threshold,
+        "normal_prep_minutes": result.normal_prep_minutes,
+        "high_demand_prep_minutes": result.high_demand_prep_minutes,
+        "very_high_demand_prep_minutes": result.very_high_demand_prep_minutes,
+        "buffer_minutes": result.buffer_minutes,
+        "is_configured": result.is_configured,
+    }

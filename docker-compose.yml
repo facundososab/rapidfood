@@ -69,6 +69,11 @@ services:
       AGENT_PROVIDER: ${AGENT_PROVIDER:-auto}
       AGENT_MODEL: ${AGENT_MODEL:-llama-3.3-70b-versatile}
       AGENT_BUSINESS_CONFIG_ID: ${AGENT_BUSINESS_CONFIG_ID:-}
+      # WhatsApp Cloud API: per-business credentials live in the DB (admin panel);
+      # this key only encrypts them at rest. Optional in dev (derived fallback).
+      WHATSAPP_CONFIG_ENCRYPTION_KEY: ${WHATSAPP_CONFIG_ENCRYPTION_KEY:-}
+      # Speech-to-text model for inbound WhatsApp voice notes (reuses GEMINI/GROQ key).
+      WHATSAPP_TRANSCRIPTION_MODEL: ${WHATSAPP_TRANSCRIPTION_MODEL:-}
       # LangSmith tracing (optional).
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}

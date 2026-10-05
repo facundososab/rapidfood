@@ -95,6 +95,29 @@ def test_delivery_sets_the_snapshot_and_shipping_cost():
     assert quote.calls == 1
 
 
+def test_delivery_sets_eta_to_preparation_plus_route():
+    order = make_order_with_line()
+    attempts = FakeAttempts()
+    executor = FakeExecutor(attempts)
+    executor.register(order)
+
+    class FakeEstimator:
+        def estimate_minutes(self, business_config_id):
+            return 25
+
+    use_case = SetDeliveryForOrderUseCase(
+        delivery_quote=FakeDeliveryQuote(),
+        executor=executor,
+        clock=FakeClock(),
+        prep_time_estimator=FakeEstimator(),
+    )
+
+    use_case.execute(_delivery_command())
+
+    assert order.route_duration_minutes == 12  # round(12.0)
+    assert order.estimated_time == 37  # 25 + 12
+
+
 def test_delivery_reopens_pending_online():
     order = make_order_with_line(status=OrderState.PENDING, payment_type=PaymentMethod.ONLINE)
     attempts = FakeAttempts(has_approved=False)
