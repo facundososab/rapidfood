@@ -6,7 +6,12 @@ import time
 from django.shortcuts import redirect, render
 from django.views import View
 
-from ..auth import AuthError, fetch_staff_profile, login_with_password
+from ..auth import (
+    AuthError,
+    fetch_staff_profile,
+    get_token_expiry,
+    login_with_password,
+)
 
 # One clear, actionable message per failure mode. Never leaks the raw provider
 # error (HTTP codes, upstream text) to the person at the login screen.
@@ -36,7 +41,15 @@ _ERROR_MESSAGES = {
 
 class LoginView(View):
     def get(self, request):
-        if request.session.get("supabase_access_token"):
+        access_token = request.session.get("supabase_access_token")
+        if access_token:
+            expiry = get_token_expiry(access_token)
+            refresh_token = request.session.get("supabase_refresh_token")
+            # A stale pre-refresh session (expired token, no refresh token) must
+            # show the login form instead of bouncing to a crashing dashboard.
+            if expiry is not None and expiry <= time.time() and not refresh_token:
+                request.session.flush()
+                return render(request, "login.html")
             return redirect("dashboard")
         return render(request, "login.html")
 
@@ -52,22 +65,19 @@ class LoginView(View):
             )
 
         try:
-            result = login_with_password(email, password)
+            token, user_email, refresh_token = login_with_password(email, password)
         except AuthError as exc:
             message = _ERROR_MESSAGES.get(exc.code, _ERROR_MESSAGES["server_error"])
             return render(request, "login.html", {"email": email, "error": message})
 
-        request.session["supabase_access_token"] = result.access_token
-        request.session["supabase_email"] = result.email
-        if result.refresh_token:
-            request.session["supabase_refresh_token"] = result.refresh_token
-        if result.expires_in:
-            request.session["supabase_expires_at"] = int(time.time()) + int(
-                result.expires_in
-            )
+        request.session["supabase_access_token"] = token
+        request.session["supabase_email"] = user_email
+        # Kept so the middleware can renew the access token before it expires.
+        if refresh_token:
+            request.session["supabase_refresh_token"] = refresh_token
 
         # Best-effort: enrich the session with the staff profile from the API.
-        profile = fetch_staff_profile(result.access_token)
+        profile = fetch_staff_profile(token)
         if profile:
             request.session["supabase_staff"] = profile
 

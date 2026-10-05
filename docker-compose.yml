@@ -46,6 +46,14 @@ services:
       MERCADOPAGO_FAILURE_URL: ${MERCADOPAGO_FAILURE_URL:-}
       MERCADOPAGO_PENDING_URL: ${MERCADOPAGO_PENDING_URL:-}
       MERCADOPAGO_CURRENCY: ${MERCADOPAGO_CURRENCY:-ARS}
+      # Mercado Pago OAuth (link your account from configuration).
+      MERCADOPAGO_CLIENT_ID: ${MERCADOPAGO_CLIENT_ID:-}
+      MERCADOPAGO_CLIENT_SECRET: ${MERCADOPAGO_CLIENT_SECRET:-}
+      MERCADOPAGO_REDIRECT_URI: ${MERCADOPAGO_REDIRECT_URI:-}
+      MERCADOPAGO_TOKEN_ENCRYPTION_KEY: ${MERCADOPAGO_TOKEN_ENCRYPTION_KEY:-}
+      MERCADOPAGO_AUTH_BASE_URL: ${MERCADOPAGO_AUTH_BASE_URL:-https://auth.mercadopago.com}
+      # Where the OAuth callback redirects the browser after linking (panel URL).
+      MERCADOPAGO_RETURN_URI: ${MERCADOPAGO_RETURN_URI:-}
       # Supabase Auth (staff login). Set in the repo-root .env; empty keeps the
       # stack booting (health check) but JWT auth/JWKS will refuse requests.
       SUPABASE_URL: ${SUPABASE_URL:-}

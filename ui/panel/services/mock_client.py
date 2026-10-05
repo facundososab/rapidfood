@@ -616,6 +616,17 @@ class MockRapidfoodClient(RapidfoodClient):
         self._delivery_config = dict(payload)
         return self._delivery_config
 
+    # ---- Mercado Pago linking --------------------------------------------
+    def get_mercadopago_status(self) -> dict:
+        return {"linked": False, "live_mode": None, "user_id": None, "public_key": None}
+
+    def get_mercadopago_authorization_url(self, business_config_id: str) -> str:
+        # The mock has no real OAuth flow; the view renders an error on an empty URL.
+        return ""
+
+    def unlink_mercadopago(self, business_config_id: str) -> None:
+        return None
+
     def get_preparation_time_config(self, business_config_id: str) -> dict:
         if not hasattr(self, "_prep_time_config"):
             self._prep_time_config = {}

@@ -42,6 +42,10 @@ from modules.conversation.application.ports.driver.notify_order_paid_port import
     NotifyOrderPaidCommand,
 )
 from modules.delivery.configuration.container import DeliveryContainer, get_delivery_container
+from modules.mercadopago.configuration.container import (
+    MercadoPagoContainer,
+    get_mercadopago_container,
+)
 from modules.order.configuration.container import OrderContainer
 from modules.order.infrastructure.adapters.driven.business.business_config_query_adapter import (
     BusinessConfigQueryAdapter,
@@ -60,6 +64,9 @@ from modules.order.infrastructure.adapters.driven.coupon.coupon_query_adapter im
 )
 from modules.order.infrastructure.adapters.driven.delivery.delivery_quote_adapter import (
     DeliveryQuoteAdapter,
+)
+from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_credentials_query_adapter import (
+    MercadoPagoCredentialsQueryAdapter,
 )
 from modules.staff.configuration.container import get_staff_container
 
@@ -310,6 +317,12 @@ def get_app_delivery_container() -> DeliveryContainer:
 
 
 @lru_cache(maxsize=1)
+def get_app_mercadopago_container() -> MercadoPagoContainer:
+    """Exposes the Mercado Pago wiring root so its views stay out of modules.*."""
+    return get_mercadopago_container()
+
+
+@lru_cache(maxsize=1)
 def get_app_container() -> OrderContainer:
     """Builds the order module wired to the real cross-context adapters."""
     catalog = get_catalog_container()
@@ -317,6 +330,7 @@ def get_app_container() -> OrderContainer:
     business = get_app_business_container()
     coupon = get_app_coupon_container()
     delivery = get_app_delivery_container()
+    mercadopago = get_app_mercadopago_container()
 
     return OrderContainer(
         catalog_query=CatalogProductQuery(catalog.product_query),
@@ -326,6 +340,9 @@ def get_app_container() -> OrderContainer:
         coupon_consume=CouponConsumeAdapter(coupon.consume_coupon),
         delivery_quote=DeliveryQuoteAdapter(delivery.calculate_delivery_quote),
         paid_notifier=_OrderPaidNotifier(),
+        credentials_query=MercadoPagoCredentialsQueryAdapter(
+            mercadopago.get_access_token
+        ),
     )
 
 

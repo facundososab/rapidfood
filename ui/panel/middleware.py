@@ -12,14 +12,17 @@ from __future__ import annotations
 
 import time
 
+import requests
 from django.contrib import messages
 from django.shortcuts import redirect
 
-from .auth import AuthError, refresh_access_token
+from .auth import AuthError, get_token_expiry, refresh_access_token
 from .services.http_client import ApiAuthError
 
-# Refresh the session token a little before it actually expires.
-_REFRESH_SKEW_SECONDS = 30
+# Renew the Supabase access token once it has this little time left, so a page
+# that loads slowly (or an image/partial fetched late) never crosses the expiry
+# mid-request and dies with the backend's `Token expired.` RuntimeError.
+REFRESH_MARGIN_SECONDS = 300
 
 
 def _client_error_types() -> tuple[type[BaseException], ...]:
@@ -72,56 +75,81 @@ class LoginRequiredMiddleware:
 class ApiSessionTokenMiddleware:
     """Keep the HTTP API client on a valid Supabase token.
 
-    Supabase access tokens expire (~1h). Before the request reaches the view this
-    middleware refreshes it with the stored refresh token; if that is impossible
-    it clears the session and redirects to login, so an expired session degrades
-    to a re-login instead of a 500.
+    The panel uses a singleton HTTP client (``get_client()``); this middleware
+    refreshes its Authorization header from the session on every request so the
+    API receives the operator JWT. Single-user panel: the header reflects the
+    last active session.
+
+    Supabase access tokens expire (default ~1h). Before applying the token, the
+    middleware transparently renews it through GoTrue when it is expired or
+    about to expire, storing the fresh pair back in the session.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        if self._refresh_if_expired(request):
+        state = self._renew_expired_access_token(request)
+        if state == "stale":
+            # Token vencido y sin forma de renovarlo: la sesión no sirve.
+            request.session.flush()
             return redirect("login")
-        self._apply_token(request.session.get("supabase_access_token"))
+        token = request.session.get("supabase_access_token")
+        self._apply_token(token)
         return self.get_response(request)
 
-    def _refresh_if_expired(self, request) -> bool:
-        """Return True when the session was cleared and a re-login is required."""
-        session = request.session
-        if not session.get("supabase_access_token"):
-            return False
+    def _renew_expired_access_token(self, request) -> str | None:
+        """Renew the session's access token when needed; never raises.
 
-        expires_at = session.get("supabase_expires_at")
-        if not expires_at or time.time() < (int(expires_at) - _REFRESH_SKEW_SECONDS):
-            return False
+        Returns ``"stale"`` when the access token is expired and cannot be
+        renewed (no refresh token, or GoTrue rejects it) so the caller can
+        drop the session and send the user to login; otherwise the fresh access
+        token when a renewal happened, or ``None`` when nothing was done
+        (anonymous, still valid, transient failure).
+        """
+        access_token = request.session.get("supabase_access_token")
+        if not access_token:
+            return None  # anonymous request: nothing to renew
 
-        refresh_token = session.get("supabase_refresh_token")
+        expiry = get_token_expiry(access_token)
+        refresh_token = request.session.get("supabase_refresh_token")
+        expired = expiry is not None and expiry <= time.time()
+        near_expiry = (
+            expiry is not None and 0 < expiry - time.time() <= REFRESH_MARGIN_SECONDS
+        )
+        unknown = expiry is None
+
+        if not expired and not near_expiry and not unknown:
+            return None  # still comfortably valid
+
         if not refresh_token:
-            session.flush()
-            return True
+            if expired:
+                # Sesión de la era previa al refresh (o token ya muerto): no hay
+                # nada que renovar; el login gate debe tomar ahora.
+                return "stale"
+            # Near expiry / undecodable but not yet expired: the token still
+            # works for a while; let it pass (no way to renew without a token).
+            return None
 
         try:
-            result = refresh_access_token(refresh_token)
+            new_access_token, new_refresh_token = refresh_access_token(refresh_token)
         except AuthError as exc:
             if exc.code == "unreachable":
-                # Transient network failure: keep the session and let the API
-                # call decide (a real 401 is handled reactively).
-                return False
-            session.flush()
-            return True
-        except Exception:
-            session.flush()
-            return True
+                # Fallo transitorio de red: conservar la sesión y dejar que la
+                # API decida (un 401 real se maneja de forma reactiva).
+                return None
+            # Refresh token expirado/revocado: descartar la sesión para que el
+            # login gate redirija en el próximo request en vez de romper la página.
+            return "stale"
+        except requests.RequestException:
+            # Transient network/timeout failure: keep the session and let the
+            # API surface the stale token rather than raising a 500 here.
+            return None
 
-        session["supabase_access_token"] = result.access_token
-        session["supabase_refresh_token"] = result.refresh_token or refresh_token
-        if result.expires_in:
-            session["supabase_expires_at"] = int(time.time()) + int(result.expires_in)
-        if result.email:
-            session["supabase_email"] = result.email
-        return False
+        request.session["supabase_access_token"] = new_access_token
+        request.session["supabase_refresh_token"] = new_refresh_token
+        request.session.modified = True
+        return new_access_token
 
     def _apply_token(self, token: str | None) -> None:
         try:

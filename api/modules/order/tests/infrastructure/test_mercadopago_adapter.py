@@ -309,6 +309,52 @@ def test_webhook_signature_validation_can_be_disabled_via_env(monkeypatch):
     assert settings.validate_webhook_signature is False
 
 
+def test_create_checkout_uses_the_per_business_token_in_the_authorization_header():
+    session = FakeSession(
+        [FakeResponse(201, {"id": "MP-1", "checkout_url": "https://mp/1"})]
+    )
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    provider.create_checkout(make_request(access_token="APP_USR-business-token"))
+
+    headers = session.calls[0]["headers"]
+    assert headers["Authorization"] == "Bearer APP_USR-business-token"
+    assert headers["X-Idempotency-Key"] == "key-abc"
+
+
+def test_create_checkout_falls_back_to_the_configured_token_without_a_business_token():
+    session = FakeSession(
+        [FakeResponse(201, {"id": "MP-1", "checkout_url": "https://mp/1"})]
+    )
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    provider.create_checkout(make_request())
+
+    assert session.calls[0]["headers"]["Authorization"] == "Bearer token"
+
+
+def test_get_payment_uses_the_per_business_token_in_the_authorization_header():
+    session = FakeSession([FakeResponse(200, {"id": "MP-1", "status": "approved"})])
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    result = provider.get_payment("MP-1", access_token="APP_USR-business-token")
+
+    assert result.status == PaymentStatus.APPROVED
+    assert (
+        session.calls[0]["headers"]["Authorization"]
+        == "Bearer APP_USR-business-token"
+    )
+
+
+def test_get_payment_falls_back_to_the_configured_token_without_a_business_token():
+    session = FakeSession([FakeResponse(200, {"id": "MP-1", "status": "approved"})])
+    provider = MercadoPagoPaymentProvider(settings=make_settings(), session=session)
+
+    provider.get_payment("MP-1")
+
+    assert session.calls[0]["headers"]["Authorization"] == "Bearer token"
+
+
 def test_signature_validation_uses_mercadopago_hmac_manifest():
     import hashlib
     import hmac

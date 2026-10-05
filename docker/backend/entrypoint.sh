@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+echo "Regenerating Prisma client..."
+uv run prisma generate --schema shared/infrastructure/prisma/schema.prisma
+
 echo "Applying Prisma migrations..."
 uv run prisma migrate deploy --schema shared/infrastructure/prisma/schema.prisma
 
