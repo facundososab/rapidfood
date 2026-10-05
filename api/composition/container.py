@@ -42,6 +42,10 @@ from modules.conversation.application.ports.driver.notify_order_paid_port import
     NotifyOrderPaidCommand,
 )
 from modules.delivery.configuration.container import DeliveryContainer, get_delivery_container
+from modules.mercadopago.configuration.container import (
+    MercadoPagoContainer,
+    get_mercadopago_container,
+)
 from modules.order.configuration.container import OrderContainer
 from modules.order.infrastructure.adapters.driven.business.business_config_query_adapter import (
     BusinessConfigQueryAdapter,
@@ -60,6 +64,9 @@ from modules.order.infrastructure.adapters.driven.coupon.coupon_query_adapter im
 )
 from modules.order.infrastructure.adapters.driven.delivery.delivery_quote_adapter import (
     DeliveryQuoteAdapter,
+)
+from modules.order.infrastructure.adapters.driven.mercadopago.mercadopago_credentials_query_adapter import (
+    MercadoPagoCredentialsQueryAdapter,
 )
 from modules.staff.configuration.container import get_staff_container
 
@@ -142,6 +149,64 @@ def get_app_conversation_container() -> ConversationContainer:
         business_service=business_service,
         client_service=client_service,
         agent_runner_factory=_build_agent_runner,
+        whatsapp_outbound=True,
+        transcriber=_build_transcriber(),
+    )
+
+
+def _build_transcriber():
+    """Speech-to-text for inbound WhatsApp audio, using the configured provider.
+
+    Gemini and Groq both accept OGG/Opus voice notes directly. Gemini is
+    preferred when it is the configured agent provider; Groq Whisper is the
+    fallback. Returns None when no usable key exists, so the channel replies
+    with a friendly fallback instead of failing.
+    """
+    from django.conf import settings
+
+    provider = _resolve_agent_provider(
+        getattr(settings, "AGENT_PROVIDER", "auto"),
+        getattr(settings, "AGENT_MODEL", ""),
+    )
+    gemini_key = getattr(settings, "GEMINI_API_KEY", "")
+    groq_key = getattr(settings, "GROQ_API_KEY", "")
+    configured_model = (
+        getattr(settings, "WHATSAPP_TRANSCRIPTION_MODEL", "") or ""
+    ).strip()
+
+    if provider == "gemini" and gemini_key:
+        return _gemini_transcriber(gemini_key, configured_model, settings)
+    if groq_key:
+        return _groq_transcriber(groq_key, configured_model)
+    if gemini_key:
+        return _gemini_transcriber(gemini_key, configured_model, settings)
+
+    logger.warning(
+        "No GEMINI_API_KEY/GROQ_API_KEY configured; inbound WhatsApp audio will "
+        "not be transcribed (customers get a fallback)."
+    )
+    return None
+
+
+def _gemini_transcriber(api_key: str, configured_model: str, settings):
+    from modules.conversation.infrastructure.adapters.driven.transcription.gemini_transcription_adapter import (
+        GeminiTranscriptionAdapter,
+    )
+
+    model = configured_model or getattr(settings, "AGENT_MODEL", "")
+    if not model:
+        logger.warning("No model for Gemini transcription; audio stays disabled.")
+        return None
+    return GeminiTranscriptionAdapter(api_key=api_key, model=model)
+
+
+def _groq_transcriber(api_key: str, configured_model: str):
+    from modules.conversation.infrastructure.adapters.driven.transcription.groq_whisper_transcription_adapter import (
+        GroqWhisperTranscriptionAdapter,
+    )
+
+    return GroqWhisperTranscriptionAdapter(
+        api_key=api_key, model=configured_model or "whisper-large-v3-turbo"
     )
 
 
@@ -252,6 +317,12 @@ def get_app_delivery_container() -> DeliveryContainer:
 
 
 @lru_cache(maxsize=1)
+def get_app_mercadopago_container() -> MercadoPagoContainer:
+    """Exposes the Mercado Pago wiring root so its views stay out of modules.*."""
+    return get_mercadopago_container()
+
+
+@lru_cache(maxsize=1)
 def get_app_container() -> OrderContainer:
     """Builds the order module wired to the real cross-context adapters."""
     catalog = get_catalog_container()
@@ -259,6 +330,7 @@ def get_app_container() -> OrderContainer:
     business = get_app_business_container()
     coupon = get_app_coupon_container()
     delivery = get_app_delivery_container()
+    mercadopago = get_app_mercadopago_container()
 
     return OrderContainer(
         catalog_query=CatalogProductQuery(catalog.product_query),
@@ -268,6 +340,9 @@ def get_app_container() -> OrderContainer:
         coupon_consume=CouponConsumeAdapter(coupon.consume_coupon),
         delivery_quote=DeliveryQuoteAdapter(delivery.calculate_delivery_quote),
         paid_notifier=_OrderPaidNotifier(),
+        credentials_query=MercadoPagoCredentialsQueryAdapter(
+            mercadopago.get_access_token
+        ),
     )
 
 

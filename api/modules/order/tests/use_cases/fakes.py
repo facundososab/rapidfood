@@ -1,8 +1,14 @@
-"""Shared fakes for order application tests (no DB)."""
+"""Shared fakes for order application tests (no DB).
+
+``FakePaymentCredentialsQuery`` never touches the linkage module: like the real
+app-level adapter it answers with a plain token or ``None``, and it can be
+configured to fail so the fallback paths can be asserted.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Optional
 
 from modules.order.application.ports.driven.catalog_query import (
     IngredientInfo,
@@ -13,6 +19,9 @@ from modules.order.application.ports.driven.catalog_query import (
 from modules.order.application.ports.driven.idempotency import (
     IdempotentMutationOutcome,
     OrderMutationContext,
+)
+from modules.order.application.ports.driven.payment_credentials_query import (
+    PaymentCredentialsQuery,
 )
 from modules.order.domain.models.order import Order
 from modules.order.domain.models.order_state import OrderState
@@ -173,6 +182,25 @@ class FakeExecutor:
             result=result,
             superseded_attempt_ids=tuple(ctx.superseded_attempt_ids),
         )
+
+
+class FakePaymentCredentialsQuery(PaymentCredentialsQuery):
+    """In-memory PaymentCredentialsQuery that records the requested businesses."""
+
+    def __init__(
+        self,
+        tokens: Optional[dict[str, str]] = None,
+        error: Optional[Exception] = None,
+    ) -> None:
+        self.tokens = dict(tokens or {})
+        self.error = error
+        self.requested: list[str] = []
+
+    def get_access_token(self, business_config_id: str) -> Optional[str]:
+        self.requested.append(business_config_id)
+        if self.error is not None:
+            raise self.error
+        return self.tokens.get(business_config_id)
 
 
 def make_order(status=OrderState.DRAFT, payment_type=None, version=0) -> Order:

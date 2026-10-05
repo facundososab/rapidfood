@@ -17,6 +17,9 @@ from modules.order.application.ports.driven.order_paid_notifier import (
     OrderPaidNotifierPort,
 )
 from modules.order.application.ports.driven.order_repository import OrderRepository
+from modules.order.application.ports.driven.payment_credentials_query import (
+    PaymentCredentialsQuery,
+)
 from modules.order.application.ports.driven.payment_provider import PaymentProviderPort
 from modules.order.application.ports.driven.payment_repository import (
     PaymentAttemptRepository,
@@ -47,14 +50,19 @@ class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
         payment_repo: PaymentAttemptRepository,
         payment_provider: PaymentProviderPort,
         paid_notifier: Optional[OrderPaidNotifierPort] = None,
+        credentials_query: Optional[PaymentCredentialsQuery] = None,
     ) -> None:
         self._order_repo = order_repo
         self._payment_repo = payment_repo
         self._payment_provider = payment_provider
         self._paid_notifier = paid_notifier
+        self._credentials_query = credentials_query
 
     def execute(self, command: HandlePaymentWebhookCommand) -> HandlePaymentWebhookResult:
-        remote = self._payment_provider.get_payment(command.data_id)
+        remote = self._payment_provider.get_payment(
+            command.data_id,
+            access_token=self._resolve_access_token(command.data_id),
+        )
         if remote is None:
             # The provider does not know this id (simulated/unknown): acknowledge
             # it so Mercado Pago stops retrying, and apply no local effect.
@@ -103,6 +111,36 @@ class HandlePaymentWebhookUseCase(HandlePaymentWebhookPort):
             processed=True,
             applied=applied,
         )
+
+    def _resolve_access_token(self, data_id: str) -> Optional[str]:
+        """Resolve the business token that owns the notified payment attempt.
+
+        The provider call is the FIRST remote hop, so the attempt must be peeked
+        locally by its provider external id to find the owning business. A
+        missing attempt/order, an unlinked business or a linkage failure all
+        degrade to ``None`` (the configured token) instead of breaking the
+        webhook: credentials are an optional enrichment, never a precondition.
+        """
+        if self._credentials_query is None:
+            return None
+        try:
+            local = self._payment_repo.get_by_external_id(data_id)
+            if local is None:
+                return None
+            order = self._order_repo.get_by_id(local.order_id)
+            if order is None:
+                return None
+            return self._credentials_query.get_access_token(
+                order.business_config_id or "default"
+            )
+        except Exception:
+            logger.warning(
+                "Per-business payment credentials unavailable (data_id=%s); "
+                "falling back to the configured token.",
+                data_id,
+                exc_info=True,
+            )
+            return None
 
     def _notify_paid(self, order) -> None:
         """Best-effort, POST-COMMIT customer notification; never breaks the webhook."""

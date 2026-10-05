@@ -78,6 +78,21 @@ from modules.order.application.use_cases.set_pickup_for_order_use_case import (
 from modules.order.application.use_cases.get_or_create_current_draft_use_case import (
     GetOrCreateCurrentDraftUseCase,
 )
+from modules.order.application.use_cases.get_preparation_time_configuration_use_case import (
+    GetPreparationTimeConfigurationUseCase,
+)
+from modules.order.application.use_cases.configure_preparation_time_use_case import (
+    ConfigurePreparationTimeUseCase,
+)
+from modules.order.infrastructure.adapters.driven.prisma.preparation_time_config_repository import (
+    PrismaPreparationTimeConfigRepository,
+)
+from modules.order.infrastructure.adapters.driven.prisma.active_order_demand_query import (
+    PrismaActiveOrderDemandQuery,
+)
+from modules.order.infrastructure.adapters.driven.prisma.preparation_time_estimator import (
+    PreparationTimeEstimator,
+)
 from modules.order.infrastructure.adapters.driven.prisma.payment_attempt_query import (
     PrismaPaymentAttemptQuery,
 )
@@ -97,7 +112,9 @@ class OrderContainer:
 
     Cross-module driven ports (catalog, client, config, coupon) default to
     in-memory fakes; the app-level composition root injects the real adapters
-    via the constructor.
+    via the constructor. ``credentials_query`` is the optional per-business
+    Mercado Pago credentials port; when absent every payment flow falls back to
+    the globally configured access token.
     """
 
     def __init__(
@@ -109,6 +126,7 @@ class OrderContainer:
         coupon_consume: Optional[Any] = None,
         delivery_quote: Optional[Any] = None,
         prisma_client: Optional[Any] = None,
+        credentials_query: Optional[Any] = None,
         paid_notifier: Optional[Any] = None,
     ):
         # Driven Adapters
@@ -117,11 +135,21 @@ class OrderContainer:
         self.payment_repository = PrismaPaymentRepository(prisma_client or db.client)
         self.mercadopago_settings = MercadoPagoSettings.from_env()
         self.payment_provider = MercadoPagoPaymentProvider(self.mercadopago_settings)
+
+        # Preparation time (ETA): config + kitchen-load counter + estimator.
+        self.preparation_time_config_repository = (
+            PrismaPreparationTimeConfigRepository(db.client)
+        )
+        self.active_order_demand_query = PrismaActiveOrderDemandQuery(db.client)
+        self.preparation_time_estimator = PreparationTimeEstimator(
+            self.preparation_time_config_repository, self.active_order_demand_query
+        )
         self.client_query = client_query if client_query is not None else FakeClientQuery()
         self.config_query = config_query if config_query is not None else FakeBusinessConfigQuery()
         self.coupon_query = coupon_query if coupon_query is not None else FakeCouponQuery()
         self.coupon_consume = coupon_consume
         self.delivery_quote = delivery_quote
+        self.credentials_query = credentials_query
         self.catalog_query = catalog_query if catalog_query is not None else FakeCatalogQuery()
         
         # Use Cases
@@ -143,13 +171,15 @@ class OrderContainer:
         self.configure_order_use_case = ConfigureOrderUseCase(
             order_repo=self.order_repository,
             config_query=self.config_query,
-            delivery_quote=self.delivery_quote
+            delivery_quote=self.delivery_quote,
+            prep_time_estimator=self.preparation_time_estimator,
         )
         self.confirm_order_use_case = ConfirmOrderUseCase(
             order_repo=self.order_repository,
             config_query=self.config_query,
             catalog_query=self.catalog_query,
-            coupon_consume=self.coupon_consume
+            coupon_consume=self.coupon_consume,
+            prep_time_estimator=self.preparation_time_estimator,
         )
         self.apply_coupon_use_case = ApplyCouponUseCase(
             order_repo=self.order_repository,
@@ -173,12 +203,14 @@ class OrderContainer:
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             currency=self.mercadopago_settings.currency,
+            credentials_query=self.credentials_query,
         )
         self.handle_payment_webhook_use_case = HandlePaymentWebhookUseCase(
             order_repo=self.order_repository,
             payment_repo=self.payment_repository,
             payment_provider=self.payment_provider,
             paid_notifier=paid_notifier,
+            credentials_query=self.credentials_query,
         )
         self.cancel_superseded_checkout_use_case = CancelSupersededCheckoutUseCase(
             payment_repo=self.payment_repository,
@@ -213,6 +245,7 @@ class OrderContainer:
             delivery_quote=self.delivery_quote,
             executor=self.idempotent_order_mutation,
             clock=clock,
+            prep_time_estimator=self.preparation_time_estimator,
         )
         self.apply_coupon_to_order_use_case = ApplyCouponToOrderUseCase(
             coupon_query=self.coupon_query,
@@ -222,6 +255,7 @@ class OrderContainer:
         self.set_pickup_for_order_use_case = SetPickupForOrderUseCase(
             executor=self.idempotent_order_mutation,
             clock=clock,
+            prep_time_estimator=self.preparation_time_estimator,
         )
 
         # Reads used by the agent / panel.
@@ -237,6 +271,16 @@ class OrderContainer:
         )
         self.get_or_create_current_draft_use_case = GetOrCreateCurrentDraftUseCase(
             self.order_repository, self.start_draft_order_use_case
+        )
+
+        # Preparation time (ETA) configuration CRUD.
+        self.get_preparation_time_configuration = (
+            GetPreparationTimeConfigurationUseCase(
+                self.preparation_time_config_repository
+            )
+        )
+        self.configure_preparation_time = ConfigurePreparationTimeUseCase(
+            self.preparation_time_config_repository
         )
 
 _container: OrderContainer | None = None

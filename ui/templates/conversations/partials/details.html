@@ -4,14 +4,13 @@
     <div class="flex items-center gap-2 text-[13px] font-semibold">
       {% icon 'info' 'w-4 h-4 text-primary' %} Detalles del contacto
     </div>
-    <button type="button" class="chat-icon-btn" title="Cerrar">{% icon 'x' 'w-4 h-4' %}</button>
   </div>
 
   <div class="text-center">
     <span class="chat-avatar mx-auto" style="width:64px;height:64px;font-size:20px;background:var(--color-purple-soft)">{{ label|initials }}</span>
     <div class="mt-3 text-[14px] font-bold">{{ label }}</div>
     <div class="text-[12px] text-ink-muted mt-1">
-      {% if conversation.clientPhone %}📞 {{ conversation.clientPhone }}{% else %}Sin teléfono registrado{% endif %}
+      {% if conversation.displayPhone %}📞 {{ conversation.displayPhone }}{% else %}Sin teléfono registrado{% endif %}
     </div>
   </div>
 

@@ -71,6 +71,18 @@ from modules.conversation.application.use_cases.receive_message import ReceiveMe
 from modules.conversation.application.use_cases.resolve_conversation_for_channel import (
     ResolveConversationForChannelUseCase,
 )
+from modules.conversation.application.use_cases.get_whatsapp_configuration import (
+    GetWhatsAppConfigurationUseCase,
+)
+from modules.conversation.application.use_cases.save_whatsapp_configuration import (
+    SaveWhatsAppConfigurationUseCase,
+)
+from modules.conversation.application.use_cases.resolve_client_for_channel import (
+    ResolveClientForChannelUseCase,
+)
+from modules.conversation.application.use_cases.send_conversation_message import (
+    SendConversationMessageUseCase,
+)
 from modules.conversation.infrastructure.adapters.driven.clock import SystemClock
 from modules.conversation.infrastructure.adapters.driven.outbound.dev_outbound_message_adapter import (
     DevOutboundMessageAdapter,
@@ -83,6 +95,21 @@ from modules.conversation.infrastructure.adapters.driven.prisma.conversation_rep
 )
 from modules.conversation.infrastructure.adapters.driven.prisma.message_repository import (
     PrismaMessageRepository,
+)
+from modules.conversation.infrastructure.adapters.driven.prisma.whatsapp_configuration_repository import (
+    PrismaWhatsAppConfigurationRepository,
+)
+from modules.conversation.infrastructure.adapters.driven.whatsapp.whatsapp_cloud_client import (
+    WhatsAppCloudClient,
+)
+from modules.conversation.infrastructure.adapters.driven.whatsapp.whatsapp_outbound_message_adapter import (
+    WhatsAppOutboundMessageAdapter,
+)
+from modules.conversation.infrastructure.adapters.driven.whatsapp.whatsapp_inbound_audio_transcriber import (
+    WhatsAppInboundAudioTranscriber,
+)
+from modules.conversation.infrastructure.adapters.driven.whatsapp.whatsapp_webhook_authenticator import (
+    WhatsAppWebhookAuthenticator,
 )
 
 
@@ -123,6 +150,20 @@ class ConversationContainer:
     create_checkout_use_case: Optional[CreateCheckoutForConversationOrderUseCase] = None
     notify_order_paid_use_case: Optional[NotifyOrderPaidUseCase] = None
 
+    # WhatsApp channel: per-business credentials + delivery.
+    get_whatsapp_configuration_use_case: Optional[
+        GetWhatsAppConfigurationUseCase
+    ] = None
+    save_whatsapp_configuration_use_case: Optional[
+        SaveWhatsAppConfigurationUseCase
+    ] = None
+    resolve_client_for_channel_use_case: Optional[ResolveClientForChannelUseCase] = None
+    send_conversation_message_use_case: Optional[SendConversationMessageUseCase] = None
+    # Channel infrastructure (NOT application use cases): the driver uses these
+    # through the container and they own the WhatsApp credentials.
+    whatsapp_webhook_authenticator: Optional[WhatsAppWebhookAuthenticator] = None
+    whatsapp_inbound_audio_transcriber: Optional[WhatsAppInboundAudioTranscriber] = None
+
 
 def build_container(
     catalog_service: Optional[CatalogServicePort] = None,
@@ -134,6 +175,11 @@ def build_container(
     message_repository=None,
     agent_runner_factory: Optional[Callable[["ConversationContainer"], AgentRunnerPort]] = None,
     outbound_message: Optional[OutboundMessagePort] = None,
+    whatsapp_config_repository=None,
+    whatsapp_sender=None,
+    whatsapp_media=None,
+    transcriber=None,
+    whatsapp_outbound: bool = False,
 ) -> ConversationContainer:
     """Build the conversation module wiring.
 
@@ -144,13 +190,26 @@ def build_container(
     """
     conversation_repository = conversation_repository or PrismaConversationRepository()
     message_repository = message_repository or PrismaMessageRepository()
+    whatsapp_config_repository = (
+        whatsapp_config_repository or PrismaWhatsAppConfigurationRepository()
+    )
+    whatsapp_sender = whatsapp_sender or WhatsAppCloudClient()
+    whatsapp_media = whatsapp_media or whatsapp_sender
     clock = SystemClock()
     intent_detector = DeterministicIntentDetector()
-    # Default outbound channel: dev adapter (logs + persists). A real sender
-    # (WhatsApp Cloud API) is injected by the composition root later.
-    outbound_message = outbound_message or DevOutboundMessageAdapter(
-        message_repository, clock
-    )
+    # Default outbound channel: dev adapter (logs + persists) so tests and local
+    # runs never hit Meta. Production wiring opts into the real WhatsApp sender.
+    if outbound_message is None:
+        if whatsapp_outbound:
+            outbound_message = WhatsAppOutboundMessageAdapter(
+                whatsapp_sender,
+                whatsapp_config_repository,
+                conversation_repository,
+                message_repository,
+                clock,
+            )
+        else:
+            outbound_message = DevOutboundMessageAdapter()
 
     container = ConversationContainer(
         resolve_conversation_use_case=ResolveConversationForChannelUseCase(
@@ -166,6 +225,27 @@ def build_container(
         ),
     )
 
+    container.get_whatsapp_configuration_use_case = GetWhatsAppConfigurationUseCase(
+        whatsapp_config_repository
+    )
+    container.save_whatsapp_configuration_use_case = (
+        SaveWhatsAppConfigurationUseCase(whatsapp_config_repository)
+    )
+    container.resolve_client_for_channel_use_case = ResolveClientForChannelUseCase(
+        client_service
+    )
+    container.send_conversation_message_use_case = SendConversationMessageUseCase(
+        conversation_repository, outbound_message
+    )
+    # Channel infrastructure: owns WhatsApp credentials; used by the driver.
+    container.whatsapp_webhook_authenticator = WhatsAppWebhookAuthenticator(
+        whatsapp_config_repository
+    )
+    if transcriber is not None:
+        container.whatsapp_inbound_audio_transcriber = WhatsAppInboundAudioTranscriber(
+            whatsapp_config_repository, whatsapp_media, transcriber
+        )
+
     container.list_conversations_use_case = ListConversationsUseCase(
         conversation_repository, message_repository, client_service
     )
@@ -173,7 +253,10 @@ def build_container(
         conversation_repository, message_repository, client_service
     )
     container.append_operator_message_use_case = AppendOperatorMessageUseCase(
-        conversation_repository, message_repository, clock
+        conversation_repository,
+        message_repository,
+        clock,
+        send_message=container.send_conversation_message_use_case,
     )
     container.set_takeover_use_case = SetConversationTakeoverUseCase(
         conversation_repository, message_repository
@@ -181,11 +264,18 @@ def build_container(
 
     if agent_runner_factory is not None:
         handler = HandleIncomingMessageUseCase(
-            message_repository, agent_runner_factory(container), clock
+            message_repository,
+            agent_runner_factory(container),
+            clock,
+            conversation_repository=conversation_repository,
         )
         container.handle_incoming_message_use_case = handler
         container.reply_as_client_use_case = ReplyAsClientForConversationUseCase(
-            conversation_repository, message_repository, handler, clock
+            conversation_repository,
+            message_repository,
+            handler,
+            clock,
+            send_message=container.send_conversation_message_use_case,
         )
 
     if catalog_service is not None:
@@ -237,7 +327,11 @@ def build_container(
             order_service
         )
         container.notify_order_paid_use_case = NotifyOrderPaidUseCase(
-            order_service, conversation_repository, outbound_message
+            order_service,
+            conversation_repository,
+            message_repository,
+            outbound_message,
+            clock,
         )
 
     return container

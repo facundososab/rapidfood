@@ -21,6 +21,31 @@ from . import dtos
 from .client import CouponValidation, Page, RapidfoodClient
 
 
+class ApiAuthError(RuntimeError):
+    """The backend rejected the session token (auth failure).
+
+    DRF returns 401 for AuthenticationFailed only when the authentication class
+    exposes a challenge header; SupabaseJWTAuthentication does not, so an expired
+    or invalid token comes back as 403. A 403 is treated as an auth failure only
+    when its detail looks like a token/credential problem, so a genuine
+    permission denial is not mistaken for a dead session.
+    """
+
+    status_code = 401
+
+
+def _looks_like_auth_failure(status_code: int, detail: str) -> bool:
+    if status_code == 401:
+        return True
+    if status_code != 403:
+        return False
+    text = (detail or "").lower()
+    return any(
+        marker in text
+        for marker in ("token", "authentication", "credentials", "jwt", "authorization")
+    )
+
+
 def _parse_dt(value):
     if value in (None, ""):
         return None
@@ -69,6 +94,9 @@ class HttpRapidfoodClient(RapidfoodClient):
     def _post(self, path: str, payload: dict) -> object:
         resp = self.session.post(f"{self.base_url}{path}", json=payload, timeout=15)
         self._raise_if_error(resp)
+        # 204 No Content won't have a JSON body
+        if resp.status_code == 204:
+            return None
         return resp.json()
 
     def _patch(self, path: str, payload: dict) -> object:
@@ -97,6 +125,8 @@ class HttpRapidfoodClient(RapidfoodClient):
             message = body.get("detail") or body.get("error") or resp.text
         except Exception:
             message = resp.text
+        if _looks_like_auth_failure(resp.status_code, message):
+            raise ApiAuthError(message or "Session expired")
         raise RuntimeError(message)
 
     # -- mappers (JSON -> DTO) ---------------------------------------------
@@ -760,3 +790,43 @@ class HttpRapidfoodClient(RapidfoodClient):
 
     def save_delivery_config(self, business_config_id, payload):
         return self._post(f"/api/delivery/{business_config_id}/configure/", payload)
+
+    # -- Mercado Pago linking ----------------------------------------------
+    def get_mercadopago_status(self):
+        business_config_id = self.get_business_config().id
+        return self._get("/api/mercadopago/status/", business_config_id=business_config_id)
+
+    def get_mercadopago_authorization_url(self, business_config_id):
+        payload = self._post("/api/mercadopago/authorize/",
+                             {"business_config_id": business_config_id})
+        return payload["authorization_url"]
+
+    def unlink_mercadopago(self, business_config_id):
+        self._post("/api/mercadopago/unlink/", {"business_config_id": business_config_id})
+
+    def get_preparation_time_config(self, business_config_id):
+        try:
+            return self._get(
+                f"/api/orders/preparation-time/{business_config_id}/configure/"
+            )
+        except RuntimeError:
+            return None
+
+    def save_preparation_time_config(self, business_config_id, payload):
+        return self._post(
+            f"/api/orders/preparation-time/{business_config_id}/configure/", payload
+        )
+
+    # -- WhatsApp configuration --------------------------------------------
+    def get_whatsapp_config(self, business_config_id):
+        try:
+            return self._get(
+                "/api/conversation/whatsapp/config/",
+                business_config_id=business_config_id,
+            )
+        except RuntimeError:
+            return {"configured": False}
+
+    def save_whatsapp_config(self, business_config_id, payload):
+        body = {**payload, "business_config_id": business_config_id}
+        return self._put("/api/conversation/whatsapp/config/", body)

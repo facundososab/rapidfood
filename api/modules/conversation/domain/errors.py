@@ -43,3 +43,23 @@ class NoActiveOrderError(AgentBusinessError):
     """An operation needs an order but the conversation has none."""
 
     code = "NO_ACTIVE_ORDER"
+
+
+class WhatsAppConfigurationValidationError(ConversationDomainError):
+    """Raised when WhatsApp credentials violate domain invariants."""
+
+
+class WhatsAppConfigurationNotFoundError(ConversationDomainError):
+    """Raised when a business has no WhatsApp configuration (or it is inactive)."""
+
+
+class WhatsAppSendError(RuntimeError):
+    """The WhatsApp Cloud API rejected or failed to deliver a message."""
+
+    def __init__(self, message: str = "", *, status_code: int | None = None) -> None:
+        super().__init__(message or "WhatsApp send failed")
+        self.status_code = status_code
+
+
+class TranscriptionFailedError(RuntimeError):
+    """Inbound audio could not be transcribed (download or STT provider failed)."""

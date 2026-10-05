@@ -615,3 +615,42 @@ class MockRapidfoodClient(RapidfoodClient):
     def save_delivery_config(self, business_config_id: str, payload: dict) -> dict:
         self._delivery_config = dict(payload)
         return self._delivery_config
+
+    # ---- Mercado Pago linking --------------------------------------------
+    def get_mercadopago_status(self) -> dict:
+        return {"linked": False, "live_mode": None, "user_id": None, "public_key": None}
+
+    def get_mercadopago_authorization_url(self, business_config_id: str) -> str:
+        # The mock has no real OAuth flow; the view renders an error on an empty URL.
+        return ""
+
+    def unlink_mercadopago(self, business_config_id: str) -> None:
+        return None
+
+    def get_preparation_time_config(self, business_config_id: str) -> dict:
+        if not hasattr(self, "_prep_time_config"):
+            self._prep_time_config = {}
+        return self._prep_time_config
+
+    def save_preparation_time_config(self, business_config_id: str, payload: dict) -> dict:
+        self._prep_time_config = dict(payload)
+        return self._prep_time_config
+
+    # ---- WhatsApp configuration ------------------------------------------
+    def get_whatsapp_config(self, business_config_id: str) -> dict:
+        return getattr(self, "_whatsapp_config", {"configured": False})
+
+    def save_whatsapp_config(self, business_config_id: str, payload: dict) -> dict:
+        current = getattr(self, "_whatsapp_config", {})
+        merged = {**current, **payload, "configured": True}
+        # Secrets are write-only: never echo them back.
+        merged["has_access_token"] = bool(
+            payload.get("access_token") or current.get("has_access_token")
+        )
+        merged["has_app_secret"] = bool(
+            payload.get("app_secret") or current.get("has_app_secret")
+        )
+        merged.pop("access_token", None)
+        merged.pop("app_secret", None)
+        self._whatsapp_config = merged
+        return merged

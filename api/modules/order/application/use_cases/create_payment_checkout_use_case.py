@@ -13,8 +13,14 @@ same attempt and reuses the same key, so no second logical checkout is created.
 """
 from __future__ import annotations
 
+import logging
+from typing import Optional
+
 from modules.order.application.idempotency_key import build_idempotency_key
 from modules.order.application.ports.driven.order_repository import OrderRepository
+from modules.order.application.ports.driven.payment_credentials_query import (
+    PaymentCredentialsQuery,
+)
 from modules.order.application.ports.driven.payment_provider import (
     CreateCheckoutRequest,
     PaymentProviderPort,
@@ -39,6 +45,8 @@ from modules.order.domain.models.payment_method import PaymentMethod
 
 _PROVIDER_NAME = "MERCADOPAGO"
 
+logger = logging.getLogger(__name__)
+
 
 class CreatePaymentCheckoutUseCase(CreatePaymentCheckoutPort):
     def __init__(
@@ -48,12 +56,14 @@ class CreatePaymentCheckoutUseCase(CreatePaymentCheckoutPort):
         payment_provider: PaymentProviderPort,
         currency: str = "ARS",
         provider_name: str = _PROVIDER_NAME,
+        credentials_query: Optional[PaymentCredentialsQuery] = None,
     ) -> None:
         self._order_repo = order_repo
         self._payment_repo = payment_repo
         self._payment_provider = payment_provider
         self._currency = currency
         self._provider_name = provider_name
+        self._credentials_query = credentials_query
 
     def execute(
         self, command: CreatePaymentCheckoutCommand
@@ -107,6 +117,7 @@ class CreatePaymentCheckoutUseCase(CreatePaymentCheckoutPort):
                 currency=self._currency,
                 external_reference=attempt.external_reference or order.id,
                 idempotency_key=attempt.create_idempotency_key or attempt.id,
+                access_token=self._resolve_access_token(order),
             )
         )
 
@@ -118,6 +129,29 @@ class CreatePaymentCheckoutUseCase(CreatePaymentCheckoutPort):
         saved = self._payment_repo.save(attempt)
 
         return _result(order.id, saved, version, created=True)
+
+    def _resolve_access_token(self, order) -> Optional[str]:
+        """Resolve the per-business Mercado Pago token, or ``None`` for the global one.
+
+        Credentials are an OPTIONAL enrichment: an unlinked business, a missing
+        linkage module or a linkage failure must never block a checkout, so every
+        failure degrades to ``None`` and the provider falls back to the token in
+        settings.
+        """
+        if self._credentials_query is None:
+            return None
+        try:
+            return self._credentials_query.get_access_token(
+                order.business_config_id or "default"
+            )
+        except Exception:
+            logger.warning(
+                "Per-business payment credentials unavailable (order=%s); "
+                "falling back to the configured token.",
+                order.id,
+                exc_info=True,
+            )
+            return None
 
 
 def _result(order_id, attempt, version, *, created):

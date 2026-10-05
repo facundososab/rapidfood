@@ -2,9 +2,9 @@
 
 The conversation module produces messages the business sends to the customer
 (the agent's replies, and proactive notifications like "your order is paid").
-This port is the boundary to the actual channel (WhatsApp, etc.): the module
-never talks to a messaging API directly, so a real sender can be plugged in
-without touching application code.
+This port is the SEND-ONLY boundary to the actual channel (WhatsApp, etc.): it
+delivers bytes and never persists. Persistence is the caller's responsibility, so
+reply paths (already stored by their use case) never duplicate the message.
 """
 from __future__ import annotations
 

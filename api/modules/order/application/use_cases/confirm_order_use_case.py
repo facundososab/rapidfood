@@ -34,11 +34,13 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
         config_query: BusinessConfigQueryPort,
         catalog_query: CatalogQuery,
         coupon_consume: Optional[CouponConsumePort] = None,
+        prep_time_estimator: Optional[object] = None,
     ) -> None:
         self.order_repo = order_repo
         self.config_query = config_query
         self.catalog_query = catalog_query
         self.coupon_consume = coupon_consume
+        self.prep_time_estimator = prep_time_estimator
 
     def execute(self, command: ConfirmOrderCommand) -> ConfirmOrderResponse:
         order = self.order_repo.get_by_id(command.order_id)
@@ -161,6 +163,9 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
         if order.coupon_code and self.coupon_consume is not None:
             self.coupon_consume.consume(order.coupon_code)
 
+        # Recompute the ETA with fresh demand right before confirming.
+        self._refresh_estimated_time(order)
+
         # Transition state and record confirmation time via domain method
         order.confirm()
 
@@ -171,3 +176,10 @@ class ConfirmOrderUseCase(ConfirmOrderPort):
             status=order.status.value,
             confirmed_at=order.confirmed_at.isoformat(),
         )
+
+    def _refresh_estimated_time(self, order) -> None:
+        """ETA = preparation (demand NOW) + delivery travel time, when available."""
+        if self.prep_time_estimator is None or not order.business_config_id:
+            return
+        prep = self.prep_time_estimator.estimate_minutes(order.business_config_id)
+        order.estimated_time = prep + (order.route_duration_minutes or 0)

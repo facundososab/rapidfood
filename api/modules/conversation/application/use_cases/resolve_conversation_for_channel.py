@@ -7,6 +7,7 @@ touching the domain.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 from uuid import uuid4
@@ -15,6 +16,8 @@ from modules.conversation.application.ports.driven.conversation_repository impor
     ConversationRepositoryPort,
 )
 from modules.conversation.domain.models.conversation import Conversation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +33,8 @@ class ResolveConversationResult:
     conversation_id: str
     client_id: Optional[str]
     created: bool
+    # A human took over: the channel driver must NOT run the agent for this thread.
+    agent_paused: bool = False
 
 
 class ResolveConversationForChannelUseCase:
@@ -41,10 +46,26 @@ class ResolveConversationForChannelUseCase:
             command.business_config_id, command.channel, command.external_thread_id
         )
         if existing is not None:
+            client_id = existing.client_id
+            # Link the customer the first time we can resolve them (a later turn
+            # may learn the phone/name); never overwrite an existing link.
+            if command.client_id and not client_id:
+                try:
+                    self._conversation_repository.set_client_id(
+                        existing.conversation_id, command.client_id
+                    )
+                    client_id = command.client_id
+                except Exception:  # linking is best-effort
+                    logger.exception(
+                        "Could not link client %s to conversation %s",
+                        command.client_id,
+                        existing.conversation_id,
+                    )
             return ResolveConversationResult(
                 conversation_id=existing.conversation_id,
-                client_id=existing.client_id,
+                client_id=client_id,
                 created=False,
+                agent_paused=bool(getattr(existing, "agent_paused", False)),
             )
 
         conversation = Conversation(

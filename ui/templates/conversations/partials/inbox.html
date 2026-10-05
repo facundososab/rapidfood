@@ -13,7 +13,6 @@
       {% icon 'search' 'w-4 h-4' %}
       <input x-model="q" placeholder="Buscar conversación" autocomplete="off">
     </label>
-    <button type="button" class="chat-icon-btn" title="Filtrar">{% icon 'filter' 'w-4 h-4' %}</button>
   </div>
 
   <div class="chat-tabs">
@@ -29,16 +28,16 @@
     {% for c in conversations %}
     <button type="button"
             class="chat-item {% if conversation and c.id == conversation.id %}active{% endif %}"
-            data-search="{{ c.clientName|default:'Cliente sin identificar' }} {{ c.lastMessage|default:'' }}"
+            data-search="{{ c.displayName|default:'Cliente sin identificar' }} {{ c.lastMessage|default:'' }}"
             data-assigned="{% if c.clientId %}1{% else %}0{% endif %}"
             x-show="(tab === 'all' || $el.dataset.assigned === '0') && (q === '' || $el.dataset.search.toLowerCase().includes(q.toLowerCase()))"
             hx-get="{% url 'conversation_detail' c.id %}"
             hx-target="#conversation-pane" hx-swap="outerHTML" hx-push-url="true">
       {% cycle '#ede9fe' '#dbeafe' '#dcfce7' '#fef3c7' '#ffe4e6' as avatar_bg silent %}
-      <span class="chat-avatar" style="background: {{ avatar_bg }}">{{ c.clientName|default:'?'|initials }}</span>
+      <span class="chat-avatar" style="background: {{ avatar_bg }}">{{ c.displayName|default:'?'|initials }}</span>
       <span class="chat-item-body">
         <span class="flex items-center justify-between gap-2">
-          <span class="chat-name truncate">{{ c.clientName|default:'Cliente sin identificar' }}</span>
+          <span class="chat-name truncate">{{ c.displayName|default:'Cliente sin identificar' }}</span>
           <span class="chat-item-meta whitespace-nowrap">{% if c.lastAt %}{{ c.lastAt|time_ago }}{% endif %}</span>
         </span>
         <span class="chat-preview block">{{ c.lastMessage|default:'Sin actividad registrada' }}</span>

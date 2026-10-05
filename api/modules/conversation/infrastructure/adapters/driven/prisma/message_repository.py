@@ -38,19 +38,24 @@ class PrismaMessageRepository:
         )
         return message
 
+    def find_by_id(self, message_id: str) -> Message | None:
+        row = self._db.message.find_unique(where={"id": message_id})
+        return _to_message(row) if row is not None else None
+
     def list_by_conversation(self, conversation_id: str) -> list[Message]:
         rows = self._db.message.find_many(where={"conversationId": conversation_id}, order={"createdAt": "asc"})
-        return [
-            Message(
-                message_id=row.id,
-                conversation_id=row.conversationId,
-                role=row.role,
-                author=getattr(row, "author", None),
-                content=row.content,
-                detected_intent=getattr(row, "detectedIntent", None),
-                sentiment=getattr(row, "sentiment", None),
-                status=getattr(row, "status", None),
-                created_at=getattr(row, "createdAt", None),
-            )
-            for row in rows
-        ]
+        return [_to_message(row) for row in rows]
+
+
+def _to_message(row) -> Message:
+    return Message(
+        message_id=row.id,
+        conversation_id=row.conversationId,
+        role=row.role,
+        author=getattr(row, "author", None),
+        content=row.content,
+        detected_intent=getattr(row, "detectedIntent", None),
+        sentiment=getattr(row, "sentiment", None),
+        status=getattr(row, "status", None),
+        created_at=getattr(row, "createdAt", None),
+    )
