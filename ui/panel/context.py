@@ -13,6 +13,7 @@ NAV_ITEMS = [
             {"key": "orders-list", "label": "Listado", "url": "orders_listing"},
         ],
     },
+    {"key": "kitchen", "label": "Cocina", "url": "kitchen", "icon": "chef-hat"},
     {"key": "products", "label": "Productos", "url": "products", "icon": "utensils"},
     {"key": "payments", "label": "Pagos", "url": "payments", "icon": "credit-card"},
     {"key": "clients", "label": "Clientes", "url": "clients", "icon": "users"},

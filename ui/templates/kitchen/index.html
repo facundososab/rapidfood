@@ -1,0 +1,24 @@
+{% extends 'base.html' %}{% block title %}Cocina{% endblock %}{% block heading %}Cocina{% endblock %}{% block subheading %}<p class="text-[13px] text-ink-muted">Pedidos confirmados y en preparación</p>{% endblock %}{% block content %}
+<div class="grid gap-6 lg:grid-cols-2">
+  <section>
+    <h2 class="font-display font-bold text-[15px] mb-3">Nuevos ({{ new_orders|length }})</h2>
+    <div class="space-y-4">
+      {% for order,transitions in new_orders %}
+      {% include 'kitchen/partials/kitchen_card.html' with order=order transitions=transitions %}
+      {% empty %}
+      <p class="text-[13px] text-ink-muted">No hay pedidos nuevos.</p>
+      {% endfor %}
+    </div>
+  </section>
+  <section>
+    <h2 class="font-display font-bold text-[15px] mb-3">En preparación ({{ in_progress_orders|length }})</h2>
+    <div class="space-y-4">
+      {% for order,transitions in in_progress_orders %}
+      {% include 'kitchen/partials/kitchen_card.html' with order=order transitions=transitions %}
+      {% empty %}
+      <p class="text-[13px] text-ink-muted">No hay pedidos en preparación.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
