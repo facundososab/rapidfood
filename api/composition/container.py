@@ -142,6 +142,8 @@ def get_app_conversation_container() -> ConversationContainer:
         client.client_query_adapter.find_by_id,
     )
 
+    from django.conf import settings
+
     return build_container(
         catalog_service=catalog_service,
         order_service=order_service,
@@ -151,6 +153,7 @@ def get_app_conversation_container() -> ConversationContainer:
         agent_runner_factory=_build_agent_runner,
         whatsapp_outbound=True,
         transcriber=_build_transcriber(),
+        menu_public_url=getattr(settings, "MENU_PUBLIC_BASE_URL", ""),
     )
 
 

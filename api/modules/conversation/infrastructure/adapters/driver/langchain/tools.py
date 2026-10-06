@@ -318,6 +318,27 @@ def build_tools(
             lambda: container.get_latest_active_order_use_case.execute(context)
         )
 
+    @tool
+    def get_menu_link() -> str:
+        """Devuelve el link público de la carta digital (el menú con precios).
+        Usala cuando el cliente pida ver la carta o el menú, o pida un link para
+        verlo. Compartí EXACTAMENTE la URL que devuelve: nunca la escribas de memoria
+        ni inventes el dominio."""
+
+        def operation():
+            base = (getattr(container, "menu_public_url", None) or "").rstrip("/")
+            if not base:
+                raise AgentBusinessError(
+                    "No tengo el link de la carta disponible en este momento.",
+                    code="MENU_LINK_UNAVAILABLE",
+                )
+            url = f"{base}/carta/"
+            if turn_state is not None:
+                turn_state["menu_url"] = url
+            return {"menu_url": url}
+
+        return _run(operation)
+
     return [
         search_products,
         get_product_detail,
@@ -336,4 +357,5 @@ def build_tools(
         cancel_order,
         create_payment_checkout,
         get_latest_active_order,
+        get_menu_link,
     ]

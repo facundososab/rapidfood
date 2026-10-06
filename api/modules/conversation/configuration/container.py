@@ -164,6 +164,8 @@ class ConversationContainer:
     send_conversation_message_use_case: Optional[SendConversationMessageUseCase] = None
     # Public digital menu: read-only business contact (name + WhatsApp number).
     get_public_contact_use_case: Optional[GetPublicContactUseCase] = None
+    # Public base URL of the digital menu, used by the get_menu_link agent tool.
+    menu_public_url: Optional[str] = None
     # Channel infrastructure (NOT application use cases): the driver uses these
     # through the container and they own the WhatsApp credentials.
     whatsapp_webhook_authenticator: Optional[WhatsAppWebhookAuthenticator] = None
@@ -185,6 +187,7 @@ def build_container(
     whatsapp_media=None,
     transcriber=None,
     whatsapp_outbound: bool = False,
+    menu_public_url: Optional[str] = None,
 ) -> ConversationContainer:
     """Build the conversation module wiring.
 
@@ -230,6 +233,7 @@ def build_container(
         ),
     )
 
+    container.menu_public_url = menu_public_url
     container.get_whatsapp_configuration_use_case = GetWhatsAppConfigurationUseCase(
         whatsapp_config_repository
     )

@@ -74,6 +74,8 @@ services:
       WHATSAPP_CONFIG_ENCRYPTION_KEY: ${WHATSAPP_CONFIG_ENCRYPTION_KEY:-}
       # Speech-to-text model for inbound WhatsApp voice notes (reuses GEMINI/GROQ key).
       WHATSAPP_TRANSCRIPTION_MODEL: ${WHATSAPP_TRANSCRIPTION_MODEL:-}
+      # Public base URL of the customer-facing digital menu (agent link).
+      MENU_PUBLIC_BASE_URL: ${MENU_PUBLIC_BASE_URL:-https://hypsicephalic-decisive-lavette.ngrok-free.dev}
       # LangSmith tracing (optional).
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
