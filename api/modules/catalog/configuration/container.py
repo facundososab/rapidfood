@@ -28,6 +28,9 @@ from modules.catalog.application.use_cases.list_prices_use_case import (
 from modules.catalog.application.use_cases.list_products_use_case import (
     ListProductsUseCase,
 )
+from modules.catalog.application.use_cases.get_public_menu_use_case import (
+    GetPublicMenuUseCase,
+)
 from modules.catalog.application.use_cases.set_discount_use_case import (
     SetDiscountUseCase,
 )
@@ -97,6 +100,9 @@ class CatalogContainer:
         self.list_products = ListProductsUseCase(products)
         self.list_prices = ListPricesUseCase(prices)
         self.list_categories = ListCategoriesUseCase(categories)
+        self.get_public_menu = GetPublicMenuUseCase(
+            self.list_categories, self.list_products, self.product_query
+        )
         self.get_product = GetProductUseCase(products, categories, prices)
         self.update_product = UpdateProductUseCase(products, categories, prices)
 
