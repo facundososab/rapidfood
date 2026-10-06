@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import uuid
 
@@ -7,7 +8,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from composition.container import get_app_conversation_container
+from composition.container import (
+    get_app_conversation_container,
+    resolve_agent_business_config_id,
+)
 from modules.conversation.domain.models.agent_execution_context import (
     AgentExecutionContext,
 )
@@ -262,3 +266,18 @@ class AgentMessageView(APIView):
                 "response": result.response,
             }
         )
+
+
+class PublicContactView(APIView):
+    """Public business contact profile for the digital menu header + WhatsApp CTA."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def get(self, request):
+        business_id = resolve_agent_business_config_id(None)
+        container = get_app_conversation_container()
+        contact = container.get_public_contact_use_case.execute(business_id)
+        response = Response(dataclasses.asdict(contact))
+        response["Cache-Control"] = "no-store"
+        return response

@@ -38,3 +38,15 @@ class BusinessServiceAdapter(BusinessServicePort):
             province=address.get("province"),
             postal_code=address.get("postalCode"),
         )
+
+    def get_name(self, business_configuration_id: str) -> Optional[str]:
+        try:
+            config = self._get_configuration.execute(
+                GetBusinessConfigurationQuery(
+                    business_config_id=business_configuration_id
+                )
+            )
+        except Exception:
+            # The business name is a convenience; never fail a turn for it.
+            return None
+        return config.get("businessName")

@@ -39,8 +39,8 @@ Fuera de alcance (v1):
 
 ## Tareas
 
-### T1 — Endpoint público de menú (catalog)
-- [ ] `application/ports/driver/get_public_menu_ports.py`: DTOs públicos (`PublicMenu`, `PublicCategory`, `PublicProduct`, `PublicVariant`, `PublicModifierGroup`, `PublicModifierOption`) + protocolo `GetPublicMenuPort`.
+### T1 — Endpoint público de menú (catalog) ✅ commit `a943073`
+- [x] `application/ports/driver/get_public_menu_ports.py`: DTOs públicos (`PublicMenu`, `PublicCategory`, `PublicProduct`, `PublicVariant`, `PublicModifierGroup`, `PublicModifierOption`) + protocolo `GetPublicMenuPort`.
 - [ ] `application/use_cases/get_public_menu_use_case.py`: arma el árbol desde `list_categories`, `list_products` (solo `state == available`) y `product_query.find_product` (variantes con `price`, modificadores). Productos sin categoría → grupo "Otros" al final si existe.
 - [ ] Wiring en `catalog/configuration/container.py` (`get_public_menu`).
 - [ ] `infrastructure/adapters/driver/rest/views.py`: `PublicMenuView(APIView)` con `permission_classes=[AllowAny]`, `authentication_classes=[]`, GET, `Cache-Control: no-store`.
@@ -96,12 +96,17 @@ Fuera de alcance (v1):
 
 ## Progreso / evidencia
 
-- [ ] T1
+- [x] T1 — commit `a943073`. `pytest api/modules/catalog/tests` → 26 passed. `lint-imports` → 10 kept, 0 broken. Test del view usa `APIRequestFactory` (ver Notas de entorno).
 - [ ] T2
 - [ ] T3
 - [ ] T4
 - [ ] T5
 
+## Notas de entorno (gotchas descubiertos)
+
+- El `.venv` local estaba incompleto (faltaban PyJWT, requests, shapely, openrouteservice, cryptography, langchain*, mercadopago, psycopg, import-linter). Se instalaron. Runner: `.venv\Scripts\python.exe -m pytest` (uv NO está instalado). Gate: `.venv\Scripts\lint-imports.exe --config ../pyproject.toml` desde `api/`.
+- Defecto preexistente: `api/modules/delivery/infrastructure/adapters/driver/rest/urls.py:19` construye `get_delivery_container()` a nivel módulo y `DeliveryContainer.__init__` accede a `db.client`, abriendo Prisma al importar el URLconf. Por eso `django.test.Client`/`resolve` cuelgan sin engine+DB. Los tests de views de API deben usar `APIRequestFactory` (no cargan URLconf). No se toca `delivery` en este sprint (fuera de alcance).
+
 ## Próximo paso
 
-Implementar T1 (endpoint público de menú en catalog).
+Implementar T2 (endpoint público de contacto en conversation).

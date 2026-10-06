@@ -13,6 +13,7 @@ from modules.conversation.infrastructure.adapters.driver.rest.views import (
     ConversationReleaseView,
     ConversationTakeoverView,
     ConversationWebhookView,
+    PublicContactView,
 )
 
 urlpatterns = [
@@ -29,6 +30,11 @@ urlpatterns = [
         name="conversation-whatsapp-config",
     ),
     path("agent/message/", AgentMessageView.as_view(), name="conversation-agent-message"),
+    path(
+        "public-contact/",
+        PublicContactView.as_view(),
+        name="conversation-public-contact",
+    ),
     path("<str:conversation_id>/messages/", ConversationMessagesView.as_view(), name="conversation-messages"),
     path(
         "<str:conversation_id>/operator-message/",
