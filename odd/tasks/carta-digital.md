@@ -100,7 +100,7 @@ Fuera de alcance (v1):
 - [x] T2 — endpoint público de contacto (conversation). Commiteado por el usuario.
 - [x] T3 — `get_menu_link` + prompt 2.3.0 + `_guard_menu_links` + `MENU_PUBLIC_BASE_URL`. Tests: 60 passed (tools/agent/policy). import-linter 10/10. Cambios aditivos: se actualizaron las 2 aserciones de inventario de tools (17→18). Pendiente de commit.
 - [x] T4 — página pública `/carta/` (UI) + service público sin auth + CTA WhatsApp. 59 tests UI OK. `app.css` recompilado (clases del panel intactas). Pendiente de commit.
-- [ ] T5
+- [x] T5 — `docs/carta-digital.md` (feature + endpoints + env var + guía multi-negocio). Pendiente de commit.
 
 ## Notas de entorno (gotchas descubiertos)
 
@@ -109,4 +109,4 @@ Fuera de alcance (v1):
 
 ## Próximo paso
 
-Implementar T2 (endpoint público de contacto en conversation).
+Sprint completo (T1–T5). T1 commiteado; T2/T3 commiteados por el usuario; T4 y T5 pendientes de commit.
