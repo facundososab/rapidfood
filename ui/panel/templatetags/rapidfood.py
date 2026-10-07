@@ -41,6 +41,25 @@ def money_or_dash(value) -> str:
     return "—" if value is None else money(value)
 
 
+@register.filter
+def ars(value) -> str:
+    """Compact menu price: "5200.00" -> "5.200", "85.50" -> "85,50"."""
+    if value in (None, ""):
+        return "—"
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
+    q = value.quantize(Decimal("0.01"))
+    whole, frac = f"{abs(q):.2f}".split(".")
+    grouped = ""
+    for i, ch in enumerate(reversed(whole)):
+        if i and i % 3 == 0:
+            grouped = "." + grouped
+        grouped = ch + grouped
+    if frac == "00":
+        return grouped
+    return f"{grouped},{frac}"
+
+
 _MONTHS_ES = (
     "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
     "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",

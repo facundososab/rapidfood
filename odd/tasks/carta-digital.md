@@ -97,9 +97,9 @@ Fuera de alcance (v1):
 ## Progreso / evidencia
 
 - [x] T1 — commit `a943073`. `pytest api/modules/catalog/tests` → 26 passed. `lint-imports` → 10 kept, 0 broken. Test del view usa `APIRequestFactory` (ver Notas de entorno).
-- [ ] T2
+- [x] T2 — endpoint público de contacto (conversation). Commiteado por el usuario.
 - [x] T3 — `get_menu_link` + prompt 2.3.0 + `_guard_menu_links` + `MENU_PUBLIC_BASE_URL`. Tests: 60 passed (tools/agent/policy). import-linter 10/10. Cambios aditivos: se actualizaron las 2 aserciones de inventario de tools (17→18). Pendiente de commit.
-- [ ] T4
+- [x] T4 — página pública `/carta/` (UI) + service público sin auth + CTA WhatsApp. 59 tests UI OK. `app.css` recompilado (clases del panel intactas). Pendiente de commit.
 - [ ] T5
 
 ## Notas de entorno (gotchas descubiertos)

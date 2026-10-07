@@ -1,0 +1,93 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }} · Carta</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20261006carta1" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍔</text></svg>" />
+</head>
+<body class="min-h-screen bg-bg font-sans text-ink">
+  <header class="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
+    <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+      <h1 class="font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">{{ title }}</h1>
+      {% if whatsapp_url %}
+      <a href="{{ whatsapp_url }}" target="_blank" rel="noopener"
+         class="btn btn-primary justify-center whitespace-nowrap !py-2.5">
+        Pedir por WhatsApp
+      </a>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+    {% if menu.categories %}
+      {% for category in menu.categories %}
+      <section class="mb-10">
+        <h2 class="mb-4 font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">{{ category.name }}</h2>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {% for product in category.products %}
+          <article class="card flex flex-col overflow-hidden p-0">
+            {% if product.image_url %}
+            <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy"
+                 class="aspect-[4/3] w-full object-cover" />
+            {% else %}
+            <div class="flex aspect-[4/3] w-full items-center justify-center bg-muted">
+              <span class="font-display text-5xl font-extrabold text-ink-faint">{{ product.name|slice:":1"|upper }}</span>
+            </div>
+            {% endif %}
+
+            <div class="flex flex-1 flex-col gap-3 p-4">
+              <h3 class="font-display text-lg font-bold leading-tight text-ink">{{ product.name }}</h3>
+              {% if product.description %}
+              <p class="text-sm leading-relaxed text-ink-soft">{{ product.description }}</p>
+              {% endif %}
+
+              {% if product.variants %}
+              <div class="mt-auto flex flex-col gap-1.5 border-t border-line pt-3">
+                {% for variant in product.variants %}
+                <div class="flex items-baseline justify-between gap-3">
+                  <span class="text-sm font-medium {% if variant.available %}text-ink{% else %}text-ink-faint line-through{% endif %}">{{ variant.name }}</span>
+                  <span class="tnum text-sm {% if variant.available %}font-semibold text-ink{% else %}text-ink-faint{% endif %}">
+                    {% if variant.available %}{% if variant.price %}$ {{ variant.price|ars }}{% else %}Consultar{% endif %}{% else %}No disponible{% endif %}
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+
+              {% if product.modifier_groups %}
+              <div class="flex flex-col gap-2 border-t border-line pt-3">
+                {% for group in product.modifier_groups %}
+                {% if group.options %}
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-faint">{{ group.name }}</p>
+                  <ul class="mt-1 flex flex-col gap-1">
+                    {% for option in group.options %}
+                    <li class="flex items-baseline justify-between gap-3 text-sm text-ink-soft">
+                      <span>{{ option.name }}</span>
+                      {% if option.price_delta %}<span class="tnum font-semibold text-ink">+${{ option.price_delta|ars }}</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    {% else %}
+    <div class="card mx-auto mt-12 flex max-w-md flex-col items-center gap-2 px-6 py-12 text-center">
+      <p class="font-display text-lg font-bold text-ink">No pudimos cargar la carta</p>
+      <p class="text-sm text-ink-soft">Probá de nuevo en un momento.</p>
+    </div>
+    {% endif %}
+  </main>
+</body>
+</html>
