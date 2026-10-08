@@ -48,9 +48,10 @@ class LangChainConversationAgentAdapter(AgentRunnerPort):
         messages.append(HumanMessage(content=turn.message))
 
         result = agent.invoke({"messages": messages}, _trace_config(turn))
-        return _guard_payment_links(
+        text = _guard_payment_links(
             _final_text(result["messages"]), turn_state.get("checkout_url")
         )
+        return _guard_menu_links(text, turn_state.get("menu_url"))
 
 
 # Any URL pointing at a Mercado Pago checkout. Used to stop the model from
@@ -76,6 +77,27 @@ def _guard_payment_links(text: str, real_checkout_url: Optional[str]) -> str:
         return _PAYMENT_LINK_RE.sub(real_checkout_url, text)
     return _PAYMENT_LINK_RE.sub(
         "(no pude generar el link de pago en este momento, ¿querés que reintente?)",
+        text,
+    )
+
+
+# Any URL pointing at the public digital menu (a "/carta/" path). Same purpose
+# as the payment guard: only the URL returned by get_menu_link in THIS turn is
+# allowed through, so a hallucinated menu domain never reaches the customer.
+_MENU_LINK_RE = re.compile(
+    r"https?://[^\s\)\]]*/carta/?[^\s\)\]]*",
+    re.IGNORECASE,
+)
+
+
+def _guard_menu_links(text: str, real_menu_url: Optional[str]) -> str:
+    """Never let a menu URL the backend did not produce reach the customer."""
+    if not _MENU_LINK_RE.search(text):
+        return text
+    if real_menu_url:
+        return _MENU_LINK_RE.sub(real_menu_url, text)
+    return _MENU_LINK_RE.sub(
+        "(no tengo el link de la carta en este momento, ¿querés que lo intente de nuevo?)",
         text,
     )
 

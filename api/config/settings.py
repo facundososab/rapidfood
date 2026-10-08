@@ -140,6 +140,13 @@ WHATSAPP_TRANSCRIPTION_MODEL: str = os.environ.get(
     "WHATSAPP_TRANSCRIPTION_MODEL", ""
 )
 
+# Public base URL of the customer-facing digital menu. The agent's get_menu_link
+# tool composes "<base>/carta/". Defaults to the current public ngrok tunnel so
+# it works out of the box; override for a real domain.
+MENU_PUBLIC_BASE_URL: str = os.environ.get(
+    "MENU_PUBLIC_BASE_URL", "https://hypsicephalic-decisive-lavette.ngrok-free.dev"
+)
+
 # LangSmith tracing (LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT /
 # LANGSMITH_WORKSPACE_ID / LANGSMITH_ENDPOINT) is NOT copied into Django
 # settings on purpose: the LangChain/LangSmith client reads os.environ directly,

@@ -93,6 +93,7 @@ def test_exposes_exactly_the_expected_tool_set():
         "cancel_order",
         "create_payment_checkout",
         "get_latest_active_order",
+        "get_menu_link",
     }
     # No administrative operations are exposed.
     for forbidden in ("create_product", "advance_order", "set_order_status", "reopen_order"):
@@ -263,3 +264,25 @@ def test_set_client_phone_is_optional():
     container, tools, _ = _tools()
     tools["set_client"].invoke({"name": "Facundo"})
     assert container.set_client_use_case.calls[0][0].phone_number is None
+
+
+def test_get_menu_link_returns_the_menu_url_and_records_it():
+    state = {}
+    container = _container(menu_public_url="https://menu.example")
+    tools = {t.name: t for t in build_tools(container, _context(), state)}
+
+    payload = json.loads(tools["get_menu_link"].invoke({}))
+
+    assert payload["ok"] is True
+    assert payload["data"]["menu_url"] == "https://menu.example/carta/"
+    assert state["menu_url"] == "https://menu.example/carta/"
+
+
+def test_get_menu_link_without_a_base_url_is_a_business_error():
+    container = _container()
+    tools = {t.name: t for t in build_tools(container, _context())}
+
+    payload = json.loads(tools["get_menu_link"].invoke({}))
+
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "MENU_LINK_UNAVAILABLE"

@@ -172,7 +172,7 @@ def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
     response = adapter.run(turn)
 
     assert response == "Tu pedido está listo"
-    assert len(captured["tools"]) == 17
+    assert len(captured["tools"]) == 18
     assert [m.type for m in captured["messages"]] == ["human", "ai", "human"]
     assert "NUNCA inventes" in captured["prompt"]
 
@@ -487,3 +487,45 @@ def test_payment_link_guard_leaves_non_payment_urls_untouched():
     text = "Mirá nuestro menú en https://rapidfood.example/menu"
 
     assert _guard_payment_links(text, None) == text
+
+
+def test_menu_link_guard_strips_a_fabricated_url_when_no_real_url():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_menu_links,
+    )
+
+    text = "Mirá la carta acá: https://fake.example/carta/menu"
+
+    guarded = _guard_menu_links(text, None)
+
+    assert "fake.example" not in guarded
+    assert "no tengo el link de la carta" in guarded
+
+
+def test_menu_link_guard_normalizes_to_the_real_menu_url():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_menu_links,
+    )
+
+    text = "Acá tenés la carta: https://invented.example/carta/"
+    real = "https://menu.example/carta/"
+
+    guarded = _guard_menu_links(text, real)
+
+    assert real in guarded
+    assert "invented.example" not in guarded
+
+
+def test_menu_link_guard_leaves_non_menu_urls_untouched():
+    from modules.conversation.infrastructure.adapters.driver.langchain.langchain_conversation_agent_adapter import (
+        _guard_menu_links,
+    )
+
+    payment = (
+        "Pagá acá: "
+        "https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=dummy"
+    )
+    assert _guard_menu_links(payment, None) == payment
+
+    plain = "Mirá nuestro menú en https://rapidfood.example/menu"
+    assert _guard_menu_links(plain, None) == plain
