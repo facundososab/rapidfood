@@ -1,1 +1,0 @@
-# Cloudinary driven adapter package

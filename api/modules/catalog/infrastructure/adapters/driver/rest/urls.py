@@ -4,7 +4,6 @@ from .views import (
     CategoryListCreateView,
     PriceListCreateView,
     ProductDetailView,
-    ProductImageUploadView,
     ProductListCreateView,
     SetDiscountView,
     SetProductStateView,
@@ -54,9 +53,4 @@ urlpatterns = [
     ),
     path("categories/", CategoryListCreateView.as_view(), name="catalog-categories"),
     path("discounts/", SetDiscountView.as_view(), name="catalog-discounts"),
-    path(
-        "products/<str:product_id>/image/",
-        ProductImageUploadView.as_view(),
-        name="catalog-product-image",
-    ),
 ]
