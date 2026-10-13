@@ -54,6 +54,7 @@ from modules.catalog.infrastructure.adapters.driven.prisma.variant_repository im
 from modules.catalog.infrastructure.adapters.driven.prisma.ingredient_repository import PrismaIngredientRepository
 from modules.catalog.infrastructure.adapters.driven.prisma.variant_ingredient_repository import PrismaVariantIngredientRepository
 from modules.catalog.infrastructure.adapters.driven.prisma.modifier_repository import PrismaModifierRepository
+from modules.catalog.infrastructure.adapters.driven.cloudinary.image_storage_adapter import CloudinaryImageStorageAdapter
 
 from modules.catalog.application.use_cases.create_variant_use_case import CreateVariantUseCase
 from modules.catalog.application.use_cases.update_variant_use_case import UpdateVariantUseCase
@@ -68,6 +69,7 @@ from modules.catalog.application.use_cases.create_modifier_option_use_case impor
 from modules.catalog.application.use_cases.update_modifier_option_use_case import UpdateModifierOptionUseCase
 from modules.catalog.application.use_cases.delete_modifier_group_use_case import DeleteModifierGroupUseCase
 from modules.catalog.application.use_cases.delete_modifier_option_use_case import DeleteModifierOptionUseCase
+from modules.catalog.application.use_cases.upload_product_image_use_case import UploadProductImageUseCase
 
 class CatalogContainer:
     def __init__(self) -> None:
@@ -80,6 +82,7 @@ class CatalogContainer:
         ingredients = PrismaIngredientRepository()
         variant_ingredients = PrismaVariantIngredientRepository()
         modifiers = PrismaModifierRepository()
+        image_storage = CloudinaryImageStorageAdapter()
 
         self.create_product = CreateProductUseCase(product_repo=products, category_repo=categories, id_generator=id_generator, variant_repo=variants)
         self.delete_product = DeleteProductUseCase(products)
@@ -113,6 +116,7 @@ class CatalogContainer:
         self.update_modifier_option = UpdateModifierOptionUseCase(modifiers)
         self.delete_modifier_group = DeleteModifierGroupUseCase(modifiers)
         self.delete_modifier_option = DeleteModifierOptionUseCase(modifiers)
+        self.upload_product_image = UploadProductImageUseCase(products, image_storage)
 
 @lru_cache(maxsize=1)
 def get_catalog_container() -> CatalogContainer:

@@ -2,6 +2,7 @@ import dataclasses
 from datetime import date
 
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -34,6 +35,10 @@ from modules.catalog.domain.errors.catalog_errors import (
     ProductNotFoundError,
 )
 from modules.catalog.domain.models.product import ProductState
+
+from modules.catalog.application.ports.driver.upload_product_image_ports import (
+    UploadProductImageCommand,
+)
 
 from .serializers import (
     AddPriceSerializer,
@@ -267,3 +272,34 @@ class SetDiscountView(APIView):
             )
 
         return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
+
+
+class ProductImageUploadView(APIView):
+    """POST /products/{product_id}/image/ — upload a real image to Cloudinary."""
+
+    parser_classes = [MultiPartParser]
+
+    def post(self, request, product_id: str):
+        image_file = request.FILES.get("image")
+        if image_file is None:
+            return Response(
+                {"detail": "Se requiere el campo 'image' con el archivo de imagen."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        command = UploadProductImageCommand(
+            product_id=str(product_id),
+            file_data=image_file.read(),
+            filename=image_file.name,
+            content_type=image_file.content_type,
+        )
+
+        container = get_app_catalog_container()
+        try:
+            image_url = container.upload_product_image.execute(command)
+        except ProductNotFoundError:
+            return Response(
+                {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({"image_url": image_url}, status=status.HTTP_200_OK)
