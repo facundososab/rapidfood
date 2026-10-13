@@ -6,11 +6,11 @@ from typing import Optional, Protocol
 
 
 @dataclass(frozen=True, slots=True)
-class PublicContactView:
+class PublicContact:
     business_name: Optional[str]
     whatsapp_number: Optional[str]
     whatsapp_enabled: bool
 
 
 class GetPublicContactPort(Protocol):
-    def execute(self, business_configuration_id: str) -> PublicContactView: ...
+    def execute(self, business_configuration_id: str) -> PublicContact: ...

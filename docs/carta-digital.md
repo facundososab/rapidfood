@@ -18,6 +18,8 @@ Flujo end-to-end:
 | Endpoint público de menú | `catalog` (REST) | `api/modules/catalog/infrastructure/adapters/driver/rest/views.py` (`PublicMenuView`) |
 | Caso de uso del menú | `catalog` (application) | `api/modules/catalog/application/use_cases/get_public_menu_use_case.py` |
 | Puerto + DTOs públicos del menú | `catalog` (ports) | `api/modules/catalog/application/ports/driver/get_public_menu_ports.py` |
+| Read model del menú (driven port) | `catalog` (ports) | `api/modules/catalog/application/ports/driven/public_menu_read_port.py` |
+| Adapter de lectura del menú | `catalog` (infrastructure) | `api/modules/catalog/infrastructure/adapters/driven/prisma/public_menu_read_adapter.py` |
 | Endpoint público de contacto | `conversation` (REST) | `api/modules/conversation/infrastructure/adapters/driver/rest/views.py` (`PublicContactView`) |
 | Caso de uso de contacto | `conversation` (application) | `api/modules/conversation/application/use_cases/get_public_contact.py` |
 | Tool del agente | `conversation` (LangChain) | `api/modules/conversation/infrastructure/adapters/driver/langchain/tools.py` (`get_menu_link`) |
@@ -32,7 +34,7 @@ Ambos son `AllowAny`, read-only, y no exponen secretos ni datos internos.
 
 ### `GET /api/catalog/menu/`
 
-Devuelve la carta: categorías → productos **disponibles** → variantes con **precio actual** → grupos de modificadores. Los precios salen en vivo de `ProductVariant` (historial `Price`). `Cache-Control: no-store`.
+Devuelve la carta: categorías → productos **disponibles** → variantes con **precio actual** → grupos de modificadores. Los precios salen en vivo de `ProductVariant` (historial `Price`). `Cache-Control: no-store`. Se arma con un read model dedicado (puerto driven `PublicMenuReaderPort` + `PrismaPublicMenuReadAdapter`) que carga todo en una cantidad **constante** de queries (sin N+1 por producto).
 
 ```json
 {
@@ -104,9 +106,9 @@ Perfil público del negocio para el encabezado de la carta y el botón de WhatsA
 ## Configuración
 
 - **`MENU_PUBLIC_BASE_URL`** (variable de entorno): dominio público sobre el que vive `/carta/`.
-  - Default: `https://hypsicephalic-decisive-lavette.ngrok-free.dev` (túnel ngrok actual).
-  - Declarada en `api/config/settings.py` y en `docker-compose.yml` (servicio `backend`).
-  - Para un dominio propio, cambiar solo esta variable; no requiere tocar código.
+  - Default: **vacío**. Al estar vacío, la tool `get_menu_link` responde un error de negocio (`MENU_LINK_UNAVAILABLE`) en vez de inventar/sharear un dominio; el resto de la carta sigue funcionando.
+  - Declarada en `api/config/settings.py`, `.env` (plantilla `.env.example`) y en `docker-compose.yml` (servicio `backend`).
+  - Para un dominio propio o el túnel ngrok, setear esta variable; no requiere tocar código.
 - **Enrutamiento**: nginx/ngrok mandan `/api/` y `/health/` al backend y **todo el resto a la UI**, así que `<dominio>/carta/` lo sirve la UI.
 
 ## Cómo verificar
@@ -150,7 +152,9 @@ Hoy el sistema es **single-business** (el negocio se resuelve solo, con fallback
 ## Archivos clave
 
 - `api/modules/catalog/application/ports/driver/get_public_menu_ports.py`
+- `api/modules/catalog/application/ports/driven/public_menu_read_port.py`
 - `api/modules/catalog/application/use_cases/get_public_menu_use_case.py`
+- `api/modules/catalog/infrastructure/adapters/driven/prisma/public_menu_read_adapter.py`
 - `api/modules/catalog/infrastructure/adapters/driver/rest/views.py` / `urls.py`
 - `api/modules/conversation/application/ports/driver/public_contact_ports.py`
 - `api/modules/conversation/application/use_cases/get_public_contact.py`

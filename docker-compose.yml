@@ -75,7 +75,9 @@ services:
       # Speech-to-text model for inbound WhatsApp voice notes (reuses GEMINI/GROQ key).
       WHATSAPP_TRANSCRIPTION_MODEL: ${WHATSAPP_TRANSCRIPTION_MODEL:-}
       # Public base URL of the customer-facing digital menu (agent link).
-      MENU_PUBLIC_BASE_URL: ${MENU_PUBLIC_BASE_URL:-https://hypsicephalic-decisive-lavette.ngrok-free.dev}
+      # Empty by default: set MENU_PUBLIC_BASE_URL in the repo-root .env (e.g. the
+      # ngrok domain) so get_menu_link shares the right domain.
+      MENU_PUBLIC_BASE_URL: ${MENU_PUBLIC_BASE_URL:-}
       # LangSmith tracing (optional).
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}

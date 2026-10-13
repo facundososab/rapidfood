@@ -94,12 +94,17 @@ def build_tools(
     container: Any,
     context: AgentExecutionContext,
     turn_state: Optional[dict] = None,
+    menu_public_url: Optional[str] = None,
 ) -> list[BaseTool]:
     """Build the agent tools bound to one trusted execution context.
 
     ``turn_state`` is an optional mutable per-turn holder the adapter uses to
     remember side effects it must validate afterwards (e.g. the REAL
     checkout_url), so a hallucinated payment link can be caught and replaced.
+
+    ``menu_public_url`` is the public base URL of the digital menu, passed
+    explicitly (not read from the container) so the tool stays decoupled from the
+    container's mutable state.
     """
 
     @tool
@@ -326,7 +331,7 @@ def build_tools(
         ni inventes el dominio."""
 
         def operation():
-            base = (getattr(container, "menu_public_url", None) or "").rstrip("/")
+            base = (menu_public_url or "").rstrip("/")
             if not base:
                 raise AgentBusinessError(
                     "No tengo el link de la carta disponible en este momento.",

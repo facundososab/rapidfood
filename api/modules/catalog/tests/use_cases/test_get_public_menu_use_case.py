@@ -1,102 +1,60 @@
-"""Public menu use case: categories -> available products -> variants/modifiers."""
+"""Public menu use case: read model -> public categories/products/variants."""
 from decimal import Decimal
 
-from modules.catalog.application.ports.driver.list_products_ports import ProductSummary
-from modules.catalog.application.ports.driver.product_query_ports import (
-    ModifierGroupSnapshot,
-    ModifierOptionSnapshot,
-    ProductSnapshot,
-    VariantSnapshot,
+from modules.catalog.application.ports.driven.public_menu_read_port import (
+    MenuReadCategory,
+    MenuReadModifierGroup,
+    MenuReadModifierOption,
+    MenuReadProduct,
+    MenuReadVariant,
+    PublicMenuReadModel,
 )
 from modules.catalog.application.use_cases.get_public_menu_use_case import (
     GetPublicMenuUseCase,
 )
-from modules.catalog.domain.models.category import Category
-from modules.catalog.domain.models.product import ProductState
 
 
-class FakeListCategories:
-    def __init__(self, categories):
-        self._categories = categories
+class FakeMenuReader:
+    def __init__(self, read_model):
+        self._read_model = read_model
 
-    def execute(self):
-        return list(self._categories)
-
-
-class FakeListProducts:
-    def __init__(self, summaries):
-        self._summaries = summaries
-        self.last_query = None
-
-    def execute(self, query):
-        self.last_query = query
-        return list(self._summaries)
+    def load_available_menu(self):
+        return self._read_model
 
 
-class FakeProductQuery:
-    def __init__(self, snapshots):
-        self._snapshots = snapshots
-
-    def find_product(self, product_id):
-        return self._snapshots.get(product_id)
-
-
-def _summary(product_id, category_id="cat-1"):
-    return ProductSummary(
+def _product(product_id, category_id="cat-1", variants=(), modifier_groups=()):
+    return MenuReadProduct(
         id=product_id,
         name=f"Product {product_id}",
         description="desc",
         image_url=None,
-        state=ProductState.AVAILABLE.value,
         category_id=category_id,
+        variants=tuple(variants),
+        modifier_groups=tuple(modifier_groups),
     )
 
 
-def _use_case(categories, summaries, snapshots=None):
+def _use_case(categories=(), products=()):
     return GetPublicMenuUseCase(
-        FakeListCategories(categories),
-        FakeListProducts(summaries),
-        FakeProductQuery(snapshots or {}),
+        FakeMenuReader(
+            PublicMenuReadModel(
+                categories=tuple(categories), products=tuple(products)
+            )
+        )
     )
-
-
-def test_only_available_products_are_requested():
-    list_products = FakeListProducts([])
-    use_case = GetPublicMenuUseCase(
-        FakeListCategories([]), list_products, FakeProductQuery({})
-    )
-
-    use_case.execute()
-
-    assert list_products.last_query.state == ProductState.AVAILABLE
 
 
 def test_variants_carry_string_price_and_availability():
-    snapshot = ProductSnapshot(
-        product_id="p-1",
-        name="Product p-1",
-        is_available=True,
+    product = _product(
+        "p-1",
         variants=(
-            VariantSnapshot(
-                variant_id="v-1",
-                variant_name="Grande",
-                price=Decimal("150.00"),
-                is_available=True,
+            MenuReadVariant(
+                id="v-1", name="Grande", price=Decimal("150.00"), available=True
             ),
-            VariantSnapshot(
-                variant_id="v-2",
-                variant_name="Chica",
-                price=None,
-                is_available=False,
-            ),
+            MenuReadVariant(id="v-2", name="Chica", price=None, available=False),
         ),
-        modifier_groups=(),
     )
-    use_case = _use_case(
-        [Category(id="cat-1", description="Bebidas")],
-        [_summary("p-1")],
-        {"p-1": snapshot},
-    )
+    use_case = _use_case([MenuReadCategory(id="cat-1", name="Bebidas")], [product])
 
     menu = use_case.execute()
 
@@ -110,20 +68,17 @@ def test_variants_carry_string_price_and_availability():
 
 
 def test_modifier_options_map_price_delta_as_string():
-    snapshot = ProductSnapshot(
-        product_id="p-1",
-        name="Product p-1",
-        is_available=True,
-        variants=(),
+    product = _product(
+        "p-1",
         modifier_groups=(
-            ModifierGroupSnapshot(
-                group_id="g-1",
+            MenuReadModifierGroup(
+                id="g-1",
                 name="Adiciones",
                 min_selections=0,
                 max_selections=3,
                 options=(
-                    ModifierOptionSnapshot(
-                        option_id="o-1",
+                    MenuReadModifierOption(
+                        id="o-1",
                         name="Extra queso",
                         price_delta=Decimal("50.00"),
                         available=True,
@@ -132,11 +87,7 @@ def test_modifier_options_map_price_delta_as_string():
             ),
         ),
     )
-    use_case = _use_case(
-        [Category(id="cat-1", description="Bebidas")],
-        [_summary("p-1")],
-        {"p-1": snapshot},
-    )
+    use_case = _use_case([MenuReadCategory(id="cat-1", name="Bebidas")], [product])
 
     group = use_case.execute().categories[0].products[0].modifier_groups[0]
 
@@ -149,10 +100,26 @@ def test_modifier_options_map_price_delta_as_string():
     assert group.options[0].available is True
 
 
+def test_products_are_grouped_by_category_in_port_order():
+    use_case = _use_case(
+        [
+            MenuReadCategory(id="cat-1", name="Bebidas"),
+            MenuReadCategory(id="cat-2", name="Platos"),
+        ],
+        [_product("p-2", category_id="cat-2"), _product("p-1", category_id="cat-1")],
+    )
+
+    menu = use_case.execute()
+
+    assert [category.id for category in menu.categories] == ["cat-1", "cat-2"]
+    assert [product.id for product in menu.categories[0].products] == ["p-1"]
+    assert [product.id for product in menu.categories[1].products] == ["p-2"]
+
+
 def test_orphan_product_lands_in_otros():
     use_case = _use_case(
-        [Category(id="cat-1", description="Bebidas")],
-        [_summary("p-1", category_id="unknown")],
+        [MenuReadCategory(id="cat-1", name="Bebidas")],
+        [_product("p-1", category_id="unknown")],
     )
 
     menu = use_case.execute()
@@ -164,13 +131,23 @@ def test_orphan_product_lands_in_otros():
     assert menu.categories[1].products[0].id == "p-1"
 
 
-def test_product_without_snapshot_has_empty_variants_and_groups():
+def test_product_without_variants_or_groups_is_still_listed():
     use_case = _use_case(
-        [Category(id="cat-1", description="Bebidas")],
-        [_summary("p-1")],
+        [MenuReadCategory(id="cat-1", name="Bebidas")], [_product("p-1")]
     )
 
     product = use_case.execute().categories[0].products[0]
 
     assert product.variants == ()
     assert product.modifier_groups == ()
+
+
+def test_no_orphans_means_no_otros_category():
+    use_case = _use_case(
+        [MenuReadCategory(id="cat-1", name="Bebidas")],
+        [_product("p-1", category_id="cat-1")],
+    )
+
+    menu = use_case.execute()
+
+    assert [category.id for category in menu.categories] == ["cat-1"]

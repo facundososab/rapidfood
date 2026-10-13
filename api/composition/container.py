@@ -144,16 +144,19 @@ def get_app_conversation_container() -> ConversationContainer:
 
     from django.conf import settings
 
+    menu_public_url = getattr(settings, "MENU_PUBLIC_BASE_URL", "")
+
     return build_container(
         catalog_service=catalog_service,
         order_service=order_service,
         delivery_service=delivery_service,
         business_service=business_service,
         client_service=client_service,
-        agent_runner_factory=_build_agent_runner,
+        agent_runner_factory=lambda container: _build_agent_runner(
+            container, menu_public_url=menu_public_url
+        ),
         whatsapp_outbound=True,
         transcriber=_build_transcriber(),
-        menu_public_url=getattr(settings, "MENU_PUBLIC_BASE_URL", ""),
     )
 
 
@@ -272,7 +275,7 @@ def _resolve_agent_provider(configured: str, model_name: str) -> str:
     )
 
 
-def _build_agent_runner(conversation_container):
+def _build_agent_runner(conversation_container, menu_public_url: str = ""):
     """Build the LangChain agent runner when the selected provider has a key.
 
     Provider comes from AGENT_PROVIDER, or is inferred from the model name when
@@ -311,6 +314,7 @@ def _build_agent_runner(conversation_container):
         model_name=model_name,
         api_key=api_key,
         provider=provider,
+        menu_public_url=menu_public_url,
     )
 
 

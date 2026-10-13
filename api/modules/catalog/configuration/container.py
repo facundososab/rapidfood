@@ -49,6 +49,9 @@ from modules.catalog.infrastructure.adapters.driven.prisma.price_repository impo
 from modules.catalog.infrastructure.adapters.driven.prisma.product_repository import (
     PrismaProductRepository,
 )
+from modules.catalog.infrastructure.adapters.driven.prisma.public_menu_read_adapter import (
+    PrismaPublicMenuReadAdapter,
+)
 from shared.infrastructure.uuid_generator import UuidGenerator
 
 
@@ -101,7 +104,7 @@ class CatalogContainer:
         self.list_prices = ListPricesUseCase(prices)
         self.list_categories = ListCategoriesUseCase(categories)
         self.get_public_menu = GetPublicMenuUseCase(
-            self.list_categories, self.list_products, self.product_query
+            PrismaPublicMenuReadAdapter()
         )
         self.get_product = GetProductUseCase(products, categories, prices)
         self.update_product = UpdateProductUseCase(products, categories, prices)

@@ -1,5 +1,7 @@
-"""GetPublicContactUseCase: degrades safely and never exposes secrets."""
+"""GetPublicContactUseCase: maps ports to a public profile, never exposes secrets."""
 from __future__ import annotations
+
+import pytest
 
 from modules.conversation.application.use_cases.get_public_contact import (
     GetPublicContactUseCase,
@@ -67,15 +69,13 @@ def test_config_absent_returns_name_only():
     assert view.whatsapp_enabled is False
 
 
-def test_repository_raises_degrades_without_crash():
+def test_repository_failure_propagates_to_the_driver():
+    """The use case does not swallow errors: the REST driver owns degradation."""
     repo = FakeWhatsAppConfigRepository(exc=RuntimeError("db down"))
     business = FakeBusinessService("Pizzería Don Luigi")
 
-    view = GetPublicContactUseCase(repo, business).execute("biz-1")
-
-    assert view.business_name == "Pizzería Don Luigi"
-    assert view.whatsapp_number is None
-    assert view.whatsapp_enabled is False
+    with pytest.raises(RuntimeError):
+        GetPublicContactUseCase(repo, business).execute("biz-1")
 
 
 def test_business_service_none_yields_no_name():

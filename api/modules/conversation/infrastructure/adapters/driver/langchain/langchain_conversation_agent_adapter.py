@@ -28,14 +28,26 @@ from modules.conversation.infrastructure.adapters.driver.langchain.tools import 
 
 
 class LangChainConversationAgentAdapter(AgentRunnerPort):
-    def __init__(self, container: Any, model: Any, prompt: str = SYSTEM_PROMPT) -> None:
+    def __init__(
+        self,
+        container: Any,
+        model: Any,
+        prompt: str = SYSTEM_PROMPT,
+        menu_public_url: Optional[str] = None,
+    ) -> None:
         self._container = container
         self._model = model
         self._prompt = prompt
+        self._menu_public_url = menu_public_url
 
     def run(self, turn: AgentTurn) -> str:
         turn_state: dict = {}
-        tools = build_tools(self._container, turn.context, turn_state)
+        tools = build_tools(
+            self._container,
+            turn.context,
+            turn_state,
+            menu_public_url=self._menu_public_url,
+        )
         agent = create_agent(
             self._model,
             tools,
@@ -246,8 +258,9 @@ def build_agent_runner(
     api_key: str,
     prompt: Optional[str] = None,
     provider: str = "groq",
+    menu_public_url: Optional[str] = None,
 ) -> LangChainConversationAgentAdapter:
     model = build_agent_model(model_name, api_key, provider=provider)
     return LangChainConversationAgentAdapter(
-        container, model, prompt or SYSTEM_PROMPT
+        container, model, prompt or SYSTEM_PROMPT, menu_public_url=menu_public_url
     )

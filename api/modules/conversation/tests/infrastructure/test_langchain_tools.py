@@ -268,8 +268,13 @@ def test_set_client_phone_is_optional():
 
 def test_get_menu_link_returns_the_menu_url_and_records_it():
     state = {}
-    container = _container(menu_public_url="https://menu.example")
-    tools = {t.name: t for t in build_tools(container, _context(), state)}
+    container = _container()
+    tools = {
+        t.name: t
+        for t in build_tools(
+            container, _context(), state, menu_public_url="https://menu.example"
+        )
+    }
 
     payload = json.loads(tools["get_menu_link"].invoke({}))
 

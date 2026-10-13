@@ -1,9 +1,14 @@
-"""Public contact profile for the digital menu (never exposes secrets)."""
+"""Public contact profile for the digital menu (never exposes secrets).
+
+This read is intentionally thin: it delegates to its ports and lets real failures
+surface. Degrading the public HTTP response is the REST driver's concern, not an
+application rule, so no broad ``except`` lives here.
+"""
 from __future__ import annotations
 
 from modules.conversation.application.ports.driver.public_contact_ports import (
     GetPublicContactPort,
-    PublicContactView,
+    PublicContact,
 )
 
 
@@ -12,27 +17,19 @@ class GetPublicContactUseCase(GetPublicContactPort):
         self._whatsapp_config_repository = whatsapp_config_repository
         self._business_service = business_service
 
-    def execute(self, business_configuration_id: str) -> PublicContactView:
-        name = None
-        if self._business_service is not None:
-            try:
-                name = self._business_service.get_name(business_configuration_id)
-            except Exception:
-                name = None
+    def execute(self, business_configuration_id: str) -> PublicContact:
+        name = (
+            self._business_service.get_name(business_configuration_id)
+            if self._business_service is not None
+            else None
+        )
 
-        config = None
-        try:
-            config = self._whatsapp_config_repository.get_by_business_config_id(
-                business_configuration_id
-            )
-        except Exception:
-            config = None
+        config = self._whatsapp_config_repository.get_by_business_config_id(
+            business_configuration_id
+        )
 
-        number = (config.display_phone_number or None) if config else None
-        enabled = bool(config.is_active) if config else False
-
-        return PublicContactView(
+        return PublicContact(
             business_name=name,
-            whatsapp_number=number,
-            whatsapp_enabled=enabled,
+            whatsapp_number=(config.display_phone_number or None) if config else None,
+            whatsapp_enabled=bool(config.is_active) if config else False,
         )

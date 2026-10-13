@@ -19,6 +19,9 @@ from modules.conversation.application.ports.driver.conversation_commands import 
     ListMessagesQuery,
     ReceiveMessageCommand,
 )
+from modules.conversation.application.ports.driver.public_contact_ports import (
+    PublicContact,
+)
 from modules.conversation.application.use_cases.handle_incoming_message import (
     HandleIncomingMessageCommand,
 )
@@ -269,15 +272,27 @@ class AgentMessageView(APIView):
 
 
 class PublicContactView(APIView):
-    """Public business contact profile for the digital menu header + WhatsApp CTA."""
+    """Public business contact profile for the digital menu header + WhatsApp CTA.
+
+    This is a public header: it must NEVER 500. Resolution or persistence failures
+    degrade to an anonymous contact (no name, no CTA) and are logged, so a DB
+    outage shows an empty header instead of a broken page — while real bugs stay
+    visible in the server logs.
+    """
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
 
     def get(self, request):
-        business_id = resolve_agent_business_config_id(None)
-        container = get_app_conversation_container()
-        contact = container.get_public_contact_use_case.execute(business_id)
+        try:
+            business_id = resolve_agent_business_config_id(None)
+            container = get_app_conversation_container()
+            contact = container.get_public_contact_use_case.execute(business_id)
+        except Exception:
+            logger.exception("Public contact profile could not be resolved")
+            contact = PublicContact(
+                business_name=None, whatsapp_number=None, whatsapp_enabled=False
+            )
         response = Response(dataclasses.asdict(contact))
         response["Cache-Control"] = "no-store"
         return response
