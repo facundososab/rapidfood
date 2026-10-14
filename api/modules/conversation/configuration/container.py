@@ -53,6 +53,7 @@ from modules.conversation.application.use_cases.order_mutations import (
     SetClientForConversationOrderUseCase,
     SetPaymentTypeForConversationOrderUseCase,
     SetPickupForConversationOrderUseCase,
+    StartNewOrderForConversationOrderUseCase,
     UpdateItemInConversationOrderUseCase,
 )
 from modules.conversation.application.use_cases.order_reads import (
@@ -135,6 +136,7 @@ class ConversationContainer:
     get_product_detail_use_case: Optional[GetProductDetailForConversationUseCase] = None
     get_current_order_use_case: Optional[GetCurrentOrderForConversationUseCase] = None
     add_item_use_case: Optional[AddItemToConversationOrderUseCase] = None
+    start_new_order_use_case: Optional[StartNewOrderForConversationOrderUseCase] = None
     update_item_use_case: Optional[UpdateItemInConversationOrderUseCase] = None
     remove_item_use_case: Optional[RemoveItemFromConversationOrderUseCase] = None
     quote_delivery_use_case: Optional[QuoteDeliveryForConversationUseCase] = None
@@ -302,6 +304,9 @@ def build_container(
             order_service
         )
         container.add_item_use_case = AddItemToConversationOrderUseCase(order_service)
+        container.start_new_order_use_case = StartNewOrderForConversationOrderUseCase(
+            order_service
+        )
         container.update_item_use_case = UpdateItemInConversationOrderUseCase(
             order_service
         )

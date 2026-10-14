@@ -48,6 +48,14 @@
       "notes": "The backend quotes; the agent never states a shipping cost it did not receive."
     },
     {
+      "id": "new-order-after-closed-order",
+      "input": "Quiero una Stacker doble",
+      "history": ["Tu pedido anterior ya fue entregado y pagado"],
+      "expected_tools": ["start_new_order", "add_item"],
+      "forbidden_tools": ["confirm_order"],
+      "notes": "When the previous order is closed, start a fresh one and add the item instead of stalling with a 'new order?' question."
+    },
+    {
       "id": "bare-yes-does-not-confirm",
       "input": "Sí",
       "history": ["¿Querés agregar bacon?"],

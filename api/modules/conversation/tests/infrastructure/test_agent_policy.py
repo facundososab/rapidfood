@@ -95,10 +95,26 @@ def test_prompt_upsells_with_a_concrete_proposal():
     assert "no un catálogo" in lowered
 
 
-def test_prompt_does_not_let_the_model_create_orders_on_new_order_required():
+def test_prompt_sells_before_closing():
+    lowered = _normalized()
+    assert "sos un vendedor, no un procesador de pedidos" in lowered
+    assert "nunca saltes a pedir el nombre, el envío o el pago" in lowered
+    assert "nombre → envío/retiro → forma de pago" in lowered
+
+
+def test_prompt_requires_checking_required_modifier_choices():
+    lowered = _normalized()
+    assert "get_product_detail" in lowered
+    assert "nunca agregues el producto sin antes preguntarle" in lowered
+    assert "invalid_modifier_selection" in lowered
+
+
+def test_prompt_resumes_with_a_new_order_on_new_order_required():
     lowered = _normalized()
     assert "new_order_required" in lowered
-    assert "no armes uno nuevo en silencio" in lowered
+    assert "start_new_order" in lowered
+    # It must NOT present the closed order as a problem the customer has to solve.
+    assert "no le preguntes \"¿querés arrancar uno nuevo?\"" in lowered
 
 
 def test_prompt_only_allows_the_domain_payment_types():

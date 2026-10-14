@@ -111,8 +111,7 @@ def _order_state_block(container: Any, context) -> str:
 def _format_order_summary(summary) -> str:
     if summary.lines:
         lines = "\n".join(
-            f"- variant_id={line.product_variant_id} line_id={line.line_id} "
-            f"cantidad={line.quantity} precio_unitario={line.unit_price}"
+            _format_order_line(line)
             for line in summary.lines
         )
     else:
@@ -125,6 +124,39 @@ def _format_order_summary(summary) -> str:
         f"tipo_entrega={summary.delivery_type} forma_pago={summary.payment_type}\n"
         f"faltantes={list(summary.missing_requirements)}"
     )
+
+
+def _format_order_line(line) -> str:
+    """One order line with the details the model needs to describe it.
+
+    Includes the human-readable product/variant name, the id the backend expects
+    back for edits (line_id, variant_id), and any modifiers or removed
+    ingredients, so a structured customer-facing summary can be built without
+    another round-trip.
+    """
+    name = (
+        getattr(line, "variant_name", None)
+        or getattr(line, "product_name", None)
+        or line.product_variant_id
+    )
+    parts = [f"line_id={line.line_id} variant_id={line.product_variant_id}"]
+    parts.append(f"{name} cantidad={line.quantity} precio_unitario={line.unit_price}")
+    modifiers = getattr(line, "modifiers", ())
+    removed = getattr(line, "removed_ingredients", ())
+    if modifiers:
+        parts.append(
+            "extras="
+            + ", ".join(
+                f"{m.name} ({m.price_delta})"
+                for m in modifiers
+            )
+        )
+    if removed:
+        parts.append(
+            "sin_ingredientes="
+            + ", ".join(ing.name for ing in removed)
+        )
+    return "- " + " | ".join(parts)
 
 
 def _trace_config(turn: AgentTurn) -> dict:

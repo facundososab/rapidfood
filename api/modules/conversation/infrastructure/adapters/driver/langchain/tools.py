@@ -135,6 +135,17 @@ def build_tools(
         )
 
     @tool
+    def start_new_order() -> str:
+        """Arranca un pedido nuevo (crea un borrador vacío) cuando el anterior ya
+        está cerrado o no existe. Si todavía hay un pedido editable, devuelve ese
+        sin crear otro. Usalo cuando el cliente pida algo nuevo y add_item u otra
+        mutación devuelva NEW_ORDER_REQUIRED, o cuando diga explícitamente que
+        quiere un pedido nuevo. Después volvé a agregar lo que pidió con add_item."""
+        return _run(
+            lambda: container.start_new_order_use_case.execute(context)
+        )
+
+    @tool
     def add_item(
         product_variant_id: str,
         quantity: int,
@@ -322,6 +333,7 @@ def build_tools(
         search_products,
         get_product_detail,
         get_current_order,
+        start_new_order,
         add_item,
         update_item,
         remove_item,

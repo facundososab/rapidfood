@@ -172,7 +172,7 @@ def test_the_langchain_adapter_returns_the_final_assistant_text(monkeypatch):
     response = adapter.run(turn)
 
     assert response == "Tu pedido está listo"
-    assert len(captured["tools"]) == 17
+    assert len(captured["tools"]) == 18
     assert [m.type for m in captured["messages"]] == ["human", "ai", "human"]
     assert "NUNCA inventes" in captured["prompt"]
 

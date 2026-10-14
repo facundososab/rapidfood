@@ -74,6 +74,37 @@ class _MutationUseCase:
         return _resolve_order_id(self._order_service, context)
 
 
+class StartNewOrderForConversationOrderUseCase:
+    """Start a fresh draft for a genuinely new order.
+
+    Idempotent and safe: when the conversation still has an editable order (a
+    DRAFT, or a PENDING order that can be reopened) it returns that one instead
+    of creating a second active order. A brand-new draft is created only when the
+    previous order is closed or there is none, which is exactly the case where
+    mutations raise ``NEW_ORDER_REQUIRED``.
+    """
+
+    def __init__(self, order_service: OrderServicePort) -> None:
+        self._order_service = order_service
+
+    def execute(self, context: AgentExecutionContext) -> dict:
+        current = self._order_service.get_current_order(
+            context.business_configuration_id, context.conversation_id
+        )
+        if current.found and current.editable and current.order_id is not None:
+            return {
+                "order_id": current.order_id,
+                "status": current.status,
+                "created": False,
+            }
+        order_id = self._order_service.get_or_create_current_draft(
+            business_config_id=context.business_configuration_id,
+            conversation_id=context.conversation_id,
+            client_id=context.client_id,
+        )
+        return {"order_id": order_id, "status": "DRAFT", "created": True}
+
+
 class AddItemToConversationOrderUseCase(_MutationUseCase):
     def execute(
         self, command: AddItemCommand, context: AgentExecutionContext

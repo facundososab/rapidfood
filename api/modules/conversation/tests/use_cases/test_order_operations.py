@@ -37,6 +37,7 @@ from modules.conversation.application.use_cases.order_mutations import (
     SetDeliveryForConversationOrderUseCase,
     SetPaymentTypeForConversationOrderUseCase,
     SetPickupForConversationOrderUseCase,
+    StartNewOrderForConversationOrderUseCase,
     UpdateItemInConversationOrderUseCase,
 )
 from modules.conversation.application.use_cases.order_reads import (
@@ -206,6 +207,39 @@ def test_add_item_on_a_closed_order_requires_a_new_order_and_creates_nothing():
 
     assert service.created_drafts == 0
     assert [c["name"] for c in service.calls] == ["get_current_order"]
+
+
+def test_start_new_order_creates_a_draft_when_there_is_none():
+    service = FakeOrderService(current=CurrentOrderDTO(found=False))
+    use_case = StartNewOrderForConversationOrderUseCase(service)
+
+    result = use_case.execute(_context())
+
+    assert result["order_id"] == "new-order"
+    assert result["created"] is True
+    assert service.created_drafts == 1
+
+
+def test_start_new_order_creates_a_fresh_draft_when_the_previous_is_closed():
+    service = FakeOrderService(current=_closed())
+    use_case = StartNewOrderForConversationOrderUseCase(service)
+
+    result = use_case.execute(_context())
+
+    assert result["order_id"] == "new-order"
+    assert result["created"] is True
+    assert service.created_drafts == 1
+
+
+def test_start_new_order_reuses_an_editable_order_without_creating():
+    service = FakeOrderService(current=_editable())
+    use_case = StartNewOrderForConversationOrderUseCase(service)
+
+    result = use_case.execute(_context())
+
+    assert result["order_id"] == "o-1"
+    assert result["created"] is False
+    assert service.created_drafts == 0
 
 
 def test_reopenable_pending_order_is_mutated_directly():
