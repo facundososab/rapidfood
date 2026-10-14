@@ -5,6 +5,7 @@ from .views import (
     PriceListCreateView,
     ProductDetailView,
     ProductListCreateView,
+    PublicMenuView,
     SetDiscountView,
     SetProductStateView,
 )
@@ -53,4 +54,5 @@ urlpatterns = [
     ),
     path("categories/", CategoryListCreateView.as_view(), name="catalog-categories"),
     path("discounts/", SetDiscountView.as_view(), name="catalog-discounts"),
+    path("menu/", PublicMenuView.as_view(), name="catalog-public-menu"),
 ]

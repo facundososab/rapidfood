@@ -59,7 +59,7 @@ class ApiErrorToastMiddleware:
 class LoginRequiredMiddleware:
     """Session gate: every page except login/logout/static requires a Supabase token."""
 
-    PUBLIC_PATHS = ("/login/", "/logout/", "/static/")
+    PUBLIC_PATHS = ("/login/", "/logout/", "/static/", "/carta/")
 
     def __init__(self, get_response):
         self.get_response = get_response

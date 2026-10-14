@@ -2,6 +2,7 @@ import dataclasses
 from datetime import date
 
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -120,6 +121,18 @@ class ProductListCreateView(APIView):
             )
 
         return Response(dataclasses.asdict(result), status=status.HTTP_201_CREATED)
+
+
+class PublicMenuView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def get(self, request):
+        container = get_app_catalog_container()
+        menu = container.get_public_menu.execute()
+        response = Response(dataclasses.asdict(menu))
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class SetProductStateView(APIView):
