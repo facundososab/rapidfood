@@ -24,6 +24,8 @@ from .views import (
     OrderSummaryView,
     SetClientView,
     PreparationTimeConfigurationView,
+    PaymentListView,
+    PaymentDetailView,
 )
 
 urlpatterns = [
@@ -34,6 +36,8 @@ urlpatterns = [
     path('draft/current/', CurrentDraftView.as_view(), name='current-draft'),
     path('latest-active/', LatestActiveOrderView.as_view(), name='latest-active-order'),
     path('payments/mercadopago/webhook/', MercadoPagoWebhookView.as_view(), name='mercadopago-webhook'),
+    path('payments/', PaymentListView.as_view(), name='payment-list'),
+    path('payments/<uuid:payment_id>/', PaymentDetailView.as_view(), name='payment-detail'),
     path(
         'preparation-time/<str:business_config_id>/configure/',
         PreparationTimeConfigurationView.as_view(),

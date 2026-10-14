@@ -34,6 +34,9 @@ class OrderSummaryDTO:
     estimated_time: Optional[int]
     client_id: Optional[str]
     client_name: Optional[str]
+    # Coupon code currently applied to the order (None when there is none). The
+    # discount amount lives in ``discount``.
+    coupon_code: Optional[str] = None
     # Real rules the order still needs satisfied before it can be confirmed.
     missing_requirements: List[str] = field(default_factory=list)
 

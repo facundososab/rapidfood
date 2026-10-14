@@ -26,6 +26,8 @@ def payment_attempt_to_domain(row: object) -> PaymentAttempt:  # type: ignore[ty
         ),
         create_idempotency_key=_get(row, "createIdempotencyKey", "create_idempotency_key"),
         cancel_idempotency_key=_get(row, "cancelIdempotencyKey", "cancel_idempotency_key"),
+        created_at=_get(row, "createdAt", "created_at"),
+        updated_at=_get(row, "updatedAt", "updated_at"),
     )
 
 

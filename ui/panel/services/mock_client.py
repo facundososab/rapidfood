@@ -207,6 +207,16 @@ class MockRapidfoodClient(RapidfoodClient):
         db.products.append(p)
         return p
 
+    def upload_product_image(
+        self, product_id: str, file_data: bytes, filename: str
+    ) -> dtos.Product:
+        p = self.get_product(product_id)
+        if p is None:
+            raise ValueError("product not found")
+        # In-memory stand-in for the Cloudinary upload: a deterministic fake URL.
+        p.imageUrl = f"https://res.cloudinary.com/demo/rapidfood/products/{product_id}.jpg"
+        return p
+
     def add_product_price(self, product_id: str, price) -> dtos.Product:
         db = self.db
         p = self.get_product(product_id)

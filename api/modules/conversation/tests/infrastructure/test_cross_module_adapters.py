@@ -231,6 +231,7 @@ def test_order_get_order_summary_maps_lines():
         address=None,
         payment_type=None,
         estimated_time=None,
+        coupon_code="FIJOS",
         missing_requirements=["delivery_type"],
     )
     adapter = _order_adapter(get_order_summary=StubUseCase(result=summary))
@@ -241,6 +242,9 @@ def test_order_get_order_summary_maps_lines():
     assert result.lines[0].modifiers[0].name == "Bacon"
     assert result.lines[0].removed_ingredients[0].name == "Cebolla"
     assert result.missing_requirements == ("delivery_type",)
+    assert result.coupon_code == "FIJOS"
+    # Derived short code the customer can reference without seeing a raw UUID.
+    assert result.display_code == "O1"
 
 
 def test_order_mutation_attempts_the_post_commit_cancellation():

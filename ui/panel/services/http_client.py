@@ -233,9 +233,16 @@ class HttpRapidfoodClient(RapidfoodClient):
         )
 
     def _payment(self, d) -> dtos.Payment:
-        return dtos.Payment(id=d["id"], orderId=d["orderId"], provider=d["provider"],
-                            status=d["status"], amount=_dec(d["amount"]), externalId=d.get("externalId"),
-                            createdAt=_parse_dt(d["createdAt"]), updatedAt=_parse_dt(d["updatedAt"]))
+        return dtos.Payment(
+            id=d["id"],
+            orderId=d.get("orderId", d.get("order_id")),
+            provider=d["provider"],
+            status=d["status"],
+            amount=_dec(d["amount"]),
+            externalId=d.get("externalId", d.get("external_id")),
+            createdAt=_parse_dt(d.get("createdAt", d.get("created_at"))),
+            updatedAt=_parse_dt(d.get("updatedAt", d.get("updated_at"))),
+        )
 
     def _address(self, d) -> Optional[dtos.Address]:
         if not d:
@@ -495,6 +502,16 @@ class HttpRapidfoodClient(RapidfoodClient):
             self.add_product_price(new_id, payload["price"])
         return self.get_product(new_id)
 
+    def upload_product_image(self, product_id, file_data, filename):
+        files = {"image": (filename or "product", file_data)}
+        resp = self.session.post(
+            f"{self.base_url}/api/catalog/products/{product_id}/image/",
+            files=files,
+            timeout=30,
+        )
+        self._raise_if_error(resp)
+        return self.get_product(product_id)
+
     def add_product_price(self, product_id, price):
         self._post(f"/api/catalog/products/{product_id}/prices/", {
             "price": str(price), "since_date": date.today().isoformat(),
@@ -551,15 +568,19 @@ class HttpRapidfoodClient(RapidfoodClient):
     def delete_modifier_option(self, option_id):
         self._delete(f"/api/catalog/modifier-options/{option_id}/")
 
-    # -- payments (not in scope yet) ---------------------------------------
+    # -- payments ----------------------------------------------------------
     def list_payments(self, *, status=None, provider=None, date_from=None, date_to=None, page=1, page_size=15):
-        return _paginate_items([], page, page_size)
+        rows = [
+            self._payment(x)
+            for x in self._get("/api/orders/payments/", status=status, provider=provider)
+        ]
+        return _paginate_items(rows, page, page_size)
 
     def get_payment(self, payment_id):
-        return None
+        return self._payment(self._get(f"/api/orders/payments/{payment_id}/"))
 
     def all_payments(self):
-        return []
+        return [self._payment(x) for x in self._get("/api/orders/payments/")]
 
     # -- clients ------------------------------------------------------------
     def list_clients(self, *, search=None, page=1, page_size=15):

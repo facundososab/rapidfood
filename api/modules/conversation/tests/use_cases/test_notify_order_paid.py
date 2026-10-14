@@ -89,6 +89,8 @@ def _summary(**overrides):
         },
         payment_type="ONLINE",
         estimated_time=35,
+        display_code="ABC12345",
+        coupon_code=None,
         missing_requirements=(),
     )
     values.update(overrides)
@@ -105,6 +107,17 @@ def test_compose_includes_items_totals_delivery_and_eta():
     assert "Envío a domicilio" in text
     assert "Avenida Real 9536" in text
     assert "Tiempo estimado: 35 minutos" in text
+    # The customer gets the order code and a warm, emoji-friendly tone.
+    assert "#ABC12345" in text
+    assert "🧾" in text and "💰" in text
+
+
+def test_compose_names_the_coupon_when_one_is_applied():
+    text = compose_order_paid_message(
+        _summary(discount="5000", coupon_code="FIJOS")
+    )
+
+    assert "Cupón FIJOS: -$5000" in text
 
 
 def test_compose_for_pickup_has_no_address():

@@ -241,6 +241,8 @@ class OrderServiceAdapter(OrderServicePort):
             address=summary.address,
             payment_type=summary.payment_type,
             estimated_time=summary.estimated_time,
+            display_code=_display_code(summary.order_id),
+            coupon_code=getattr(summary, "coupon_code", None),
             missing_requirements=tuple(summary.missing_requirements),
         )
 
@@ -449,3 +451,16 @@ def _mutation(response) -> OrderMutationDTO:
         total_amount=getattr(response, "total_amount", None),
         shipping_cost=getattr(response, "shipping_cost", None),
     )
+
+
+def _display_code(order_id: Optional[str]) -> Optional[str]:
+    """Short, stable, customer-facing order code derived from the order id.
+
+    The order id is a UUID; a raw UUID is unreadable in a chat. The first 8 hex
+    characters are unique enough for a single restaurant and stay stable for the
+    life of the order (no extra column / migration needed).
+    """
+    if not order_id:
+        return None
+    compact = str(order_id).replace("-", "").upper()
+    return compact[:8] or None

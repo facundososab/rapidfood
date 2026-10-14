@@ -81,36 +81,48 @@ class NotifyOrderPaidUseCase(NotifyOrderPaidPort):
 
 def compose_order_paid_message(summary: OrderSummaryDTO) -> str:
     """Customer-facing confirmation: items, totals, delivery and ETA."""
+    code = getattr(summary, "display_code", None)
+    header = "✅ ¡Pago acreditado! Tu pedido quedó confirmado."
+    if code:
+        header = f"✅ ¡Pago acreditado! Tu pedido #{code} quedó confirmado."
+
     items = "\n".join(_line(line) for line in summary.lines) or "- (sin productos)"
 
     parts = [
-        "¡Pago acreditado! Tu pedido quedó confirmado.",
+        header,
         "",
+        "🧾 Tu pedido:",
         items,
         "",
-        f"Subtotal: ${summary.subtotal}",
+        f"➖ Subtotal: ${summary.subtotal}",
     ]
-    if summary.discount and summary.discount not in ("0", "0.0", "0.00"):
-        parts.append(f"Descuento: -${summary.discount}")
+    if _has_discount(summary.discount):
+        coupon = getattr(summary, "coupon_code", None)
+        label = f"🏷️ Cupón {coupon}:" if coupon else "🏷️ Descuento:"
+        parts.append(f"{label} -${summary.discount}")
     if summary.shipping_cost:
-        parts.append(f"Envío: ${summary.shipping_cost}")
+        parts.append(f"🛵 Envío: ${summary.shipping_cost}")
     if summary.total_amount:
-        parts.append(f"Total: ${summary.total_amount}")
+        parts.append(f"💰 Total: ${summary.total_amount}")
 
     parts.append("")
     if summary.delivery_type == _PICKUP:
-        parts.append("Retiro en el local")
+        parts.append("🏪 Retiro en el local")
     else:
-        parts.append("Envío a domicilio")
+        parts.append("🛵 Envío a domicilio")
         address = _format_address(summary.address)
         if address:
             parts.append(address)
 
     if summary.estimated_time:
-        parts.append(f"Tiempo estimado: {summary.estimated_time} minutos")
+        parts.append(f"⏱️ Tiempo estimado: {summary.estimated_time} minutos")
 
-    parts.extend(["", "¡Gracias por tu compra!"])
+    parts.extend(["", "¡Gracias por tu compra! 🙌"])
     return "\n".join(parts)
+
+
+def _has_discount(discount) -> bool:
+    return bool(discount) and str(discount) not in ("0", "0.0", "0.00")
 
 
 def _line(line) -> str:

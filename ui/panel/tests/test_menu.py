@@ -102,6 +102,34 @@ def test_carta_empty_menu_still_renders(monkeypatch):
     assert "No pudimos cargar la carta" in response.content.decode("utf-8")
 
 
+def test_carta_renders_a_product_image_when_present(monkeypatch):
+    menu = PublicMenu(
+        categories=(
+            PublicCategory(
+                id="c1",
+                name="Burgers",
+                products=(
+                    PublicProduct(
+                        id="p1",
+                        name="Hamburguesa Clásica",
+                        description="Con cheddar",
+                        image_url="https://cdn.example.com/burger.jpg",
+                        variants=(
+                            PublicVariant(id="v1", name="Simple", price="5200.00", available=True),
+                        ),
+                        modifier_groups=(),
+                    ),
+                ),
+            ),
+        )
+    )
+    _patch(monkeypatch, menu, SAMPLE_CONTACT)
+
+    content = Client().get("/carta/").content.decode("utf-8")
+
+    assert "https://cdn.example.com/burger.jpg" in content
+
+
 def test_carta_unavailable_variant_shows_marker(monkeypatch):
     menu = PublicMenu(
         categories=(

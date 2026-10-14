@@ -69,3 +69,17 @@ class PaymentAttemptRepository(ABC):
     @abstractmethod
     def update_status(self, payment_id: str, status: PaymentStatus) -> PaymentAttempt:
         pass
+
+    @abstractmethod
+    def list_all(
+        self,
+        status: Optional[PaymentStatus] = None,
+        provider: Optional[str] = None,
+    ) -> list[PaymentAttempt]:
+        """All payment attempts, newest first, optionally filtered (panel read)."""
+        pass
+
+    @abstractmethod
+    def list_by_order(self, order_id: str) -> list[PaymentAttempt]:
+        """Every payment attempt of an order, newest first."""
+        pass

@@ -78,6 +78,10 @@ from modules.order.application.use_cases.set_pickup_for_order_use_case import (
 from modules.order.application.use_cases.get_or_create_current_draft_use_case import (
     GetOrCreateCurrentDraftUseCase,
 )
+from modules.order.application.use_cases.payment_reads import (
+    GetPaymentUseCase,
+    ListPaymentsUseCase,
+)
 from modules.order.application.use_cases.restart_conversation_order_use_case import (
     RestartConversationOrderUseCase,
 )
@@ -278,6 +282,10 @@ class OrderContainer:
         self.restart_conversation_order_use_case = RestartConversationOrderUseCase(
             self.order_repository, self.start_draft_order_use_case
         )
+
+        # Payments (panel read): list with filters + detail.
+        self.list_payments_use_case = ListPaymentsUseCase(self.payment_repository)
+        self.get_payment_use_case = GetPaymentUseCase(self.payment_repository)
 
         # Preparation time (ETA) configuration CRUD.
         self.get_preparation_time_configuration = (

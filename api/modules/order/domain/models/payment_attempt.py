@@ -34,6 +34,8 @@ class PaymentAttempt:
     cancellation_status: Optional[CancellationStatus] = None
     create_idempotency_key: Optional[str] = None
     cancel_idempotency_key: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @property
     def superseded(self) -> bool:

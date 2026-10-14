@@ -170,12 +170,18 @@ def _format_order_summary(summary) -> str:
         )
     else:
         lines = "- (sin productos todavía)"
+    code = getattr(summary, "display_code", None)
+    coupon = getattr(summary, "coupon_code", None)
+    eta = getattr(summary, "estimated_time", None)
     return (
-        f"order_id={summary.order_id} estado={summary.status} versión={summary.version}\n"
+        f"order_id={summary.order_id} codigo_pedido={('#' + code) if code else '(sin código)'} "
+        f"estado={summary.status} versión={summary.version}\n"
         f"líneas:\n{lines}\n"
         f"subtotal={summary.subtotal} descuento={summary.discount} "
+        f"cupon_codigo={coupon or '(sin cupón)'} "
         f"envío={summary.shipping_cost} total={summary.total_amount}\n"
-        f"tipo_entrega={summary.delivery_type} forma_pago={summary.payment_type}\n"
+        f"tipo_entrega={summary.delivery_type} forma_pago={summary.payment_type} "
+        f"tiempo_estimado={eta if eta is not None else '(sin calcular)'} min\n"
         f"faltantes={list(summary.missing_requirements)}"
     )
 

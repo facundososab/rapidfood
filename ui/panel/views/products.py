@@ -34,6 +34,7 @@ def save(request, product_id=None):
 
     if product_id:
         p = client.save_product(payload)
+        _upload_image_if_present(client, p.id, request)
         messages.success(request, 'Producto actualizado.')
         return redirect('product_detail', product_id=p.id)
     
@@ -65,7 +66,16 @@ def save(request, product_id=None):
                         "initial_price": prices[i]
                     })
 
+    _upload_image_if_present(client, p.id, request)
     return redirect('product_detail', product_id=p.id)
+
+
+def _upload_image_if_present(client, product_id, request):
+    """Upload a product image to Cloudinary when the form sent one."""
+    image = request.FILES.get('image')
+    if not image:
+        return
+    client.upload_product_image(product_id, image.read(), image.name)
 
 def toggle_availability(request,product_id):
  p=required(get_client().get_product(product_id)); get_client().set_product_availability(product_id,not p.available); return redirect('product_detail',product_id=product_id)

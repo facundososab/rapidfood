@@ -102,6 +102,11 @@ class RapidfoodClient(ABC):
     def save_product(self, payload: dict) -> dtos.Product: ...
 
     @abstractmethod
+    def upload_product_image(
+        self, product_id: str, file_data: bytes, filename: str
+    ) -> dtos.Product: ...
+
+    @abstractmethod
     def add_product_price(self, product_id: str, price) -> dtos.Product: ...
 
     @abstractmethod

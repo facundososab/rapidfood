@@ -64,6 +64,11 @@ class OrderSummaryDTO:
     address: Optional[dict]
     payment_type: Optional[str]
     estimated_time: Optional[int]
+    # Short, customer-facing order code (e.g. "006C5EA6"); derived from the order
+    # id so the customer can reference it without seeing a raw UUID.
+    display_code: Optional[str] = None
+    # Coupon code applied to the order, when it has one.
+    coupon_code: Optional[str] = None
     missing_requirements: Tuple[str, ...] = field(default_factory=tuple)
 
 

@@ -76,6 +76,7 @@ class GetOrderSummaryUseCase(GetOrderSummaryPort):
             estimated_time=order.estimated_time,
             client_id=order.client_id,
             client_name=order.client_name,
+            coupon_code=order.coupon_code,
             missing_requirements=missing,
         )
 

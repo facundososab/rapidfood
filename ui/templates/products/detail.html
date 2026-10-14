@@ -383,7 +383,7 @@
           {% include 'components/icon.html' with name='x' cls='w-4 h-4' %}
         </button>
       </div>
-      <form method="post" action="{% url 'product_save' product.id %}" class="p-5 space-y-4" x-data="{ img: '{{ product.imageUrl|default:'' }}' }">
+      <form method="post" enctype="multipart/form-data" action="{% url 'product_save' product.id %}" class="p-5 space-y-4" x-data="{ img: '{{ product.imageUrl|default:'' }}' }">
         {% csrf_token %}
         <div>
           <label class="th block mb-2">Nombre</label>
@@ -394,10 +394,17 @@
           <textarea class="field resize-none" name="description" rows="3" placeholder="Detalle del producto, ingredientes, tamaño…">{{ product.description }}</textarea>
         </div>
         <div>
-          <label class="th block mb-2">Imagen (URL) <span class="text-ink-faint font-normal">— opcional</span></label>
-          <input class="field" name="image_url" type="url" value="{{ product.imageUrl|default:'' }}" x-model="img" placeholder="https://…">
+          <label class="th block mb-2">Imagen <span class="text-ink-faint font-normal">— opcional</span></label>
+          <input name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                 class="field file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink"
+                 @change="const f = $event.target.files[0]; if (f) img = URL.createObjectURL(f)">
+          <p class="mt-2 text-[12px] text-ink-faint">JPEG, PNG, WEBP o GIF · hasta 5 MB. Se sube al guardar.</p>
+          <div class="mt-3">
+            <label class="th block mb-2">… o pegá una URL <span class="text-ink-faint font-normal">— opcional</span></label>
+            <input class="field" name="image_url" type="url" value="{{ product.imageUrl|default:'' }}" x-model="img" placeholder="https://…">
+          </div>
           <template x-if="img">
-            <img :src="img" @error="$el.style.display='none'" referrerpolicy="no-referrer" class="mt-2 w-14 h-14 rounded-lg object-cover border border-line bg-muted" alt="Vista previa">
+            <img :src="img" @error="$el.style.display='none'" referrerpolicy="no-referrer" class="mt-3 w-20 h-20 rounded-lg object-cover border border-line bg-muted" alt="Vista previa">
           </template>
         </div>
         <div>

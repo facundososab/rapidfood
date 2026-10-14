@@ -110,3 +110,26 @@ class PrismaPaymentRepository(PaymentAttemptRepository):
             data={"status": status.value},
         )
         return payment_attempt_to_domain(row)
+
+    def list_all(
+        self,
+        status: Optional[PaymentStatus] = None,
+        provider: Optional[str] = None,
+    ) -> list[PaymentAttempt]:
+        where: dict = {}
+        if status is not None:
+            where["status"] = (
+                status.value if isinstance(status, PaymentStatus) else str(status)
+            )
+        if provider:
+            where["provider"] = provider
+        rows = self._prisma.payment.find_many(
+            where=where or None, order={"createdAt": "desc"}
+        )
+        return [payment_attempt_to_domain(row) for row in rows]
+
+    def list_by_order(self, order_id: str) -> list[PaymentAttempt]:
+        rows = self._prisma.payment.find_many(
+            where={"orderId": order_id}, order={"createdAt": "desc"}
+        )
+        return [payment_attempt_to_domain(row) for row in rows]

@@ -44,6 +44,9 @@ from modules.order.application.ports.driver.payment_ports import (
     CreatePaymentCheckoutCommand,
     HandlePaymentWebhookCommand,
 )
+from modules.order.application.ports.driver.payment_reads_ports import (
+    ListPaymentsQuery,
+)
 from modules.order.application.ports.driver.preparation_time_ports import (
     ConfigurePreparationTimeCommand,
 )
@@ -161,6 +164,31 @@ def _order_to_dict(order: Order, client=None) -> dict:
     }
 
 
+def _payment_to_dict(payment) -> dict:
+    return {
+        "id": payment.id,
+        "order_id": payment.order_id,
+        "provider": payment.provider,
+        "status": (
+            payment.status.value if hasattr(payment.status, "value") else str(payment.status)
+        ),
+        "amount": payment.amount,
+        "order_version": payment.order_version,
+        "external_id": payment.external_id,
+        "preference_id": payment.preference_id,
+        "checkout_url": payment.checkout_url,
+        "external_reference": payment.external_reference,
+        "superseded_at": payment.superseded_at,
+        "cancellation_status": (
+            payment.cancellation_status.value
+            if hasattr(payment.cancellation_status, "value")
+            else payment.cancellation_status
+        ),
+        "created_at": payment.created_at,
+        "updated_at": payment.updated_at,
+    }
+
+
 class OrderListView(APIView):
     def get(self, request):
         query = ListOrdersQuery(
@@ -224,7 +252,40 @@ class OrderDetailView(APIView):
             return Response(
                 {"detail": "La orden no existe"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(_order_to_dict(order, _client_dict(container, order)))
+        data = _order_to_dict(order, _client_dict(container, order))
+        # Associated payment attempts (the panel shows them on the order detail).
+        data["payments"] = [
+            _payment_to_dict(p)
+            for p in container.payment_repository.list_by_order(order.id)
+        ]
+        return Response(data)
+
+
+class PaymentListView(APIView):
+    """GET /api/orders/payments/ — payment attempts (panel), filterable."""
+
+    def get(self, request):
+        container = get_app_container()
+        rows = container.list_payments_use_case.execute(
+            ListPaymentsQuery(
+                status=request.query_params.get("status"),
+                provider=request.query_params.get("provider"),
+            )
+        )
+        return Response([_payment_to_dict(p) for p in rows])
+
+
+class PaymentDetailView(APIView):
+    """GET /api/orders/payments/<payment_id>/ — one payment attempt."""
+
+    def get(self, request, payment_id):
+        container = get_app_container()
+        payment = container.get_payment_use_case.execute(str(payment_id))
+        if payment is None:
+            return Response(
+                {"detail": "El pago no existe"}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(_payment_to_dict(payment))
 
 
 class UpdateOrderStatusView(APIView):

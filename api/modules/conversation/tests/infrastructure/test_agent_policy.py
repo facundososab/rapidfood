@@ -99,7 +99,43 @@ def test_prompt_sells_before_closing():
     lowered = _normalized()
     assert "sos un vendedor, no un procesador de pedidos" in lowered
     assert "nunca saltes a pedir el nombre, el envío o el pago" in lowered
-    assert "nombre → envío/retiro → forma de pago" in lowered
+    # When the products are closed, ask for ALL missing data at once, not one by one.
+    assert "pedí todo lo que falta de una sola vez" in lowered
+    assert "no vayas dato por dato" in lowered
+
+
+def test_prompt_avoids_narrating_the_first_item_as_added():
+    lowered = _normalized()
+    assert 'no digas "sumé" / "agregué"' in lowered
+    # It may confirm an EXTRA added later, just not the item the customer asked for.
+    assert "algo extra que el cliente no había pedido" in lowered
+
+
+def test_prompt_offers_the_menu_link_when_a_new_order_starts():
+    lowered = _normalized()
+    assert "get_menu_link" in lowered
+    assert "ofrecelé la carta" in lowered
+
+
+def test_prompt_shows_the_coupon_amount_from_the_backend():
+    lowered = _normalized()
+    assert "cupón fijos: -$5.000" in lowered
+    assert "el monto y el código salen del backend" in lowered
+
+
+def test_prompt_states_mercado_pago_in_the_summary():
+    assert "online (mercado pago)" in _normalized()
+
+
+def test_prompt_includes_the_order_code_in_the_final_message():
+    lowered = _normalized()
+    assert "codigo_pedido" in lowered
+    assert "#006c5ea6" in lowered
+
+
+def test_prompt_announces_the_eta_when_quoting_delivery():
+    lowered = _normalized()
+    assert "decí también el tiempo aproximado" in lowered
 
 
 def test_prompt_requires_checking_required_modifier_choices():
