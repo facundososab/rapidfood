@@ -7,10 +7,14 @@ class UploadProductImageCommand:
     product_id: str
     file_data: bytes
     filename: str
-    content_type: str
+
+
+@dataclass(frozen=True)
+class UploadProductImageResponse:
+    image_url: str
 
 
 class UploadProductImagePort(Protocol):
-    def execute(self, command: UploadProductImageCommand) -> str:
-        """Returns the public URL of the uploaded image."""
-        ...
+    def execute(
+        self, command: UploadProductImageCommand
+    ) -> UploadProductImageResponse: ...

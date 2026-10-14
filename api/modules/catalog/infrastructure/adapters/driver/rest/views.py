@@ -37,6 +37,7 @@ from modules.catalog.domain.errors.catalog_errors import (
 )
 from modules.catalog.domain.models.product import ProductState
 
+from modules.catalog.application.ports.driven.image_storage_port import ImageStorageError
 from modules.catalog.application.ports.driver.upload_product_image_ports import (
     UploadProductImageCommand,
 )
@@ -45,6 +46,7 @@ from .serializers import (
     AddPriceSerializer,
     CreateCategorySerializer,
     CreateProductSerializer,
+    ProductImageUploadSerializer,
     SetDiscountSerializer,
     SetProductStateSerializer,
     UpdateProductSerializer,
@@ -293,26 +295,27 @@ class ProductImageUploadView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request, product_id: str):
-        image_file = request.FILES.get("image")
-        if image_file is None:
-            return Response(
-                {"detail": "Se requiere el campo 'image' con el archivo de imagen."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = ProductImageUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        image_file = serializer.validated_data["image"]
 
         command = UploadProductImageCommand(
             product_id=str(product_id),
             file_data=image_file.read(),
             filename=image_file.name,
-            content_type=image_file.content_type,
         )
 
         container = get_app_catalog_container()
         try:
-            image_url = container.upload_product_image.execute(command)
+            result = container.upload_product_image.execute(command)
         except ProductNotFoundError:
             return Response(
                 {"detail": "El producto no existe"}, status=status.HTTP_404_NOT_FOUND
             )
+        except ImageStorageError:
+            return Response(
+                {"detail": "No se pudo almacenar la imagen. Intente nuevamente."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
-        return Response({"image_url": image_url}, status=status.HTTP_200_OK)
+        return Response(dataclasses.asdict(result), status=status.HTTP_200_OK)
