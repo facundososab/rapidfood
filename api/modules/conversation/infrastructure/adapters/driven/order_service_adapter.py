@@ -49,6 +49,9 @@ from modules.order.application.ports.driver.payment_ports import (
 from modules.order.application.ports.driver.remove_item_from_order_port import (
     RemoveItemFromOrderCommand,
 )
+from modules.order.application.ports.driver.restart_conversation_order_port import (
+    RestartConversationOrderCommand,
+)
 from modules.order.application.ports.driver.set_delivery_for_order_port import (
     SetDeliveryForOrderCommand,
 )
@@ -139,6 +142,7 @@ class OrderServiceAdapter(OrderServicePort):
         cancel_order: Any,
         create_payment_checkout: Any,
         cancel_superseded_checkout: Any,
+        reset_conversation_order: Any = None,
     ) -> None:
         self._get_current_order = get_current_order
         self._get_latest_active_order = get_latest_active_order
@@ -156,6 +160,7 @@ class OrderServiceAdapter(OrderServicePort):
         self._cancel_order = cancel_order
         self._create_payment_checkout = create_payment_checkout
         self._cancel_superseded_checkout = cancel_superseded_checkout
+        self._reset_conversation_order = reset_conversation_order
 
     # --- reads -----------------------------------------------------------
     @_translate_order_errors
@@ -395,6 +400,18 @@ class OrderServiceAdapter(OrderServicePort):
     def cancel_order(self, order_id: str) -> OrderStatusDTO:
         response = self._cancel_order.execute(CancelOrderCommand(order_id=order_id))
         return OrderStatusDTO(order_id=response.order_id, status=response.status)
+
+    @_translate_order_errors
+    def reset_active_order(self, business_config_id: str, conversation_id: str) -> Optional[str]:
+        if self._reset_conversation_order is None:
+            return None
+        result = self._reset_conversation_order.execute(
+            RestartConversationOrderCommand(
+                business_config_id=business_config_id,
+                conversation_id=conversation_id,
+            )
+        )
+        return getattr(result, "order_id", None)
 
     @_translate_order_errors
     def create_payment_checkout(self, order_id: str) -> CheckoutDTO:

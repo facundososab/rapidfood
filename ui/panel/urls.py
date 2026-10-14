@@ -18,6 +18,7 @@ urlpatterns = [
     path("login/", auth.LoginView.as_view(), name="login"),
     path("logout/", auth.LogoutView.as_view(), name="logout"),
     path("", dashboard.index, name="dashboard"),
+    path("carta", menu.carta),
     path("carta/", menu.carta, name="menu"),
 
     # Orders

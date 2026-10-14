@@ -46,6 +46,8 @@ Opcionalmente, `api/.env` y `ui/.env` se cargan primero como override local por 
 | `NGROK_AUTHTOKEN`                                 | Token del agente ngrok (requerido por el servicio `ngrok`)         | _(vacío)_                                                   |
 | `NGROK_DOMAIN`                                    | Dominio reservado que el túnel publica hacia `backend:8000`        | `hypsicephalic-decisive-lavette.ngrok-free.dev`             |
 | `MENU_PUBLIC_BASE_URL`                            | Dominio público base de la carta digital (`<base>/carta/`); vacío = el agente no comparte link | _(vacío)_                         |
+| `CONVERSATION_SESSION_IDLE_HOURS`                 | Horas de inactividad tras las cuales el próximo mensaje cierra el pedido anterior y arranca uno nuevo (interno) | `2`                              |
+| `CONVERSATION_GREETING_IDLE_HOURS`                | Horas de inactividad tras las cuales el agente vuelve a saludar; menos = sigue el hilo | `12`                                 |
 
 ## Auth del personal (Supabase)
 

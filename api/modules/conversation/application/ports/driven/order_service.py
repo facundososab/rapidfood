@@ -199,4 +199,16 @@ class OrderServicePort(Protocol):
 
     def cancel_order(self, order_id: str) -> OrderStatusDTO: ...
 
+    def reset_active_order(
+        self, business_config_id: str, conversation_id: str
+    ) -> Optional[str]:
+        """Close the conversation's unfinished order and open a fresh draft.
+
+        Returns the new draft's order_id, or None when there was nothing to
+        restart (no DRAFT/PENDING order — e.g. the last order is already being
+        prepared). Used when a channel detects a new session on a long-idle
+        conversation so the previous order is not reused.
+        """
+        ...
+
     def create_payment_checkout(self, order_id: str) -> CheckoutDTO: ...

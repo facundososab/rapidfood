@@ -130,6 +130,7 @@ def get_app_conversation_container() -> ConversationContainer:
         cancel_order=order.cancel_order_use_case,
         create_payment_checkout=order.create_payment_checkout_use_case,
         cancel_superseded_checkout=order.cancel_superseded_checkout_use_case,
+        reset_conversation_order=order.restart_conversation_order_use_case,
     )
     delivery_service = DeliveryServiceAdapter(delivery.calculate_delivery_quote)
     business_service = BusinessServiceAdapter(
@@ -146,6 +147,15 @@ def get_app_conversation_container() -> ConversationContainer:
 
     menu_public_url = getattr(settings, "MENU_PUBLIC_BASE_URL", "")
 
+    from datetime import timedelta
+
+    session_idle_after = timedelta(
+        hours=getattr(settings, "CONVERSATION_SESSION_IDLE_HOURS", 2)
+    )
+    greeting_idle_after = timedelta(
+        hours=getattr(settings, "CONVERSATION_GREETING_IDLE_HOURS", 12)
+    )
+
     return build_container(
         catalog_service=catalog_service,
         order_service=order_service,
@@ -157,6 +167,8 @@ def get_app_conversation_container() -> ConversationContainer:
         ),
         whatsapp_outbound=True,
         transcriber=_build_transcriber(),
+        session_idle_after=session_idle_after,
+        greeting_idle_after=greeting_idle_after,
     )
 
 

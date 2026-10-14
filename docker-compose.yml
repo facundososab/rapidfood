@@ -78,6 +78,15 @@ services:
       # Empty by default: set MENU_PUBLIC_BASE_URL in the repo-root .env (e.g. the
       # ngrok domain) so get_menu_link shares the right domain.
       MENU_PUBLIC_BASE_URL: ${MENU_PUBLIC_BASE_URL:-}
+      # Conversation session boundaries (hours of inactivity): past the first, a
+      # new message restarts the order; past the second, the agent greets again.
+      CONVERSATION_SESSION_IDLE_HOURS: ${CONVERSATION_SESSION_IDLE_HOURS:-2}
+      CONVERSATION_GREETING_IDLE_HOURS: ${CONVERSATION_GREETING_IDLE_HOURS:-12}
+      # Cloudinary (product image upload). Read lazily by the image storage
+      # adapter; empty keeps the stack booting but image uploads fail.
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       # LangSmith tracing (optional).
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}

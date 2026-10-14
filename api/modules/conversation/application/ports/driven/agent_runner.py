@@ -25,6 +25,10 @@ class AgentTurn:
     # job, and it must be exhaustive: a role silently falling back to "human"
     # feeds the agent its own words back as the customer's.
     history: Tuple[Tuple[MessageRole, str], ...] = ()
+    # True when the channel decided this message starts a NEW session (the
+    # customer was away long enough). The agent greets only on a new session and
+    # otherwise continues the thread without re-greeting.
+    new_session: bool = False
 
 
 class AgentRunnerPort(Protocol):

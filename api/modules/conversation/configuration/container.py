@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Callable, Optional
 
 from modules.conversation.application.ports.driven.agent_runner import (
@@ -187,6 +188,8 @@ def build_container(
     whatsapp_media=None,
     transcriber=None,
     whatsapp_outbound: bool = False,
+    session_idle_after: Optional[timedelta] = None,
+    greeting_idle_after: Optional[timedelta] = None,
 ) -> ConversationContainer:
     """Build the conversation module wiring.
 
@@ -278,6 +281,9 @@ def build_container(
             agent_runner_factory(container),
             clock,
             conversation_repository=conversation_repository,
+            order_service=order_service,
+            session_idle_after=session_idle_after,
+            greeting_idle_after=greeting_idle_after,
         )
         container.handle_incoming_message_use_case = handler
         container.reply_as_client_use_case = ReplyAsClientForConversationUseCase(

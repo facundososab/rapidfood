@@ -68,6 +68,7 @@ def _order_adapter(**overrides) -> OrderServiceAdapter:
         cancel_order=stub("cancel_order"),
         create_payment_checkout=stub("create_payment_checkout"),
         cancel_superseded_checkout=stub("cancel_superseded_checkout"),
+        reset_conversation_order=stub("reset_conversation_order"),
     )
 
 
@@ -299,6 +300,21 @@ def test_order_mutation_survives_a_failing_cancellation():
     )
 
     assert result.order_id == "o-1"
+
+
+def test_order_reset_active_order_returns_the_new_draft_id():
+    reset = StubUseCase(
+        result=SimpleNamespace(
+            previous_order_id="old", order_id="new-draft", created=True
+        )
+    )
+    adapter = _order_adapter(reset_conversation_order=reset)
+
+    order_id = adapter.reset_active_order("biz-1", "conv-1")
+
+    assert order_id == "new-draft"
+    assert reset.commands[0].business_config_id == "biz-1"
+    assert reset.commands[0].conversation_id == "conv-1"
 
 
 def test_order_draft_creation_is_marked_as_agent():

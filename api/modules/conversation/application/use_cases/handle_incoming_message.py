@@ -2,12 +2,16 @@
 
 Channel-agnostic by design: WhatsApp, LangSmith and the panel all normalize their
 inbound to (context, text) and call THIS use case. It owns the turn policy —
-idempotency and human takeover (pause) — so a channel driver can never diverge:
-persist USER -> (skip agent if a human took over) -> run agent -> persist ASSISTANT.
+idempotency, human takeover (pause) and the idle-session boundary — so a channel
+driver can never diverge: persist USER -> (skip agent if a human took over) ->
+(if the conversation went idle, close the stale order and start a fresh one) ->
+run agent -> persist ASSISTANT.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -25,8 +29,13 @@ from modules.conversation.application.ports.driven.conversation_repository impor
 from modules.conversation.application.ports.driven.message_repository import (
     MessageRepositoryPort,
 )
+from modules.conversation.application.ports.driven.order_service import (
+    OrderServicePort,
+)
 from modules.conversation.domain.models.message import Message
 from modules.conversation.domain.value_objects import MessageRole, MessageStatus
+
+logger = logging.getLogger(__name__)
 
 
 def message_id_for(context: AgentExecutionContext) -> str:
@@ -44,6 +53,20 @@ def message_id_for(context: AgentExecutionContext) -> str:
         return str(UUID(str(external)))
     except (ValueError, AttributeError, TypeError):
         return str(uuid5(NAMESPACE_URL, f"{context.conversation_id}:{external}"))
+
+
+def _to_naive_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """Normalize a datetime to naive UTC so aware/naive values can be compared.
+
+    The clock returns timezone-aware UTC while timestamps read back from the DB
+    are naive; comparing them directly raises. Treating a naive value as UTC is
+    correct here because everything we persist is stored as UTC wall time.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,11 +96,21 @@ class HandleIncomingMessageUseCase:
         agent_runner: AgentRunnerPort,
         clock: ClockPort,
         conversation_repository: Optional[ConversationRepositoryPort] = None,
+        order_service: Optional[OrderServicePort] = None,
+        session_idle_after: Optional[timedelta] = None,
+        greeting_idle_after: Optional[timedelta] = None,
     ) -> None:
         self._message_repository = message_repository
         self._agent_runner = agent_runner
         self._clock = clock
         self._conversation_repository = conversation_repository
+        self._order_service = order_service
+        # Idle > session_idle_after starts a NEW ordering session: the previous
+        # unfinished order is closed and a fresh draft is opened (silently).
+        self._session_idle_after = session_idle_after
+        # Idle > greeting_idle_after makes the agent greet again; a short pause
+        # (minutes / couple of hours) is just a continuation of the thread.
+        self._greeting_idle_after = greeting_idle_after
 
     def execute(
         self, command: HandleIncomingMessageCommand
@@ -122,18 +155,30 @@ class HandleIncomingMessageUseCase:
                 paused=True,
             )
 
-        history = tuple(
-            (message.role, message.content)
+        previous = [
+            message
             for message in self._message_repository.list_by_conversation(
                 context.conversation_id
             )
             if message.message_id != user_message.message_id
-        )
+        ]
+        history = tuple((message.role, message.content) for message in previous)
+
+        idle = self._idle_gap(previous)
+        if self._starts_new_order_session(idle):
+            # Internal only: never mention to the customer that a new order was
+            # opened. Best-effort — an order-side failure must not break the turn.
+            self._reset_idle_order(context)
 
         # If the agent raises, the USER message stays persisted and the error
         # propagates to the driver (a technical failure, not a business result).
         response = self._agent_runner.run(
-            AgentTurn(message=command.content, context=context, history=history)
+            AgentTurn(
+                message=command.content,
+                context=context,
+                history=history,
+                new_session=self._is_new_session(previous, idle),
+            )
         )
 
         assistant_message = self._message_repository.add(
@@ -159,3 +204,48 @@ class HandleIncomingMessageUseCase:
             return False
         record = self._conversation_repository.get_by_id(conversation_id)
         return bool(record is not None and getattr(record, "agent_paused", False))
+
+    def _idle_gap(self, previous: list[Message]) -> Optional[timedelta]:
+        """Time since the last previous message, or None for the first message."""
+        timestamps = [
+            _to_naive_utc(getattr(message, "created_at", None))
+            for message in previous
+        ]
+        timestamps = [ts for ts in timestamps if ts is not None]
+        if not timestamps:
+            return None
+        now = _to_naive_utc(self._clock.now())
+        if now is None:
+            return None
+        gap = now - max(timestamps)
+        return gap if gap.total_seconds() >= 0 else timedelta(0)
+
+    def _starts_new_order_session(self, idle: Optional[timedelta]) -> bool:
+        return (
+            self._order_service is not None
+            and self._session_idle_after is not None
+            and idle is not None
+            and idle > self._session_idle_after
+        )
+
+    def _is_new_session(
+        self, previous: list[Message], idle: Optional[timedelta]
+    ) -> bool:
+        if not previous:
+            return True  # first message ever: the agent opens the conversation
+        return (
+            self._greeting_idle_after is not None
+            and idle is not None
+            and idle > self._greeting_idle_after
+        )
+
+    def _reset_idle_order(self, context: AgentExecutionContext) -> None:
+        try:
+            self._order_service.reset_active_order(
+                context.business_configuration_id, context.conversation_id
+            )
+        except Exception:
+            logger.exception(
+                "Failed to reset the idle conversation order (conversation=%s)",
+                context.conversation_id,
+            )

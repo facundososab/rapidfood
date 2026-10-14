@@ -78,6 +78,9 @@ from modules.order.application.use_cases.set_pickup_for_order_use_case import (
 from modules.order.application.use_cases.get_or_create_current_draft_use_case import (
     GetOrCreateCurrentDraftUseCase,
 )
+from modules.order.application.use_cases.restart_conversation_order_use_case import (
+    RestartConversationOrderUseCase,
+)
 from modules.order.application.use_cases.get_preparation_time_configuration_use_case import (
     GetPreparationTimeConfigurationUseCase,
 )
@@ -270,6 +273,9 @@ class OrderContainer:
             self.order_repository, self.config_query, self.catalog_query
         )
         self.get_or_create_current_draft_use_case = GetOrCreateCurrentDraftUseCase(
+            self.order_repository, self.start_draft_order_use_case
+        )
+        self.restart_conversation_order_use_case = RestartConversationOrderUseCase(
             self.order_repository, self.start_draft_order_use_case
         )
 

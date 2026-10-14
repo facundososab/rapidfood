@@ -72,6 +72,14 @@ def test_menu_url_reverses_to_carta():
     assert reverse("menu") == "/carta/"
 
 
+def test_carta_is_public_with_and_without_trailing_slash(monkeypatch):
+    """`/carta` (no trailing slash) must open the menu without requiring login."""
+    _patch(monkeypatch, _menu(), SAMPLE_CONTACT)
+
+    assert Client().get("/carta").status_code == 200
+    assert Client().get("/carta/").status_code == 200
+
+
 def test_carta_public_page_renders(monkeypatch):
     _patch(monkeypatch, _menu(), SAMPLE_CONTACT)
 

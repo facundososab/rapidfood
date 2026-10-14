@@ -51,7 +51,9 @@ class LangChainConversationAgentAdapter(AgentRunnerPort):
         agent = create_agent(
             self._model,
             tools,
-            system_prompt=_compose_prompt(self._prompt, self._container, turn.context),
+            system_prompt=_compose_prompt(
+                self._prompt, self._container, turn.context, turn.new_session
+            ),
         )
 
         messages: list[BaseMessage] = [
@@ -114,14 +116,32 @@ def _guard_menu_links(text: str, real_menu_url: Optional[str]) -> str:
     )
 
 
-def _compose_prompt(base_prompt: str, container: Any, context) -> str:
+def _compose_prompt(base_prompt: str, container: Any, context, new_session: bool) -> str:
     """Base policy prompt + the LIVE order state for THIS conversation.
 
     The order (not the chat history) is the source of truth. Showing it on every
     turn is what stops the model from reconstructing the order out of previous
     messages and re-adding items that are already there.
     """
-    return f"{base_prompt}\n\n{_order_state_block(container, context)}"
+    return (
+        f"{base_prompt}\n\n{_session_block(new_session)}"
+        f"\n\n{_order_state_block(container, context)}"
+    )
+
+
+def _session_block(new_session: bool) -> str:
+    """Tell the agent whether to greet again or just continue the thread."""
+    header = "SESIÓN (para el saludo)"
+    if new_session:
+        return (
+            f"{header}\nEl cliente vuelve después de un buen rato: es una charla "
+            "NUEVA. Saludá breve y natural y retomá desde cero; no arrastres "
+            "detalles del pedido anterior."
+        )
+    return (
+        f"{header}\nLa charla venía en curso: NO vuelvas a saludar. Seguí el hilo "
+        "como si no hubiera pasado nada (nada de \"¡Hola!\" de nuevo)."
+    )
 
 
 def _order_state_block(container: Any, context) -> str:

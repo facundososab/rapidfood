@@ -147,6 +147,21 @@ WHATSAPP_TRANSCRIPTION_MODEL: str = os.environ.get(
 # error instead of inventing a URL.
 MENU_PUBLIC_BASE_URL: str = os.environ.get("MENU_PUBLIC_BASE_URL", "")
 
+# Conversation session boundaries, in hours of inactivity between messages.
+#   - CONVERSATION_SESSION_IDLE_HOURS: after this idle time the next inbound
+#     message starts a NEW ordering session — the previous unfinished order
+#     (draft / unpaid pending) is closed and a fresh draft opened, internally and
+#     without telling the customer.
+#   - CONVERSATION_GREETING_IDLE_HOURS: after this idle time the agent greets
+#     again; a shorter pause is treated as a continuation of the same thread
+#     (no repeated "¡Hola!").
+CONVERSATION_SESSION_IDLE_HOURS: float = float(
+    os.environ.get("CONVERSATION_SESSION_IDLE_HOURS", "2")
+)
+CONVERSATION_GREETING_IDLE_HOURS: float = float(
+    os.environ.get("CONVERSATION_GREETING_IDLE_HOURS", "12")
+)
+
 # LangSmith tracing (LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT /
 # LANGSMITH_WORKSPACE_ID / LANGSMITH_ENDPOINT) is NOT copied into Django
 # settings on purpose: the LangChain/LangSmith client reads os.environ directly,
