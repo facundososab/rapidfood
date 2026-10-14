@@ -45,6 +45,7 @@ Opcionalmente, `api/.env` y `ui/.env` se cargan primero como override local por 
 | `BACKEND_PORT` / `UI_PORT`                        | Puertos publicados por Docker Compose                              | `8000` / `8001`                                             |
 | `NGROK_AUTHTOKEN`                                 | Token del agente ngrok (requerido por el servicio `ngrok`)         | _(vacío)_                                                   |
 | `NGROK_DOMAIN`                                    | Dominio reservado que el túnel publica hacia `backend:8000`        | `hypsicephalic-decisive-lavette.ngrok-free.dev`             |
+| `MENU_PUBLIC_BASE_URL`                            | Dominio público base de la carta digital (`<base>/carta/`); vacío = el agente no comparte link | _(vacío)_                         |
 
 ## Auth del personal (Supabase)
 
@@ -173,6 +174,61 @@ usa **texto libre dentro de la ventana de 24h**; fuera de la ventana WhatsApp ex
 > crear la app en Meta, requisitos del número (sin WhatsApp asociado), access token
 > permanente, app secret, webhook y solución de problemas.
 
+### Carta digital (menú público)
+
+La **carta digital** es una página pública de solo lectura (`/carta/`) con el menú y los
+**precios en vivo**. El agente de WhatsApp comparte el link cuando el cliente lo pide.
+No requiere login (es un endpoint `AllowAny`).
+
+**Qué se necesita**
+
+- La UI levantada (sirve la página `/carta/`) y el backend (sirve los dos endpoints
+  públicos: `GET /api/catalog/menu/` y `GET /api/conversation/public-contact/`).
+- `MENU_PUBLIC_BASE_URL` con el dominio público que verá el cliente. El agente arma el
+  link como `"<MENU_PUBLIC_BASE_URL>/carta/"`. Si queda vacío, el agente responde un
+  mensaje amigable en vez de inventar una URL; la página `/carta/` sigue funcionando
+  igual.
+
+**Local (sin Docker)**
+
+1. Agregá la variable al `.env` de la raíz (apuntá al puerto de la UI):
+
+   ```bash
+   MENU_PUBLIC_BASE_URL=http://localhost:8001
+   ```
+
+2. (Re)iniciá la API y el panel con el `.env` cargado:
+
+   ```bash
+   cd api && uv run python manage.py runserver        # → http://127.0.0.1:8000
+   cd ui  && python manage.py runserver 8001          # → http://127.0.0.1:8001
+   ```
+
+3. Abrí la carta en **http://localhost:8001/carta/**.
+
+   > El panel lee la API con `RAPIDFOOD_API_BASE_URL` (default `http://localhost:8000`).
+   > Si tu API corre en otro puerto, ajustá esa variable también.
+
+**Docker Compose**
+
+El servicio `proxy` (nginx) manda `/api/` al backend y **todo lo demás a la UI**, así que
+`<dominio>/carta/` se sirve solo. Seteá la variable en el `.env` de la raíz y levantá el
+stack:
+
+```bash
+# Con el túnel ngrok ya configurado (ver sección "Túnel ngrok"):
+MENU_PUBLIC_BASE_URL=https://hypsicephalic-decisive-lavette.ngrok-free.dev
+docker compose up --build
+# Local sin túnel (accedé por el puerto publicado de la UI):
+# MENU_PUBLIC_BASE_URL=http://localhost:8001
+```
+
+Luego abrí `<MENU_PUBLIC_BASE_URL>/carta/`. La carta es **read-only**, muestra solo
+productos **disponibles**, resuelve precios en vivo y responde `Cache-Control: no-store`.
+
+> Detalle de endpoints, decisiones y plan multi-negocio:
+> [`docs/carta-digital.md`](docs/carta-digital.md).
+
 ## Setup sin Docker (todo local)
 
 Requiere **PostgreSQL**, **uv** y **Python 3.13**. Solo difieren la instalación/gestión de
@@ -267,6 +323,7 @@ Guías en `docs/`:
 
 - [`docs/reglas-de-calculo.md`](docs/reglas-de-calculo.md) — cómo se calcula el **precio total**, el **costo de envío** y el **tiempo de entrega** (fórmulas, ejemplos y referencias al código).
 - [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) — **conectar un número de WhatsApp**: crear la app en Meta, requisitos del número, credenciales (access token, app secret, verify token), webhook y problemas comunes.
+- [`docs/carta-digital.md`](docs/carta-digital.md) — **carta digital pública**: endpoints, link desde el agente, configuración y plan multi-negocio.
 - [`docs/ARCHITECTURE-GUIDE.md`](docs/ARCHITECTURE-GUIDE.md) — arquitectura hexagonal y decisiones de diseño.
 - [`docs/modelo-dominio.md`](docs/modelo-dominio.md) — modelo de dominio.
 - [`docs/order-state-machine.md`](docs/order-state-machine.md) — máquina de estados del pedido.

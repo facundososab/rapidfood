@@ -28,6 +28,9 @@ from modules.catalog.application.use_cases.list_prices_use_case import (
 from modules.catalog.application.use_cases.list_products_use_case import (
     ListProductsUseCase,
 )
+from modules.catalog.application.use_cases.get_public_menu_use_case import (
+    GetPublicMenuUseCase,
+)
 from modules.catalog.application.use_cases.set_discount_use_case import (
     SetDiscountUseCase,
 )
@@ -46,6 +49,9 @@ from modules.catalog.infrastructure.adapters.driven.prisma.price_repository impo
 from modules.catalog.infrastructure.adapters.driven.prisma.product_repository import (
     PrismaProductRepository,
 )
+from modules.catalog.infrastructure.adapters.driven.prisma.public_menu_read_adapter import (
+    PrismaPublicMenuReadAdapter,
+)
 from shared.infrastructure.uuid_generator import UuidGenerator
 
 
@@ -54,6 +60,7 @@ from modules.catalog.infrastructure.adapters.driven.prisma.variant_repository im
 from modules.catalog.infrastructure.adapters.driven.prisma.ingredient_repository import PrismaIngredientRepository
 from modules.catalog.infrastructure.adapters.driven.prisma.variant_ingredient_repository import PrismaVariantIngredientRepository
 from modules.catalog.infrastructure.adapters.driven.prisma.modifier_repository import PrismaModifierRepository
+from modules.catalog.infrastructure.adapters.driven.cloudinary.image_storage_adapter import CloudinaryImageStorageAdapter
 
 from modules.catalog.application.use_cases.create_variant_use_case import CreateVariantUseCase
 from modules.catalog.application.use_cases.update_variant_use_case import UpdateVariantUseCase
@@ -68,6 +75,7 @@ from modules.catalog.application.use_cases.create_modifier_option_use_case impor
 from modules.catalog.application.use_cases.update_modifier_option_use_case import UpdateModifierOptionUseCase
 from modules.catalog.application.use_cases.delete_modifier_group_use_case import DeleteModifierGroupUseCase
 from modules.catalog.application.use_cases.delete_modifier_option_use_case import DeleteModifierOptionUseCase
+from modules.catalog.application.use_cases.upload_product_image_use_case import UploadProductImageUseCase
 
 class CatalogContainer:
     def __init__(self) -> None:
@@ -80,6 +88,7 @@ class CatalogContainer:
         ingredients = PrismaIngredientRepository()
         variant_ingredients = PrismaVariantIngredientRepository()
         modifiers = PrismaModifierRepository()
+        image_storage = CloudinaryImageStorageAdapter()
 
         self.create_product = CreateProductUseCase(product_repo=products, category_repo=categories, id_generator=id_generator, variant_repo=variants)
         self.delete_product = DeleteProductUseCase(products)
@@ -97,6 +106,9 @@ class CatalogContainer:
         self.list_products = ListProductsUseCase(products)
         self.list_prices = ListPricesUseCase(prices)
         self.list_categories = ListCategoriesUseCase(categories)
+        self.get_public_menu = GetPublicMenuUseCase(
+            PrismaPublicMenuReadAdapter()
+        )
         self.get_product = GetProductUseCase(products, categories, prices)
         self.update_product = UpdateProductUseCase(products, categories, prices)
 
@@ -113,6 +125,7 @@ class CatalogContainer:
         self.update_modifier_option = UpdateModifierOptionUseCase(modifiers)
         self.delete_modifier_group = DeleteModifierGroupUseCase(modifiers)
         self.delete_modifier_option = DeleteModifierOptionUseCase(modifiers)
+        self.upload_product_image = UploadProductImageUseCase(products, image_storage)
 
 @lru_cache(maxsize=1)
 def get_catalog_container() -> CatalogContainer:

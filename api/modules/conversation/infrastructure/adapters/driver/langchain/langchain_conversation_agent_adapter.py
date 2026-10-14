@@ -28,14 +28,26 @@ from modules.conversation.infrastructure.adapters.driver.langchain.tools import 
 
 
 class LangChainConversationAgentAdapter(AgentRunnerPort):
-    def __init__(self, container: Any, model: Any, prompt: str = SYSTEM_PROMPT) -> None:
+    def __init__(
+        self,
+        container: Any,
+        model: Any,
+        prompt: str = SYSTEM_PROMPT,
+        menu_public_url: Optional[str] = None,
+    ) -> None:
         self._container = container
         self._model = model
         self._prompt = prompt
+        self._menu_public_url = menu_public_url
 
     def run(self, turn: AgentTurn) -> str:
         turn_state: dict = {}
-        tools = build_tools(self._container, turn.context, turn_state)
+        tools = build_tools(
+            self._container,
+            turn.context,
+            turn_state,
+            menu_public_url=self._menu_public_url,
+        )
         agent = create_agent(
             self._model,
             tools,
@@ -48,9 +60,10 @@ class LangChainConversationAgentAdapter(AgentRunnerPort):
         messages.append(HumanMessage(content=turn.message))
 
         result = agent.invoke({"messages": messages}, _trace_config(turn))
-        return _guard_payment_links(
+        text = _guard_payment_links(
             _final_text(result["messages"]), turn_state.get("checkout_url")
         )
+        return _guard_menu_links(text, turn_state.get("menu_url"))
 
 
 # Any URL pointing at a Mercado Pago checkout. Used to stop the model from
@@ -76,6 +89,27 @@ def _guard_payment_links(text: str, real_checkout_url: Optional[str]) -> str:
         return _PAYMENT_LINK_RE.sub(real_checkout_url, text)
     return _PAYMENT_LINK_RE.sub(
         "(no pude generar el link de pago en este momento, ¿querés que reintente?)",
+        text,
+    )
+
+
+# Any URL pointing at the public digital menu (a "/carta/" path). Same purpose
+# as the payment guard: only the URL returned by get_menu_link in THIS turn is
+# allowed through, so a hallucinated menu domain never reaches the customer.
+_MENU_LINK_RE = re.compile(
+    r"https?://[^\s\)\]]*/carta/?[^\s\)\]]*",
+    re.IGNORECASE,
+)
+
+
+def _guard_menu_links(text: str, real_menu_url: Optional[str]) -> str:
+    """Never let a menu URL the backend did not produce reach the customer."""
+    if not _MENU_LINK_RE.search(text):
+        return text
+    if real_menu_url:
+        return _MENU_LINK_RE.sub(real_menu_url, text)
+    return _MENU_LINK_RE.sub(
+        "(no tengo el link de la carta en este momento, ¿querés que lo intente de nuevo?)",
         text,
     )
 
@@ -256,8 +290,9 @@ def build_agent_runner(
     api_key: str,
     prompt: Optional[str] = None,
     provider: str = "groq",
+    menu_public_url: Optional[str] = None,
 ) -> LangChainConversationAgentAdapter:
     model = build_agent_model(model_name, api_key, provider=provider)
     return LangChainConversationAgentAdapter(
-        container, model, prompt or SYSTEM_PROMPT
+        container, model, prompt or SYSTEM_PROMPT, menu_public_url=menu_public_url
     )
